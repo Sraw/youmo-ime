@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
@@ -47,6 +48,7 @@ class KeyboardTapsTest {
     // 061-neighbour-18key: pinyin's 18 keys' tap, a block of its own past the 14 keys' (双拼's 18 keys send the same
     // G18 codes as codes): the G18 code and its place back, whatever the session
     @Test
+    @Uat("PY-152")
     fun aPinyinEighteenKeysTapComesBackAsItsG18CodeAndPlace() {
         for (nineKeys in listOf(true, false)) {
             for (code in NineKeyLetters.G18.codes) {

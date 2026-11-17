@@ -490,6 +490,7 @@ class EnginesTest : EnginesFixture() {
     // 061-neighbour-groups: 双拼's 18 keys and 大千 read a key tapped by its neighbour's edge as that key unless 纠错 is
     // off. 小鹤 [JK][XC] with JK tapped toward H is hao; 大千 ㄒㄠ (xao spells nothing) with ㄒ tapped toward ㄏ is hao
     @Test
+    @Uat("PY-150", "SP-48")
     fun shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff() {
         val engines = Engines(::load, null)
         fun tapped(im: String, keys: String, touches: List<Touch>): List<String> {

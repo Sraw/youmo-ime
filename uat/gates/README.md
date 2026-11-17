@@ -22,7 +22,7 @@ first start moves them); a released build in gate 3 before 0.6.0 has no pack to 
 
 The checks (`phase.py check`), the same after every upgrade and restore: the fixtures' settings
 (括号成对 关, 键盘高度 高, 性能档位 中档 in the file and on the settings page), the input method list
-and order, 繁体 on (`guojia` gives 國家), the punctuation map (`,` gives 、), the custom phrase
+and order, 繁体 on (`guojia` gives 國家), the punctuation (the fixtures' edited map gone since 0.6.1, ST-145: `,` gives the stock ，), the custom phrase
 (`dz`), the learned word (`jingmiaoyu` gives 鲸喵屿 first), each read from the files as fcitx reads
 them and typed on the test page (from `host-config/` and `host-data/` in the app's own storage; for a
 v0.3.x build installed in gate 3, from `config/` and `data/` on the external storage, where it keeps

@@ -370,6 +370,7 @@ class NeighbourSlipTest {
     // 注音九键 (read since the user's 11-16, over -2): [ㄖㄥㄩ][ㄅㄉㄚ], spelling nothing as typed, with ㄖㄥㄩ
     // tapped at its very left edge, toward ㄈㄌㄝ, reads fa and la; a little in (-0.45), past the floor, nothing
     @Test
+    @Uat("PY-151")
     fun zhuyinsNineKeysReadAGroupAsTheOneNextToIt() {
         val keys = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.NINE, neighbours = true)
         val r = ZhuyinKeys.groupCode(10)

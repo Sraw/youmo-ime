@@ -41,7 +41,9 @@ PIECES = {"蓝鲸花园": [("lanjinghuayuan", "蓝鲸花园")], "幽默": [("you
           "日": [("ri", "日")], "鲸喵屿": [("jing", "鲸"), ("miao", "喵"), ("yu", "屿")],
           # VO-54: 竫 (jìng, 三级字) as 静 reads
           "徐竫": [("xu", "徐"), ("jing", "竫")],
-          "你好": [("nihao", "你好")], "您好呀": [("ninhao", "您好"), ("ya", "呀")]}
+          "你好": [("nihao", "你好")], "您好呀": [("ninhao", "您好"), ("ya", "呀")],
+          # VO-56 (12-voice.py) adds it through add_word, which types it by these pieces
+          "酒店式公寓": [("jiudian", "酒店"), ("shi", "式"), ("gongyu", "公寓")]}
 
 
 def words(cs):
@@ -206,8 +208,8 @@ def show_hidden(d):
         d.back()
 
 
-def pick_in_download(d, name):
-    """the file picker, open: name in 下载 tapped"""
+def pick_in_download(d, name, after=1.0):
+    """the file picker, open: name in 下载 tapped, then after seconds"""
     # a package the picker has not served yet opens in 最近 (the release build after the debug one
     # had used it): go to 下载 through the roots drawer
     s = d.screen()
@@ -223,7 +225,7 @@ def pick_in_download(d, name):
         d.swipe((540, 1900), (540, 900), 400)
     else:
         raise Blocked(f"下载里没有 {name}")
-    d.tap(n.c, 1.0)
+    d.tap(n.c, after)
 
 
 def import_file(d, name, target=None):
@@ -741,16 +743,31 @@ def wd37(d):
     push(d, "phrases.txt")
     d.step("导入")
     phrase_menu(d, "导入")
-    pick_in_download(d, "phrases.txt")
-    # a toast's window is not in uiautomator's dump: 导入了 1 条短语 is read off the pictures (its count
-    # asserted on the JVM)
-    for i in range(3):
-        time.sleep(0.6)
-        d.shot("full", f"导入后的提示（应为导入了 1 条短语）{i + 1}/3",
-               png=d.adb("exec-out", "screencap", "-p", binary=True))
+    # since 13c01a731 the import says its count on the one undo bar (a Snackbar, in the dump), no
+    # 已添加 bar and no toast
+    pick_in_download(d, "phrases.txt", after=0.1)
+    bar = d.wait(lambda x: x if x.find(contains="导入了 1 条短语") else None, timeout=5, step=0.2,
+                 what="提示条「导入了 1 条短语」")
+    d.shot("full", "导入后页底一个提示条：导入了 1 条短语 / 撤销",
+           png=d.adb("exec-out", "screencap", "-p", binary=True))
+    check(not bar.find(contains="已添加"), f"没有「已添加」：{bar.texts()}")
+    check(bar.find(text="撤销"), f"提示条带撤销：{bar.texts()}")
     shown = d.all_texts()
     check(sum("北京市海淀区" in t for t in shown) == 1, f"导入后 dz 只有一条：{shown}")
     check(any("上海" in t for t in shown), f"导入后有 sh →「上海」：{shown}")
+    d.step("撤销")
+    d.tap_text("撤销", after=0.8)
+    shown = d.all_texts()
+    check(not any("上海" in t for t in shown), f"撤销后 sh 没了：{shown}")
+    check(sum("北京市海淀区" in t for t in shown) == 1, f"撤销后 dz 还在：{shown}")
+    d.shot("full", "撤销后：只少了 sh")
+    d.step("再导入一次")
+    phrase_menu(d, "导入")
+    pick_in_download(d, "phrases.txt", after=0.1)
+    d.wait(lambda x: x if x.find(contains="导入了 1 条短语") else None, timeout=5, step=0.2,
+           what="再导入的提示条")
+    shown = d.all_texts()
+    check(any("上海" in t for t in shown) and sum("北京市海淀区" in t for t in shown) == 1, f"再导入后列表 {shown}")
     d.step("离开再回来")
     d.back()
     home(d, "词库与短语", "自定义短语")

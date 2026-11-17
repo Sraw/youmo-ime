@@ -40,9 +40,10 @@ def back_to_keys(d):
     d._keys = None
 
 
-def copy_range(d, start, n):
+def copy_range(d, start, n, at_copy=None):
     """in the focused field: the cursor at its very start (a tap before the first character: the
-    panel's |< goes to the start of the line only), → start times, 选择, → n times, 复制"""
+    panel's |< goes to the start of the line only), → start times, 选择, → n times, 复制. [at_copy]:
+    called right after 复制, while its notice shows (a line said goes in 1 s since 0.6.1: ST-26's shot)"""
     f = d.field()
     d.tap((f.b[0] + 18, f.b[1] + 55), 0.6)
     edit_panel(d)
@@ -53,16 +54,18 @@ def copy_range(d, start, n):
         d.taps([right.c] * start, gap=0.05, after=0.3)
     d.tap(sel.c, 0.3)
     d.taps([right.c] * n, gap=0.05, after=0.3)
-    ime(d, desc="复制", after=0.6)
+    ime(d, desc="复制", after=0.2 if at_copy else 0.6)
+    if at_copy:
+        at_copy()
     ime(d, desc="把光标移动到结尾", after=0.3)
     back_to_keys(d)
 
 
-def copy_word(d, word):
+def copy_word(d, word, at_copy=None):
     """copy a word of the 长文本 field (the clipboard as 前提)"""
     d.open_page("long")
     i = LONG.index(word)
-    copy_range(d, i, len(word))
+    copy_range(d, i, len(word), at_copy)
 
 
 def clip_items(d):

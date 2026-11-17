@@ -153,8 +153,11 @@ def file_checks(d, version=None, old=False):
     trad = ini_values(cat(d, f"{config}/conf/chttrans.conf"))
     item("繁体 (chttrans.conf EnabledIM)", "engine-pinyin" in [v for k, v in trad.items() if k.startswith("EnabledIM/")],
          trad)
+    # 0.6.1 has no 中文标点 page: an upgrade deletes an edited table and a restore does not bring one back (ST-145),
+    # and the new build's backup has none for an old build to restore
     punc = cat(d, f"{data}/punctuation/punc.mb.zh_CN")
-    item("中文标点 , → 、 (punc.mb.zh_CN)", ", 、" in punc.splitlines(), [l for l in punc.splitlines() if l.startswith(",")])
+    item("中文标点 改过的表不在 (punc.mb.zh_CN 没有 , 、)", ", 、" not in punc.splitlines(),
+         [l for l in punc.splitlines() if l.startswith(",")])
     phrase = cat(d, f"{data}/pinyin/customphrase")
     item("自定义短语 dz (customphrase)", "dz,1=北京市海淀区" in phrase.splitlines(), phrase.strip())
     if version:
@@ -204,7 +207,7 @@ def typed_checks(d, version=None):
     d.type(",")
     time.sleep(0.8)
     t = d.field_text()
-    item("中文标点: , → 、", t == "、", t)
+    item("中文标点: , 是自带的「，」", t == "，", t)
     # the row's dialog, its checked option: the page shows no summary for it
     try:
         home(d, "通用输入")

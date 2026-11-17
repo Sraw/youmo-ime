@@ -590,7 +590,7 @@ class ToolbarUatTest {
     }
 
     @Test
-    @Uat("TB-42")
+    @Uat("TB-42", "TB-68")
     fun theToolbarButtonsPageSetsTheBar() {
         prefs.set(toolbarButtons, "")
         SettingsHarness().use { st ->

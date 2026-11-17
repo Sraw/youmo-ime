@@ -202,8 +202,8 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-14r [P0] 从 0.3.2 升级：导入的大词库转换成压缩的，空间省下一大半
 - **前提**：装着 v0.3.2 正式版（不是要测的这一版），在它里面按 WD-14d 把雾凇拼音并入基础词库，等合好（候选里有「阿坝州」）；再导入 `dict-words.txt` 并入基础词库后把它 **关闭**；记下 **系统设置 → 应用 → 幽默输入法 → 存储** 的"用户数据"大小和词库目录（`adb shell ls -l /sdcard/Android/data/<包名>/files/data/pinyin/dictionaries`：`frost_dict_for_fcitx5.txt`、`dict-words.txt.disable`、`merged.ymd` 约 106 MB）。
-- **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`）；回测试页点输入框弹出键盘，马上打几个字；等到提示「词库格式已升级」（最多三分钟）；看词库目录和应用的存储；打 a b a z h o u、k e m i a o t a n g p u；打开词库页。
-- **预期**：键盘马上弹出、照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；外部的 `files/data` 已经没有了（升级后搬进应用自己的目录，核对好就删了旧的，同 PR-41）；词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，模拟器上 `adb root` 后直接 `adb shell`）里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
+- **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`）；回测试页点输入框弹出键盘，马上打几个字（0.6.0 起安装包不带词库：键盘写着「需要导入文字包才能打字」，点它到「资源包」导入文字包；升级在导入后就开始，191 万词约 7 秒合好，点 **确定** 后马上回测试页弹出键盘，才看得到空闲栏）；等到提示「词库格式已升级」（最多三分钟）；看词库目录和应用的存储；打 a b a z h o u、k e m i a o t a n g p u；打开词库页。
+- **预期**：键盘马上弹出（导入文字包前写着「需要导入文字包才能打字」）、导入后照常打字；空闲栏写着「正在升级词库格式 N%」，进度一路往前走，合好以后提示「词库格式已升级」；外部的 `files/data` 已经没有了（升级后搬进应用自己的目录，核对好就删了旧的，同 PR-41）；词库目录（以 root 看 `/data/data/<包名>/files/host-data/pinyin/dictionaries`，模拟器上 `adb root` 后直接 `adb shell`）里是 `frost_dict_for_fcitx5.txt.gz`（约 24 MB）、`dict-words.txt.gz.disable` 和 `merged.ymd`（约 50 MB），没有 `.txt`、`.tmp` 文件；"用户数据"减去导入的文字包（`/data/user_de/0/<包名>` 约 300 MB；0.3.2 的词库数据在安装包里，"应用大小"从约 362 MB 降到约 51 MB）比升级前少约 120 MB；候选里有「阿坝州」，kemiaotangpu 第一页没有「氪喵糖铺」；词库页里 frost 已开启、约 191 万个词，dict-words 已关闭。这一条在发版时用正式版跑。
 
 ### WD-14s [P1] 升级转换词库时强行停止，再打开接着做完
 - **前提**：B0-设置，按 WD-14h 的前提放好 0.3.1 样子的 `frost.txt`（不放 `old.txt.disable`）。
@@ -233,7 +233,7 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ### WD-14v [P1] 装回 0.3.2 再升级：导入的基础词库藏起来，回来时又有了
 - **前提**：WD-14r 做完的手机（这一版正式版，frost 已开启、dict-words 已关闭，目录里是 `frost_dict_for_fcitx5.txt.gz`、`dict-words.txt.gz.disable`）。
-- **操作**：照用户装回旧版的路（docs/faq.md「想装回旧版本」；正式版不能 `install -r -d` 留着数据降级，手机上只能卸载）：**备份全部**，把文件拷到电脑；卸载；装 v0.3.2 正式版，走完向导，把备份推回"下载"，**从备份恢复** 选它；回测试页打 x i m u z h e n；打开词库页；看词库目录。再在 0.3.2 里按 WD-11 把 `dict-words.txt` 并入基础词库；然后装回这一版正式版（`adb install -r`）；回测试页弹出键盘，等到提示「词库格式已升级」（最多三分钟）；打 x i m u z h e n、k e m i a o t a n g p u；打开词库页；看词库目录。
+- **操作**：照用户装回旧版的路（docs/faq.md「想装回旧版本」；正式版不能 `install -r -d` 留着数据降级，手机上只能卸载）：**备份全部**，把文件拷到电脑；卸载；装 v0.3.2 正式版，走完向导，把备份推回"下载"，**从备份恢复** 选它；回测试页打 x i m u z h e n；打开词库页；看词库目录。再在 0.3.2 里按 WD-11 把 `dict-words.txt` 并入基础词库；然后装回这一版正式版（`adb install -r`）；回测试页弹出键盘（卸载时文字包一起删了：照 WD-14r 从键盘到「资源包」导入文字包，点 **确定** 后马上回测试页弹出键盘），等到提示「词库格式已升级」（最多三分钟）；打 x i m u z h e n、k e m i a o t a n g p u；打开词库页；看词库目录。
 - **预期**：0.3.2 里键盘照常打字，不崩；ximuzhen 的候选里没有「溪木镇」（frost 才有的词，0.3.2 和这一版的基础词库都没有；「阿坝州」基础词库本来就有，测不出），词库页"基础词库"一节没有 frost；词库目录里 `frost_dict_for_fcitx5.txt.gz`、`dict-words.txt.gz.disable` 还在。装回这一版后空闲栏写着「正在升级词库格式 N%」，合好以后：ximuzhen 第一页有「溪木镇」，kemiaotangpu 第一页有「氪喵糖铺」；词库页 frost 已开启、约 191 万个词，dict-words 只有一行、已开启（0.3.2 里新导入的那份胜出）；词库目录里 dict-words 只剩 `dict-words.txt.gz`，没有 `.txt`、`.txt.gz.disable`、`.tmp` 文件。这一条在发版时用正式版跑。
 
 ### WD-14w [P1] 升级转换词库时导入新词库

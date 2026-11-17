@@ -1882,9 +1882,15 @@ def handwriting(d, on, offered=True):
     would go unseen (raised from a reset it blocks the case being reset, not the one that left it); English and
     a password field grey it out (described 「手写，这里用不了」, not found by its name here) and a hardware
     keyboard has none (the toggle is kept for the next field it is offered in)"""
+    tapped = False
     for _ in range(3):
         s = d.screen()
         b = s.find(desc="手写", where="ime")
+        if not b and tapped and not on:
+            # turned off from the candidate bar while it shows predictions (HW-41 after 人 and space): that
+            # 手写 is there only while handwriting is on (docs/other-input-methods.md), so it goes, not dims
+            d._keys = None
+            return
         if not b:
             if not offered and not on:
                 return
@@ -1893,6 +1899,7 @@ def handwriting(d, on, offered=True):
             d._keys = None
             return
         d.tap(b.c, 0.6)
+        tapped = True
     raise Blocked(f"「手写」按钮点了没变成{'开' if on else '关'}")
 
 
@@ -3005,16 +3012,25 @@ def import_packs_ui(d, files=None):
     name = os.path.basename(path)
     if not d.sh(f"ls /sdcard/Download/{name} 2>/dev/null").strip():
         d.adb("push", path, f"/sdcard/Download/{name}", check=True, timeout=600)
+    # the newest in 下载 each time, and scanned: adb push keeps the build's mtime, and the files the cases
+    # put there since (layouts, themes, backups) sorted it off the picker's first screen (0.6.1 release run)
+    d.sh(f"touch /sdcard/Download/{name}; "
+         f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}")
+    # the picker started afresh: one left open or remembering another folder by a case before (seen in
+    # the 0.6.1 release run after PR-52b and ST-101 on loaded hosts) hid the pack from every reset after it
+    for p in re.findall(r"package:(\S*documentsui\S*)", d.sh("pm list packages documentsui")):
+        d.sh(f"am force-stop {p}")
     home(d, "资源包")
     d.tap_text("导入资源包", after=0.5)
     in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"导入资源包没出文件选择：{d.top_activity()}")
     s = d.screen()
-    if s.find(text="近期的文件"):
+    if s.find(text="近期的文件") or not s.find(text=name):
         to_downloads(d, s)
-    d.tap_text(name, scroll=False, after=1.0)
-    s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains="已导入") else None,
+    d.tap_text(name, after=1.0)
+    # the same pack a second time says 「…已经导入过，没有变化…导入完成」 (gate 3's rewrite and backup steps)
+    s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains="已导入") or x.find(contains="导入完成") else None,
                timeout=180, step=1.0, what="导入结果")
     if not s.find(contains="文字包"):
         raise Blocked(f"文字包没导入：{s.texts()[:6]}")

@@ -18,6 +18,7 @@ import java.io.File
 import java.time.Duration
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
@@ -136,6 +137,7 @@ class SettingsPagesTest {
      * there: a row by its key, a control revealed and shown. 按键字符和快捷键 also as 多选 shows it.
      */
     @Test
+    @Uat("ST-168")
     fun everyTappableTextOnAHandPageIsSearched() {
         val st = harness()
         val ctx = st.activity

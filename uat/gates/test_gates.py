@@ -42,9 +42,12 @@ class FileChecksTest(unittest.TestCase):
     class FakeDevice:
         """the files restore-files left, the first start's move into host-config/host-data made"""
 
-        def __init__(self, tars, de_left=(), ext_left=(), moved=True):
-            """moved False: a v0.3.x build installed, nothing moved (gate 3's new → v0.3.x)"""
+        def __init__(self, tars, de_left=(), ext_left=(), moved=True, punc_kept=False):
+            """moved False: a v0.3.x build installed, nothing moved (gate 3's new → v0.3.x).
+            punc_kept: the fixture's edited punctuation table still there; by default gone, as 0.6.1's first
+            start deletes it and its backup has none for an old build to restore (ST-145)"""
             self.tars, self.de_left, self.ext_left, self.moved = tars, de_left, ext_left, moved
+            self.punc_kept = punc_kept
 
         def root(self, cmd):
             if cmd.startswith("ls -d "):   # what of the old copies is left on the external storage
@@ -52,6 +55,8 @@ class FileChecksTest(unittest.TestCase):
             if cmd.startswith("ls "):   # what of the old native data is left in user_de
                 return " ".join(self.de_left)
             path = cmd.split()[1]
+            if path.endswith("/punctuation/punc.mb.zh_CN") and not self.punc_kept:
+                return ""
             # external.tar has config/ and data/: the move put them here
             if self.moved:
                 path = path.replace(phase.HOST_CONFIG, phase.EXTERNAL + "/config").replace(
@@ -75,6 +80,13 @@ class FileChecksTest(unittest.TestCase):
         self.assertEqual(7, len(res))
         self.assertEqual([], [r for r in res if not r["ok"]])
 
+    def test_an_edited_punctuation_table_left_fails(self):
+        import tarfile
+        v = os.path.join(gates.FIXTURES, "v0.3.2")
+        with tarfile.open(os.path.join(v, "data.tar")) as data, tarfile.open(os.path.join(v, "external.tar")) as ext:
+            res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}, punc_kept=True))
+        self.assertEqual(["中文标点"], [r["item"].split()[0] for r in res if not r["ok"]])
+
     def test_an_old_build_s_files_are_read_where_it_keeps_them(self):
         import tarfile
         v = os.path.join(gates.FIXTURES, "v0.3.2")
@@ -82,7 +94,8 @@ class FileChecksTest(unittest.TestCase):
             # a v0.3.x build (gate 3's new → v0.3.x) keeps config/ and data/ on the external storage (F4975)
             (True, []),
             # read where this build keeps them, the old build's files are not found: every host item fails
-            (False, ["性能档位", "输入法", "繁体", "中文标点", "自定义短语"]),
+            # (but 中文标点, which passes on no edited table)
+            (False, ["性能档位", "输入法", "繁体", "自定义短语"]),
         ]
         for old, failed in rows:
             with self.subTest(old=old), tarfile.open(os.path.join(v, "data.tar")) as data, \
@@ -134,7 +147,8 @@ class FileChecksTest(unittest.TestCase):
 
     def test_a_missing_file_fails_its_items(self):
         res = phase.file_checks(self.FakeDevice({}))
-        self.assertEqual([], [r["item"] for r in res if r["ok"]])
+        # but 中文标点: no table at all is the stock punctuation, what 0.6.1 leaves
+        self.assertEqual(["中文标点"], [r["item"].split()[0] for r in res if r["ok"]])
 
     def test_the_input_methods_out_of_order_fail(self):
         import io

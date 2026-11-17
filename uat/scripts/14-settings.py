@@ -11,6 +11,14 @@ import zipfile
 from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, in_picker, pinyin_keyboard, script, to_downloads)
 
 
+def debuggable(d, what):
+    """the debug build only: a release build is not debuggable, `run-as` there prints its refusal to stderr and
+    nothing to stdout, so a check on its output passes or fails for nothing (0.6.1 release run: ST-143, ST-164, ST-175)"""
+    import uat
+    if uat.BUILD == "release":
+        raise Blocked(f"正式包不能 run-as（{what}）：在 debug 包上跑")
+
+
 def kb_box(d, s=None):
     s = s or d.screen()
     kb = s.find(rid="keyboard_view", where="ime")
@@ -685,8 +693,7 @@ def st26(d):
     # (UndoChipTest.withAnimationsOffItIsInPlaceAndOpaqueAtOnce): a recording cannot tell it, the
     # notice's first frame being three quarters of the way in already; here a look
     d.step("禁用动画时的提示")
-    script("05-toolbar").copy_word(d, "公园")
-    d.shot("full", "禁用动画，复制后的提示")
+    script("05-toolbar").copy_word(d, "公园", at_copy=lambda: d.shot("full", "禁用动画，复制后的提示"))
     # Android's own 移除动画 does the same with the setting off
     d.step("系统移除动画")
     appearance_tab(d, "大小与样式")
@@ -695,8 +702,7 @@ def st26(d):
     try:
         d.open_page("text")
         sys0, _ = record_toolbar(d)
-        script("05-toolbar").copy_word(d, "公园")
-        d.shot("full", "系统移除动画，复制后的提示")
+        script("05-toolbar").copy_word(d, "公园", at_copy=lambda: d.shot("full", "系统移除动画，复制后的提示"))
     finally:
         d.sh("settings put global animator_duration_scale 1")
     check(sys0 <= 1, f"系统移除动画后工具栏仍有 {sys0} 个过渡帧")
@@ -1359,7 +1365,17 @@ def dialog_text(d, way, pinyin, word):
 def dialog_text_field(d, way):
     """上滑 or 下滑 set to 文字: its field, the one on screen (the other cards folded)"""
     dialog_way(d, way, "文字")
-    eds = [n for n in d.screen().app() if n.cls.endswith("EditText")]
+    # where it stays: the dialog grows with the card opened and centres itself again a moment later, past the
+    # Dumper's quiet wait; a field read before that was tapped below itself and 好 went in ahead of the old text
+    # (0.6.1 release run: ST-106, KB-72)
+    eds, last = [], None
+    for _ in range(10):
+        eds = [n for n in d.screen().app() if n.cls.endswith("EditText")]
+        at = [n.b for n in eds]
+        if at == last:
+            break
+        last = at
+        time.sleep(0.3)
     if len(eds) != 1:
         raise Blocked(f"{way}的文字框不是屏上唯一的输入框：{[n.text for n in eds]}")
     return eds[0]
@@ -1905,6 +1921,7 @@ def typing_xi(d):
 
 @case("ST-143", base="B0-设置", mutates=True)
 def st143(d):
+    debuggable(d, "删启动标记")
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统深色模式", False)
     push_shift060_pack(d, "uat-shift060")
@@ -1982,6 +1999,7 @@ def unseen_notice(d):
 
 @case("ST-175", base="B0-设置", mutates=True)
 def st175(d):
+    debuggable(d, "删启动标记")
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统深色模式", False)
     pinyin_keyboard(d, "18 键")
@@ -2289,6 +2307,7 @@ def st149(d):
     import_layout(d, "uat-not-text")
     check(d.wait_text("这个文件不是布局", timeout=8, where="all", contains=True), f"没说不是布局：{d.screen().texts('all')[:10]}")
     d.tap_text("确定", where="all", scroll=False, after=1.5)
+    debuggable(d, "看 files/layouts")
     check(d.sh(f"run-as {PKG} ls files/layouts 2>/dev/null").strip() == "", "拒绝后留下了文件")
     return "不合格的列出「显示的字太长」；不是文字的说不是布局；什么都没留下"
 
@@ -2436,6 +2455,7 @@ def st163(d):
 
 @case("ST-164", base="B0-设置", mutates=True)
 def st164(d):
+    debuggable(d, "删布局文件")
     import_uat_qwerty(d, use=["拼音"])
     check("哈哈" in types_haha(d), "拼音的 a 键没打出「哈哈」")
     d.step("布局文件不见了")

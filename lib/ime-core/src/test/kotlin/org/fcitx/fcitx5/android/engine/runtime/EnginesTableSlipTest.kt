@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.pinyin.Near
@@ -34,6 +35,7 @@ class EnginesTableSlipTest : EnginesFixture() {
     private val tap = Action.Key('e', touch = Touch(0.45f, 0f, 36f, 50f, listOf(Near('r', 1f, 0f))))
 
     @Test
+    @Uat("TBL-56")
     fun aSlipIntoAnEmptyCodeIsReadAsTheKeyMeantUnlessSlipsAreOff() {
         val engines = engines()
         engines.type(InputMethodCatalog.CANGJIE, "ab")
@@ -48,6 +50,7 @@ class EnginesTableSlipTest : EnginesFixture() {
     private val towardW = Action.Key('e', touch = Touch(-0.45f, 0f, 36f, 50f, listOf(Near('w', -1f, 0f))))
 
     @Test
+    @Uat("TBL-54")
     fun aCodeReadFromASlipWaitsThenTheNextKeyThatCannotGoOnCommitsIt() {
         val engines = engines()
         engines.type(InputMethodCatalog.CANGJIE, "ab")

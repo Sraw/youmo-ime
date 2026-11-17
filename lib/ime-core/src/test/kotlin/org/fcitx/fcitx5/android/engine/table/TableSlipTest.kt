@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.pinyin.Near
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
@@ -42,6 +43,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun aKeyThatMakesAnEmptyCodeIsReadAsTheOneItsTapLeansTo() {
         // abe leads nowhere; the tap at e's right edge, toward r
         val (_, s) = session().tap("ab", 'e', e(0.45f))
@@ -61,6 +63,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun theNearestKeyThatLeadsOnIsTaken() {
         val nowhereRight = dictionary("ab 丙", "abw 乙", "abww 乙乙", "abd 丁", "abdd 丁丁")
         // r would be nearer, but abr leads nowhere: the next nearest that leads on
@@ -71,12 +74,14 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aCodeWithEntriesIsNeverChanged() {
         val withE = dictionary("ab 丙", "abe 月", "abee 月月", "abr 甲", "abrr 甲甲")
         assertEquals("abe", session(dictionary = withE).tap("ab", 'e', e(0.49f)).second.preedit)
     }
 
     @Test
+    @Uat("TBL-55")
     fun aCodesFirstKeyIsNeverRead() {
         // nothing typed: a key leading nowhere is the app's, as without a place
         val noE = dictionary("r 白", "ra 白白")
@@ -86,6 +91,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aFullCodesNextKeyStartsTheNextCode() {
         // abrr is full: e starts a code of its own, committing 甲甲 as without a place
         val (commit, s) = session().tap("abrr", 'e', e(0.49f))
@@ -94,6 +100,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun theWildcardIsNeverReadAsAnotherKey() {
         val wild = TableOptions(noMatchAutoSelectLength = 0, matchingKey = 'z')
         // a code with the wildcard in it: as typed
@@ -112,6 +119,7 @@ class TableSlipTest {
     private fun language(): TableLanguage = handwritingData.let { TableLanguage(TextWords(it.model, it.wordIndex)) }
 
     @Test
+    @Uat("TBL-55")
     fun aKeyAfterAWholeCodeIsReadOnlyAtTheEdge() {
         // 你 by wq, 们 by wqiu; wqii leads on from wqi, so o toward i is read there but for the topping floor
         val wubi = dictionary("w 人", "wq 你", "wqiu 们", "wqii 他", "o 火", "oo 炎", "u 立")
@@ -135,6 +143,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aKeyIsNeverReadAsOneLeadingToTheTextItWouldCommit() {
         // wqi shows 你 first; u even at y's edge: wqiy's first is 你 again, nothing gained, so 顶字
         val (commit, s) = session(TableOptions.WUBI, dictionary = wubi).tap("wqi", 'u', uTowardY(-0.49f))
@@ -143,6 +152,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aKeyAfterAWholeCodeIsReadOnlyForACodeTheWordModelWeighsAsMuch() {
         // the fixture's model knows 人 alone: wqi's first, 夔, is weighed less than 人 the key would commit, so 顶字 as typed
         val rare = dictionary("wq 人", "wqiy 夔", "o 火", "oo 炎")
@@ -157,6 +167,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aCodeWithAKeyReadAsItsNeighbourNeverCommitsItself() {
         // ab then e read as r: abr's 甲 is no lone candidate here; abw with one entry (乙) waits, a space commits it
         val lone = dictionary("a 工", "ab 丙", "abw 乙", "abd 丁", "abdd 丁丁", "r 白")
@@ -175,6 +186,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun aCodeReadFromASlipWithOneCandidateIsCommittedByAKeyThatCannotGoOn() {
         val lone = dictionary("a 工", "ab 丙", "abw 乙", "abd 丁", "abdd 丁丁", "r 白", "re 白月")
         val full = TableOptions(noMatchAutoSelectLength = 0, autoSelectLength = 3)
@@ -194,6 +206,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun everyKeyReadKeepsItsMarkWhenAnotherGoes() {
         // ab, e read as r, e read as w (abrw), ⌫: abr still has a key read, so r on target does not commit abrr
         val two = dictionary("ab 丙", "abr 甲", "abrr 甲甲", "abrw 甲乙")
@@ -210,6 +223,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun aCodeReadFromASlipWaitsOnlyWhereItWouldHaveCommittedItself() {
         // more than one candidate: the next key goes into the code (仓颉's way), nothing committed
         val two = dictionary("ab 丙", "abw 乙", "abw 乚", "r 白")
@@ -230,6 +244,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun theKeyAfterAWaitingCodeIsReadAsAToppingKeyIs() {
         // abw's lone 乙 waits (abwe's 鬱 held back by 生僻字屏蔽, so not shown); abwe leads on all the same
         val lone = dictionary("ab 丙", "abw 乙", "abwe 鬱", "r 白", "e 月")
@@ -248,6 +263,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun aWaitingCodeIsCommittedOnceWhereTheTableTops() {
         // 五笔: wq, o read as i (wqi: 们 of wqiu), u: wqiu's lone 们 waits; o cannot go on, it commits 们 once
         val wubi = dictionary("w 人", "wq 你", "wqiu 们", "o 火", "oo 炎", "u 立")
@@ -262,6 +278,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun aWaitingCodeIsCommittedByPunctuationASpaceOrASelectionKeyAsAnyCode() {
         val lone = dictionary("ab 丙", "abw 乙")
         val options = TableOptions(noMatchAutoSelectLength = 0, autoSelectLength = 3, selectionKeys = "123")
@@ -274,6 +291,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun ziranmaTopsAsWubiDoes() {
         val ziranma = dictionary("w 人", "wq 你", "wqiu 们", "o 火", "oo 炎")
         val (commit, s) = session(TableOptions.ZIRANMA, dictionary = ziranma).tap("wq", 'o', oTowardI(-0.3f))
@@ -283,6 +301,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun erbiNeverTopsAndItsPinyinKeyIsNeverRead() {
         val erbi = dictionary("ab 丙", "abr 甲", "abp 乙", "r 白", "e 月", "ee 朋")
         // ab is a whole code, but 二笔 tops nothing: e off-centre is read at the floor of an empty code
@@ -297,6 +316,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-55")
     fun wubiPinyinReadsNoKeyAsOneLeadingToPinyinAlone() {
         // abr leads to a pinyin entry only: ab's 丙 topped by e, as typed
         val table = dictionary("ab 丙", "@abr 甲", "e 月", "ee 朋", header = mapOf("拼音" to "@"))
@@ -306,6 +326,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun aKeyPutInMidCodeIsNeverReadAndMovesTheMarks() {
         val mid = dictionary("ab 丙", "abr 甲", "aeb 戊", "aebr 乙")
         val full = TableOptions(noMatchAutoSelectLength = 0, autoSelectLength = 4)
@@ -323,6 +344,7 @@ class TableSlipTest {
     }
 
     @Test
+    @Uat("TBL-54")
     fun noKeyIsReadAsASelectionKeyNorAnEndKey() {
         // ab: e's neighbours r and w are a selection key and an end key here: as typed
         val keys = TableOptions(noMatchAutoSelectLength = 0, selectionKeys = "r", endKeys = "w")
