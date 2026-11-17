@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.junit.Assert.assertEquals
@@ -26,7 +27,7 @@ import org.robolectric.annotation.Config
 /**
  * 双拼's 18 keys: Q WE RT Y U IO P, A SD FG H JK L;, then the separator, Z XC V BN M and
  * backspace; the 14 keys' bottom row. A tap sends the group's code ([NineKeyLetters.G18]),
- * never a letter, and no place across the key yet; corners 1 to 0 from the top row on.
+ * never a letter, and no place across the key (pinyin's 18 keys' does); corners 1 to 0 from the top row on.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -76,17 +77,39 @@ class GroupedKeyboard18Test {
         assertEquals(KeyAction.HostKeyAction(":"), swipe("M"))
     }
 
+    // 061-neighbour-18key: the 18 keys' layout has its two-letter groups lean (060-render-v2 §15); pinyin's 18 keys
+    // send a tap with where across the key it fell (Keyboard.pinyin18Tap), 双拼's the code alone wherever it falls
     @Test
-    fun aTapIsTheCodeAloneWhereverItFalls() {
+    @Uat("PY-152")
+    fun pinyinsTapGoesWithWhereItFellAndShuangpinsIsTheCodeAlone() {
         val we = press("WE")
-        // the 18 keys' layout has none of its taps lean (lean="off", 060-render-v2 §15)
         val k18 = SceneLayouts.of(context, "k18")!!
         val leaning = SceneGroups.leaning(k18.layout, k18.fragments)
-        assertEquals(emptySet<String>(), leaning)
+        assertTrue("we" in leaning && "bn" in leaning && "q" !in leaning)
         assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18, leaning))
         assertEquals(we, GroupedKeyboard.tapped(we, 0.9f, NineKeyLetters.G18, leaning))
-        // a layout's own lean on them: the engine has no places for G18's codes yet (Keyboard.TAPS, P3)
-        assertEquals(we, GroupedKeyboard.tapped(we, 0.1f, NineKeyLetters.G18, setOf("we")))
+        val pinyin = GroupedKeyboard.layout(NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false)
+        val pinyinWe = pinyin.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "WE" }
+            .behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action
+        val code = NineKeyLetters.G18.key('w')
+        for (at in listOf(0f, 0.1f, 0.9f, 1f)) {
+            val sent = GroupedKeyboard.tapped(pinyinWe, at, NineKeyLetters.G18, leaning)
+            assertEquals(KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyin18Tap(code, at)), KeyStates.Virtual), sent)
+            assertEquals(code, Keyboard.tappedCode((sent as KeyAction.SymAction).sym.sym - UNICODE))
+        }
+        // no place (TalkBack's click), a group not leaning (a layout's lean="off"): the code alone
+        assertEquals(pinyinWe, GroupedKeyboard.tapped(pinyinWe, Float.NaN, NineKeyLetters.G18, leaning))
+        assertEquals(pinyinWe, GroupedKeyboard.tapped(pinyinWe, 0.1f, NineKeyLetters.G18, leaning - "we"))
+        // a key of one letter, and pinyin's L though its group is L; (微软 双拼's ing): its place too, for a slip from it
+        // onto a key of two (T9Segmenter weighs nothing of its own); on a keyboard where nothing leans, the code alone
+        for (shown in listOf("Q", "L")) {
+            val key = pinyin.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == shown }
+                .behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action
+            val one = NineKeyLetters.G18.key(shown.lowercase().single())
+            assertEquals(KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyin18Tap(one, 0.9f)), KeyStates.Virtual), GroupedKeyboard.tapped(key, 0.9f, NineKeyLetters.G18, leaning))
+            assertEquals(key, GroupedKeyboard.tapped(key, 0.9f, NineKeyLetters.G18, emptySet()))
+        }
+        assertTrue("l;" in leaning)
     }
 
     // pinyin's 18 keys have no ;: L alone on the key (its long press the resolver's, g18/l: KeyDefaults)

@@ -40,7 +40,7 @@ class ShuangpinSegmenter(
     typos: Boolean = true,
     private val abbreviations: Boolean = true,
     private val neighbours: Boolean = false,
-    private val slipCost: SlipCost = SlipCost(),
+    private val slipCost: SlipCost = SLIP,
 ) : Segmenter {
 
     override val spellsFullPinyin: Boolean get() = false
@@ -185,6 +185,10 @@ class ShuangpinSegmenter(
     private companion object {
         /** Keys are ASCII; see [ShuangpinScheme.isKey]. */
         const val KEYS = 128
+
+        // the loosest floor that turns no sentence typed on target (a tap in the key's middle, σ 0.15) wrong, the
+        // user's 11-16 rule; over -4 one did in each scheme (061-neighbour-18key-impl-report §5)
+        val SLIP = SlipCost(floor = -3.75f)
 
         fun single(syllable: Int) = SyllableMatches(intArrayOf(syllable), intArrayOf(0))
     }

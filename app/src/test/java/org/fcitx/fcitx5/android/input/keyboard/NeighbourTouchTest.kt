@@ -206,21 +206,11 @@ class NeighbourTouchTest {
     }
 
     // 大千: a symbol key's tap goes with the symbol keys around it by their codes; a tone key's none, nor is a tone key
-    // among the keys around (ㄉ has ㄅ to its left, ˇ to its right no neighbour). 注音九键 reads no slip: no tap goes
-    // with a place
+    // among the keys around (ㄉ has ㄅ to its left, ˇ to its right no neighbour)
     @Test
     @Uat("PY-150")
     fun dachensSymbolKeysGoWithTheSymbolKeysAround() {
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        val nine = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)).also { h = it }.start()
-        nine.idle()
-        nine.relayout()
-        nine.tapOff(nine.keyNamed("r2c2"), 0.3f)
-        nine.tapOff(nine.keyNamed("r1c1"), 0.3f)
-        assertEquals(0, nine.api.touches.size)
-        assertTrue(nine.api.calls.toString(), nine.api.calls.count { it.startsWith("sendKey(") } >= 2)
-        nine.close()
-        h = null
         val dachen = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)).also { h = it }.start()
         dachen.idle()
         dachen.relayout()
@@ -230,6 +220,25 @@ class NeighbourTouchTest {
         assertTrue("${d.near}", d.near.all { it.char in ZhuyinKeys.DACHEN.codes })
         dachen.tapOff(dachen.keyNamed("3"), 0.3f)
         assertEquals(1, dachen.api.touches.size)
+    }
+
+    // 注音九键 since the user's 11-16: a group key's tap goes with the group keys around it by their group codes
+    // (ㄆㄊㄛ has ㄎㄑㄟ to its right); the tone key ˉ's none
+    @Test
+    @Uat("PY-151")
+    fun zhuyinsNineGroupKeysGoWithTheGroupKeysAround() {
+        prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
+        val nine = KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)).also { h = it }.start()
+        nine.idle()
+        nine.relayout()
+        nine.tapOff(nine.keyNamed("r2c2"), 0.3f)
+        val groups = (0 until ZhuyinKeys.GROUPS).map(ZhuyinKeys::groupCode)
+        val t = nine.api.touches.single().second
+        assertTrue("${t.near}", t.near(ZhuyinKeys.groupCode(4))!!.nx > 0f)
+        assertTrue("${t.near}", t.near.all { it.char in groups })
+        nine.tapOff(nine.keyNamed("r1c1"), 0.3f)
+        assertEquals(1, nine.api.touches.size)
+        assertTrue(nine.api.calls.toString(), nine.api.calls.count { it.startsWith("sendKey(") } >= 2)
     }
 
     // through the host to the engine: the key's payload, the engine's Keyboard reads its touch

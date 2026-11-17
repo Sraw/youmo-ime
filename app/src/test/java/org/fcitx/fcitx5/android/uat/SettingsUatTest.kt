@@ -319,9 +319,9 @@ class SettingsUatTest {
         assertTrue(st.titles().toString(), st.titles().none { "punctuation" in it.lowercase() || "标点" in it })
         // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
-        // 注音九键 alone reads no slip; pinyin's nine, 14 and 18 keys do (061-neighbour-correction), 双拼's grouped
-        // keyboards and 大千 too (061-neighbour-groups)
-        assertTrue(summary(R.string.im_typos).endsWith(notFor(c.ZHUYIN_NINE)))
+        // every keyboard reads a slip, 注音九键 too since the user's 11-16: no 不适用 line (061-neighbour-correction,
+        // 061-neighbour-groups)
+        assertEquals(s(R.string.im_typos_summary), summary(R.string.im_typos))
         // no 不适用 line names English: the Chinese section's title says it for its rows, and every input
         // method's other rows are English's too
         val chinese = st.preferences().map { it.summary.toString() }

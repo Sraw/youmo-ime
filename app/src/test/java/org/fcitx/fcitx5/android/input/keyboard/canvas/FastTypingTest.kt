@@ -110,8 +110,9 @@ class FastTypingTest {
         h.after(30)
         f.up(1)
         h.idle()
-        // GH's middle then L (one letter, so its plain code, no place), once each: a finger's key typed twice, or the other's lost, fails
-        assertEquals(h.sent().toString(), listOf(tapSym('g', 0.5f), UNICODE + NineKeyLetters.G14.key('l').code), h.sent().map(::symOf))
+        // GH's middle then L's (one letter, its place too, for a slip from it), once each: a finger's key typed twice, or the
+        // other's lost, fails
+        assertEquals(h.sent().toString(), listOf(tapSym('g', 0.5f), tapSym('l', 0.5f)), h.sent().map(::symOf))
     }
 
     // "dui"'s u then i on UI, a finger each: u where the first came down (the left half), then i

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
@@ -20,7 +21,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A 14-key tap with where it fell, [Keyboard.tapKey] (design k14-tap-position §1.3): one character, a code and a place. */
+/** A 14-key tap with where it fell, [Keyboard.tapKey] (design k14-tap-position §1.3): one character, a code and a place; pinyin's 18 keys' the same ([Keyboard.pinyin18Tap]). */
 class KeyboardTapsTest {
 
     private fun recorded() = RecordedSession(PinyinSession(sessionTestData(), T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), spell = true, prediction = false))
@@ -43,6 +44,29 @@ class KeyboardTapsTest {
         assertEquals(Action.Key(g14Code('b'), at = 0.75f), session.actions.single())
     }
 
+    // 061-neighbour-18key: pinyin's 18 keys' tap, a block of its own past the 14 keys' (双拼's 18 keys send the same
+    // G18 codes as codes): the G18 code and its place back, whatever the session
+    @Test
+    fun aPinyinEighteenKeysTapComesBackAsItsG18CodeAndPlace() {
+        for (nineKeys in listOf(true, false)) {
+            for (code in NineKeyLetters.G18.codes) {
+                for (step in listOf(0, 8, 16)) {
+                    val session = recorded()
+                    val c = Keyboard.pinyin18Tap(code, step / 16f)
+                    assertTrue(c in Keyboard.TAPS_18)
+                    Keyboard(session, nineKeys).onEvent(EngineEvent.CHAR, c)
+                    assertEquals("$code $step", Action.Key(code, at = step / 16f), session.actions.single())
+                    assertEquals(code, Keyboard.tappedCode(c))
+                    assertEquals(InputMethodCatalog.PINYIN_KEYS18, KeyboardPair.pinyinKeyed(c))
+                    assertNull(KeyboardPair.shuangpinKeyed(c))
+                }
+            }
+        }
+        assertEquals(Keyboard.TAPS_18.first, Keyboard.pinyin18Tap(NineKeyLetters.G18.key('a'), 0f))
+        assertThrows(IllegalArgumentException::class.java) { Keyboard.pinyin18Tap(NineKeyLetters.G18.key('b'), Float.NaN) }
+        assertThrows(IllegalArgumentException::class.java) { Keyboard.pinyin18Tap(g14Code('b'), 0.5f) }
+    }
+
     @Test
     fun aPlaceJustPastTheKeyIsItsEdgeNotTheNextCodesPlace() {
         assertEquals(Keyboard.tapKey(g14Code('b'), 0f), Keyboard.tapKey(g14Code('b'), -0.01f))
@@ -62,7 +86,7 @@ class KeyboardTapsTest {
     fun noTwoKeyBlocksShareACharacter() {
         val ranges = listOf(
             Keyboard.LETTERS, Keyboard.NINE_DIGITS, Keyboard.NINE_LETTERS, Keyboard.INK..Keyboard.LOOKUP, Keyboard.STROKES,
-            Keyboard.PINYIN_NINE, Keyboard.PINYIN_18, Keyboard.SHUANGPIN_14, Keyboard.TAPS, Keyboard.PLACES,
+            Keyboard.PINYIN_NINE, Keyboard.PINYIN_18, Keyboard.SHUANGPIN_14, Keyboard.TAPS, Keyboard.TAPS_18, Keyboard.PLACES,
             Keyboard.ZHUYIN_NINE, Keyboard.ZHUYIN_FULL,
         )
         // no two blocks overlap, the taps included
@@ -86,7 +110,11 @@ class KeyboardTapsTest {
             g14Code('u').code to 'u',
             // a key of one letter
             Keyboard.tapKey(g14Code('l'), 0.9f) to 'l',
-            // the 18 keys' and the nine keys' 双拼's codes: their key's first letter (no taps of theirs yet)
+            // pinyin's 18 keys' taps (Keyboard.pinyin18Tap): the letter of the half tapped, as the 14 keys'
+            Keyboard.pinyin18Tap(NineKeyLetters.G18.key('b'), 0.75f) to 'n',
+            Keyboard.pinyin18Tap(NineKeyLetters.G18.key('b'), 0.25f) to 'b',
+            Keyboard.pinyin18Tap(NineKeyLetters.G18.key('w'), 1f) to 'e',
+            // the 18 keys' and the nine keys' 双拼's codes: their key's first letter (no taps of theirs)
             0xF8C1 to 'b',
             0xF8C8 to 'i',
             0xF8CB to 'l',

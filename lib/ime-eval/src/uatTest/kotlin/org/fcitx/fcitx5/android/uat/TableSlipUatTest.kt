@@ -56,7 +56,7 @@ class TableSlipUatTest {
         // etn is 乃's whole code, etnj no code: j off-centre is the next code's first, 乃 committed (顶字)
         with(EngineReplay(im = InputMethodCatalog.WUBI)) {
             type("etn")
-            tapJ(-0.35f)
+            tapJ(-0.3f)
             expectText("乃")
             assertEquals("j", preedit)
         }

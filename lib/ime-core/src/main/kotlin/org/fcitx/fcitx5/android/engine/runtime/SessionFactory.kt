@@ -199,9 +199,9 @@ internal class SessionFactory(
                 ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own, neighbours = s.typos), spell = true))
             }
             // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
-            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards. 大千 reads slipped
-            // keys, 注音九键 none (061-neighbour-groups: one sentence typed on target there with no tones went wrong)
-            ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows), spell = true, kind = Kinds.ZHUYIN_NINE))
+            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards. Both read slipped
+            // keys (061-neighbour-groups; 注音九键 since the user's 11-16)
+            ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_NINE))
             ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_DACHEN))
             ENGLISH -> {
                 val data = englishData()

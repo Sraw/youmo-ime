@@ -19,7 +19,7 @@ key r1c2 kind=letter a11y="W E，2"
   hit rect(154,0,309,176)
   anchor 231.5,88 up 0,-1
   text label="WE" alt="2"
-  shortcut="g18/we" letters="we" lean=off
+  shortcut="g18/we" letters="we"
   normal
     text "WE" 200,107.69 system 400 52.5 #ff37474f
     text "2" 274.38,47.78 system 700 28 #ff7a858a
@@ -31,7 +31,7 @@ key r1c3 kind=letter a11y="R T，3"
   hit rect(309,0,463,176)
   anchor 386,88 up 0,-1
   text label="RT" alt="3"
-  shortcut="g18/rt" letters="rt" lean=off
+  shortcut="g18/rt" letters="rt"
   normal
     text "RT" 354.5,107.69 system 400 52.5 #ff37474f
     text "3" 428.38,47.78 system 700 28 #ff7a858a
@@ -68,7 +68,7 @@ key r1c6 kind=letter a11y="I O，6"
   hit rect(771,0,926,176)
   anchor 848.5,88 up 0,-1
   text label="IO" alt="6"
-  shortcut="g18/io" letters="io" lean=off
+  shortcut="g18/io" letters="io"
   normal
     text "IO" 817,107.69 system 400 52.5 #ff37474f
     text "6" 891.38,47.78 system 700 28 #ff7a858a
@@ -105,7 +105,7 @@ key r2c2 kind=letter a11y="S D，9"
   hit rect(180,176,360,351)
   anchor 270,263.5 up 0,-1
   text label="SD" alt="9"
-  shortcut="g18/sd" letters="sd" lean=off
+  shortcut="g18/sd" letters="sd"
   normal
     text "SD" 238.5,283.19 system 400 52.5 #ff37474f
     text "9" 325.38,223.78 system 700 28 #ff7a858a
@@ -117,7 +117,7 @@ key r2c3 kind=letter a11y="F G，0"
   hit rect(360,176,540,351)
   anchor 450,263.5 up 0,-1
   text label="FG" alt="0"
-  shortcut="g18/fg" letters="fg" lean=off
+  shortcut="g18/fg" letters="fg"
   normal
     text "FG" 418.5,283.19 system 400 52.5 #ff37474f
     text "0" 505.38,223.78 system 700 28 #ff7a858a
@@ -141,7 +141,7 @@ key r2c5 kind=letter a11y="J K，）"
   hit rect(720,176,900,351)
   anchor 810,263.5 up 0,-1
   text label="JK" alt="）"
-  shortcut="g18/jk" letters="jk" lean=off
+  shortcut="g18/jk" letters="jk"
   normal
     text "JK" 778.5,283.19 system 400 52.5 #ff37474f
     text "）" 853.62,223.78 system 700 28 #ff7a858a
@@ -153,7 +153,7 @@ key r2c6 kind=letter a11y="L，-"
   hit rect(900,176,1080,351)
   anchor 990,263.5 up 0,-1
   text label="L" alt="-"
-  shortcut="g18/l" letters="l;" lean=off
+  shortcut="g18/l" letters="l;"
   normal
     text "L" 974.25,283.19 system 400 52.5 #ff37474f
     text "-" 1045.38,223.78 system 700 28 #ff7a858a
@@ -190,7 +190,7 @@ key r3c2 kind=letter a11y="X C，！"
   hit rect(313,351,464,527)
   anchor 388.5,439 up 0,-1
   text label="XC" alt="！"
-  shortcut="g18/xc" letters="xc" lean=off
+  shortcut="g18/xc" letters="xc"
   normal
     text "XC" 357,458.69 system 400 52.5 #ff37474f
     icon content-copy 328,374,357,403 #ff7a858a
@@ -216,7 +216,7 @@ key r3c4 kind=letter a11y="B N，？"
   hit rect(616,351,767,527)
   anchor 691.5,439 up 0,-1
   text label="BN" alt="？"
-  shortcut="g18/bn" letters="bn" lean=off
+  shortcut="g18/bn" letters="bn"
   normal
     text "BN" 660,458.69 system 400 52.5 #ff37474f
     text "？" 720.62,398.78 system 700 28 #ff7a858a

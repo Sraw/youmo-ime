@@ -47,11 +47,37 @@ class TouchSimTest {
         assertNotEquals(slipped.map { it.touches }, TouchSim.convert(samples, "qwerty:s0.25:slip:2").map { it.touches })
     }
 
+    // the 18 keys' taps with where across the key they fell, as the app sends them (061-neighbour-18key): every
+    // key its dx from the left edge, to the nearest of the app's 17 places (a key of one letter's too, for a slip
+    // from it); another keyboard's none at all
+    @Test
+    fun theEighteenKeysTapsGoWithTheirPlace() {
+        val g18 = listOf(Sample("nihao".map(NineKeyLetters.G18::key).joinToString(""), "你好", "t"))
+        val tapped = TouchSim.convert(g18, "k18:s0.2:clean")
+        val placed = TouchSim.placed(tapped, NineKeyLetters.G18).single()
+        val taps = placed.taps!!
+        assertEquals(5, taps.size)
+        // dx + 0.5, to a sixteenth
+        for (i in 0 until 5) assertEquals(Math.round((placed.touches!![i]!!.dx + 0.5f) * 16) / 16f, taps[i], 1e-6f)
+        assertEquals(tapped, TouchSim.placed(tapped, NineKeyLetters.STANDARD))
+    }
+
     // the set as tapped, for the device's runner: read back the same
     @Test
     fun aSetTappedIsWrittenAndReadBack() {
         val tapped = TouchSim.convert(samples, "qwerty-ms:s0.3:slip") + Sample("a1", "啊1", "t", touches = listOf(TouchSim.board("qwerty").boxes.touch('a', 20f, 80f), null))
         assertEquals(tapped, EvalSet.parse(tapped.asSequence().map(EvalSet::line)))
+    }
+
+    // the 18 keys' places too, for the device's runner to send each key as the app does (061-neighbour-18key);
+    // a set of places alone (--taps) its touches all none
+    @Test
+    fun aSetTappedWithPlacesIsWrittenAndReadBack() {
+        val g18 = listOf(Sample("nihao".map(NineKeyLetters.G18::key).joinToString(""), "你好", "t"))
+        val placed = TouchSim.placed(TouchSim.convert(g18, "k18:s0.2:clean"), NineKeyLetters.G18)
+        assertEquals(placed, EvalSet.parse(placed.asSequence().map(EvalSet::line)))
+        val taps = listOf(placed.single().copy(touches = null))
+        assertEquals(taps, EvalSet.parse(taps.asSequence().map(EvalSet::line)))
     }
 
     @Test

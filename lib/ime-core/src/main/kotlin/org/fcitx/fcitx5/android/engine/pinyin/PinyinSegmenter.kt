@@ -48,7 +48,7 @@ class PinyinSegmenter(
     neighbours: Boolean = false,
     private val latin: LatinWords? = null,
     private val userLatin: UserLatinWords? = null,
-    private val slipCost: SlipCost = SlipCost(),
+    private val slipCost: SlipCost = SLIP,
 ) : Segmenter {
 
     // the settings' own, shared by the sessions made with them (SettingsMemo)
@@ -187,6 +187,11 @@ class PinyinSegmenter(
 
     private companion object {
         const val VOWELS = "aeiouv"
+
+        // the loosest floor that turns no sentence typed on target (a tap in the key's middle, σ 0.15, both halves
+        // × seeds 1–3) wrong, the user's 11-16 rule: over -2 `deo` with o by i read 得 (dei); a slip that also spells
+        // as typed costs -2 more, so none is read (061-neighbour-18key-impl-report §5)
+        val SLIP = SlipCost(floor = -1.75f)
 
         val ONE = booleanArrayOf(false)
         val BOTH = booleanArrayOf(false, true)

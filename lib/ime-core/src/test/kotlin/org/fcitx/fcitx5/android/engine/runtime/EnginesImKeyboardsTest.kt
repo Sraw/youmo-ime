@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
+import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -120,6 +122,35 @@ class EnginesImKeyboardsTest : EnginesFixture() {
         engines.onEvent(PINYIN, EngineEvent.RESET, 0)
         engines.context(PINYIN, "")
         assertEquals(0, engines.type(PINYIN, "ni").candidates.indexOf("你"))
+        engines.close()
+    }
+
+    // 061-neighbour-18key: pinyin's 18 keys' taps with where they fell (Keyboard.pinyin18Tap) reach its session and
+    // weigh the letters as the 14 keys' do: BN IO is 比 (the likelier) in the middle and as codes alone, 你 tapped
+    // on n and i
+    @Test
+    @Uat("PY-152")
+    fun pinyinsEighteenKeysTapsGoWithWhereTheyFell() {
+        pinyin = PinyinDataBuilder()
+            .unigram("<unk>", -7f, 0f)
+            .unigram("你", -3f, 0f)
+            .unigram("比", -2.5f, 0f)
+            .entry("你", syl("ni"))
+            .entry("比", syl("bi"))
+            .build()
+            .toByteArray()
+        val engines = engines(PINYIN)
+        fun first(codes: List<Int>): String {
+            engines.onEvent(PINYIN, EngineEvent.RESET, 0)
+            engines.context(PINYIN, "")
+            engines.typeCodes(PINYIN, codes)
+            return engines.texts(PINYIN).first()
+        }
+        fun tapped(b: Float, i: Float) = listOf(Keyboard.pinyin18Tap(NineKeyLetters.G18.key('b'), b), Keyboard.pinyin18Tap(NineKeyLetters.G18.key('i'), i))
+        assertEquals("比", first(pinyin18("bi")))
+        assertEquals("比", first(tapped(0.5f, 0.5f)))
+        assertEquals("比", first(tapped(0f, 0f)))
+        assertEquals("你", first(tapped(1f, 0f)))
         engines.close()
     }
 

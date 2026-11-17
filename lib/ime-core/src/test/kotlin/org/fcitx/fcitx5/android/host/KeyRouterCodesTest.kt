@@ -75,21 +75,23 @@ class KeyRouterCodesTest {
 
     // a grouped keyboard's code or a tap's, by the blocks they are taken from: the test follows them if they move
     private fun isGroupedOrTap(c: Int) =
-        c in NineKeyLetters.G14_BLOCK || c in NineKeyLetters.G18_BLOCK || c in NineKeyLetters.NINE_SP_BLOCK || c in Keyboard.TAPS
+        c in NineKeyLetters.G14_BLOCK || c in NineKeyLetters.G18_BLOCK || c in NineKeyLetters.NINE_SP_BLOCK || c in Keyboard.TAPS || c in Keyboard.TAPS_18
 
     // (c) a code reaches the input method whose keyboard it is of alone: pinyin the 14 keys', 双拼
     // the 18 keys' and the nine keys' 双拼's; the other's dropped, never read as one of its groups
     @Test
     fun aCodeOfAnotherInputMethodsKeyboardIsSwallowed() {
         val tap = Keyboard.tapKey(g14Code('b'), 0.75f)
-        for ((im, read) in listOf(InputMethodCatalog.PINYIN to listOf(g14Code('b').code, tap), InputMethodCatalog.SHUANGPIN to listOf(0xF8C1, nineSpCode('6').code))) {
+        // pinyin's 18 keys' tap (Keyboard.pinyin18Tap) pinyin's though 双拼's 18 keys send its G18 code (0xF8C1)
+        val tap18 = Keyboard.pinyin18Tap('\uF8C1', 0.75f)
+        for ((im, read) in listOf(InputMethodCatalog.PINYIN to listOf(g14Code('b').code, tap, tap18), InputMethodCatalog.SHUANGPIN to listOf(0xF8C1, nineSpCode('6').code))) {
             val host = Host(fails = false)
             val core = core(host)
             core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN))
             core.setCurrentInputMethod(im)
             val log = core.log()
             host.events.clear()
-            for (c in listOf(g14Code('b').code, 0xF8C1, nineSpCode('6').code, g14Code('w').code, tap)) assertTrue(core.sendKey(Key(KeySyms.fromUnicode(c)), virtual = true))
+            for (c in listOf(g14Code('b').code, 0xF8C1, nineSpCode('6').code, g14Code('w').code, tap, tap18)) assertTrue(core.sendKey(Key(KeySyms.fromUnicode(c)), virtual = true))
             assertTrue(log.toString(), log.none { it is HostEvent.Commit || it is HostEvent.Key })
             val told = host.events.map { it.second }.filter(::isGroupedOrTap)
             assertEquals(im, read, told)

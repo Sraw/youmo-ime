@@ -204,7 +204,7 @@ internal class KeyboardPair(
 
         /**
          * Pinyin's: the 14 keys' codes (a tap's with its place too) to [InputMethodCatalog.PINYIN_KEYS],
-         * the 18 keys' to [InputMethodCatalog.PINYIN_KEYS18], a layout's own groups' (their codes and taps,
+         * the 18 keys' (their codes and taps, [Keyboard.TAPS_18]) to [InputMethodCatalog.PINYIN_KEYS18], a layout's own groups' (their codes and taps,
          * NineKeyLetters.CUSTOM_BLOCK, [Keyboard.PLACES]) to [InputMethodCatalog.PINYIN_KEYS_OWN], the nine keys' (their digits, a letter 连按
          * types, [Keyboard.LETTERS], and a glide over them) to [InputMethodCatalog.T9], 注音九键's and 大千's
          * to [InputMethodCatalog.ZHUYIN_NINE] and [InputMethodCatalog.ZHUYIN]; [keyboard] making
@@ -233,7 +233,7 @@ internal class KeyboardPair(
         /** Pinyin's keyed session code point [c] is for ([pinyin]), null for none. */
         fun pinyinKeyed(c: Int): String? = when {
             c in Keyboard.TAPS -> InputMethodCatalog.PINYIN_KEYS
-            c in Keyboard.PINYIN_18 -> InputMethodCatalog.PINYIN_KEYS18
+            c in Keyboard.PINYIN_18 || c in Keyboard.TAPS_18 -> InputMethodCatalog.PINYIN_KEYS18
             c in Keyboard.PLACES || c in NineKeyLetters.CUSTOM_BLOCK -> InputMethodCatalog.PINYIN_KEYS_OWN
             c in Keyboard.ZHUYIN_NINE -> InputMethodCatalog.ZHUYIN_NINE
             c in Keyboard.ZHUYIN_FULL -> InputMethodCatalog.ZHUYIN

@@ -20,8 +20,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Touch
  * code (简码, or a part of one that shows the character first) then the next code's first key most often,
  * only a tap nearer the edge ([Costs.toppingFloor]) is read, as a key whose code's first is another text
  * the word model weighs as much as the one the key would commit: typed on target (TouchSim's taps, whole
- * codes and the shortest part that shows the character first), no word changes. [TableSession] asks at
- * the code's end only.
+ * codes and the shortest part that shows the character first, a tap in the key's middle), no word changes.
+ * [TableSession] asks at the code's end only.
  */
 class TableSlips internal constructor(
     private val costs: Costs,
@@ -121,12 +121,12 @@ class TableSlips internal constructor(
          * as typed (a QWERTY neighbour across costs it −2.8 or less), and of the empty codes a slip made,
          * those read into a wrong character are 1% (仓颉) and 2.5% (二笔), against 8% and 20% at −4, for a few
          * more right ones below it. Where the key would commit what is shown (顶字, or a code that waits),
-         * −0.1 with the word model's check: typed by the shortest part of a code that shows the word, then the
-         * next word's first key, −0.5 changed words typed on target 3 times in 250 000 (覅 → 要饭, 低级 → 父母:
-         * rare ones the model weighs below the phrase a neighbour leads to) and −0.15 still once; −0.1 none in
-         * 570 000 (whole codes and parts, five tables, s0.2 and s0.3, seeds 1–3, both halves), reading a
-         * third of what −0.5 read (五笔 238 of 801 slips into an empty code).
+         * −1 with the word model's check: the loosest that changes no word typed on target, a tap in the key's
+         * middle (σ 0.15: whole codes and the shortest part that shows the word, then the next word's first key;
+         * five tables, seeds 1–3, both halves; the user's rule of 2026-11-16), where −1.5 changed one; a looser
+         * hand changes a few (覅 → 要饭: a rare word the model weighs below the phrase a neighbour leads to).
+         * −0.1 read a third of what −1 reads (061-neighbour-18key-impl-report).
          */
-        val SLIPS = Costs(SlipCost(floor = -1.5f), toppingFloor = -0.1f)
+        val SLIPS = Costs(SlipCost(floor = -1.5f), toppingFloor = -1f)
     }
 }

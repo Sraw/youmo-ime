@@ -322,12 +322,17 @@ class ZhuyinKeyboard(
         override fun reads(node: KeyNode): Any? = node.label.takeIf { ZHUYIN_ACTION in node.actions.values }
     }
 
-    // 大千's symbol keys as the engine reads their codes: a tap goes with where it fell and the symbol keys around it
-    // (061-neighbour-groups); not a tone's. 注音九键's none: it reads no slipped key (one sentence typed on target
-    // there with no tones went wrong)
-    override fun typingKeys(): List<Pair<Char, KeyRef>> = if (nine) emptyList() else canvas?.shownKeys.orEmpty().mapNotNull { node ->
+    // 大千's symbol keys and 注音九键's group keys as the engine reads their codes: a tap goes with where it fell and
+    // the keys around it (061-neighbour-groups; 注音九键's since the user's 11-16, a few sentences typed on target
+    // going wrong taken for the slips read); not a tone's
+    override fun typingKeys(): List<Pair<Char, KeyRef>> = canvas?.shownKeys.orEmpty().mapNotNull { node ->
         if (ZHUYIN_ACTION !in node.actions.values) return@mapNotNull null
-        node.label?.singleOrNull()?.let { codeOf(it, nine = false) }?.let(Keyboard::keyedChar)?.let { it to KeyRef(node.id, node.copy == 1) }
+        val code = if (nine) {
+            ZhuyinKeys.GROUP_SYMBOLS.indexOf(node.label).takeIf { it >= 0 }?.let(Keyboard::zhuyinNineKey)
+        } else {
+            node.label?.singleOrNull()?.let { codeOf(it, nine = false) }
+        }
+        code?.let(Keyboard::keyedChar)?.let { it to KeyRef(node.id, node.copy == 1) }
     }
 
     // what the bottom row shows now (grouped-bottom.xml's when= and bindings, as the grouped keyboards'): an

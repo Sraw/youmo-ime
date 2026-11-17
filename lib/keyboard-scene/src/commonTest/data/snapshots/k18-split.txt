@@ -22,7 +22,7 @@ key r1c2 kind=letter a11y="W E，2"
   hit rect(1499,0,1639,126)
   anchor 1569,63 up 0,-1
   text label="WE" alt="2"
-  shortcut="g18/we" letters="we" lean=off
+  shortcut="g18/we" letters="we"
   normal
     shadow rect(1506.88,10.5,1631.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1506.88,10.5,1631.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -36,7 +36,7 @@ key r1c3 kind=letter a11y="R T，3"
   hit rect(1639,0,1779,126)
   anchor 1709,63 up 0,-1
   text label="RT" alt="3"
-  shortcut="g18/rt" letters="rt" lean=off
+  shortcut="g18/rt" letters="rt"
   normal
     shadow rect(1646.88,10.5,1771.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1646.88,10.5,1771.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -79,7 +79,7 @@ key r1c6 kind=letter a11y="I O，6"
   hit rect(2060,0,2200,126)
   anchor 2130,63 up 0,-1
   text label="IO" alt="6"
-  shortcut="g18/io" letters="io" lean=off
+  shortcut="g18/io" letters="io"
   normal
     shadow rect(2067.88,10.5,2192.13,118.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2067.88,10.5,2192.13,115.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -122,7 +122,7 @@ key r2c2 kind=letter a11y="S D，9"
   hit rect(1522,126,1686,252)
   anchor 1604,189 up 0,-1
   text label="SD" alt="9"
-  shortcut="g18/sd" letters="sd" lean=off
+  shortcut="g18/sd" letters="sd"
   normal
     shadow rect(1529.88,136.5,1678.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1529.88,136.5,1678.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -136,7 +136,7 @@ key r2c3 kind=letter a11y="F G，0"
   hit rect(1686,126,1849,252)
   anchor 1767.5,189 up 0,-1
   text label="FG" alt="0"
-  shortcut="g18/fg" letters="fg" lean=off
+  shortcut="g18/fg" letters="fg"
   normal
     shadow rect(1693.88,136.5,1841.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1693.88,136.5,1841.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -164,7 +164,7 @@ key r2c5 kind=letter a11y="J K，）"
   hit rect(2013,126,2176,252)
   anchor 2094.5,189 up 0,-1
   text label="JK" alt="）"
-  shortcut="g18/jk" letters="jk" lean=off
+  shortcut="g18/jk" letters="jk"
   normal
     shadow rect(2020.88,136.5,2168.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2020.88,136.5,2168.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -178,7 +178,7 @@ key r2c6 kind=letter a11y="L，-"
   hit rect(2176,126,2340,252)
   anchor 2258,189 up 0,-1
   text label="L" alt="-"
-  shortcut="g18/l" letters="l;" lean=off
+  shortcut="g18/l" letters="l;"
   normal
     shadow rect(2183.88,136.5,2332.13,244.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(2183.88,136.5,2332.13,241.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -221,7 +221,7 @@ key r3c2 kind=letter a11y="X C，！"
   hit rect(1643,252,1780,378)
   anchor 1711.5,315 up 0,-1
   text label="XC" alt="！"
-  shortcut="g18/xc" letters="xc" lean=off
+  shortcut="g18/xc" letters="xc"
   normal
     shadow rect(1650.88,262.5,1772.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1650.88,262.5,1772.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc
@@ -251,7 +251,7 @@ key r3c4 kind=letter a11y="B N，？"
   hit rect(1918,252,2055,378)
   anchor 1986.5,315 up 0,-1
   text label="BN" alt="？"
-  shortcut="g18/bn" letters="bn" lean=off
+  shortcut="g18/bn" letters="bn"
   normal
     shadow rect(1925.88,262.5,2047.13,370.13 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(1925.88,262.5,2047.13,367.5 r=10.5,10.5,10.5,10.5) #fffbfbfc

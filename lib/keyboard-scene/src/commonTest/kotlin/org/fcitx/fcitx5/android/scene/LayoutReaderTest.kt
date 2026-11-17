@@ -181,8 +181,8 @@ class LayoutReaderTest {
         // L; whatever its face shows (pinyin's L): the group the engine reads its code by
         assertEquals("l;", k18.single { it.id == "r2c6" }.letters?.group)
         assertNull(k18.single { it.id == "apostrophe" }.letters)
-        // the 18 keys send their codes alone; the 14 keys' two letters a row lean
-        assertTrue(k18.none { it.leans })
+        // the 18 keys' lean too since 061-neighbour-18key (they had lean="off"), as the 14 keys' two letters a row
+        assertEquals(listOf("we", "rt", "io", "sd", "fg", "jk", "l;", "xc", "bn"), k18.filter { it.leans }.map { it.letters!!.group })
         val k14 = Forms.layout("k14").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
         assertEquals(Letters(listOf("as")), k14.single { it.id == "r2c1" }.letters)
         assertEquals(listOf(true, false), listOf("r2c1", "r2c5").map { id -> k14.single { it.id == id }.leans })

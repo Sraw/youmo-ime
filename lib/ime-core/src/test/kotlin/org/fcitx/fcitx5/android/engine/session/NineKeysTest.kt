@@ -142,7 +142,7 @@ class NineKeysTest {
         val rows = listOf(
             OwnPresses(
                 "18 keys: 双拼's zhong is 2 keys and 5 letters, chi's IO next tapped on i's side; catches letters " +
-                    "counted as presses (the 18 keys send no place, so the tap is given here)",
+                    "counted as presses (双拼's 18 keys send no place, so the tap is given here)",
                 g18, "vsii".map { NineKeyLetters.G18.key(it) }.joinToString(""), 2, 0f,
             ),
             OwnPresses(

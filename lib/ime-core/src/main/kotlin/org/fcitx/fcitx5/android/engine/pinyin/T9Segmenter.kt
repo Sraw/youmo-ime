@@ -50,9 +50,10 @@ import java.util.TreeMap
  * read too, as likely as where it was tapped says ([SlipCost]; 061-neighbour-correction §4.3, §4.4):
  * whole syllables only, legal (costing more) where the keys as typed spell one. In zhuyin a key
  * around is a group key around (注音九键) or a symbol's key around (大千), never a tone's
- * (061-neighbour-groups; the app reads them on 大千 alone: on 注音九键 a sentence typed on target with
- * no tones went wrong). On a keyboard that weighs a key's letters by where it was tapped, the key
- * slipped to has its letters weighed by where the tap lies on it, the slipped key's own not at all.
+ * (061-neighbour-groups; 注音九键 since the user's 11-16, over -2: a slip that also spells as typed
+ * never). On a keyboard that weighs a key's letters by where it was tapped, the key slipped to has its
+ * letters weighed by where the tap lies on it, the slipped key's own not at all: the slipped key needs a
+ * place for it, so on such a keyboard a key of one letter has its place too, weighing nothing of its own.
  *
  * The keys may spell syllables in zhuyin's symbols instead ([KeySpelling], 注音九键 and 大千 of
  * [ZhuyinKeys]): every syllable indexed by its symbols' keys, a symbol typed as itself its code, a
@@ -65,10 +66,19 @@ class T9Segmenter(
     override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
     neighbours: Boolean = false,
     // the nine keys' digits read the slips over -3 alone: on a phone (6T) those over -4 cost 2.7 ms a key at the
-    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3);
-    // 大千's keys too, a symbol each: over -4 its keys typed with no tone took a quarter more arcs, over the tenth
-    // allowed (061-neighbour-groups)
-    private val slipCost: SlipCost = if (letters.isGrouped && letters != ZhuyinKeys.DACHEN) SlipCost() else SlipCost(floor = -3f),
+    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3).
+    // The rest by the user's 11-16 rule, the loosest floor that turns no sentence typed on target (a tap in the key's
+    // middle, σ 0.15, both halves × seeds 1–3) wrong (061-neighbour-18key-impl-report §5): 注音九键 -2 (over -2.5
+    // one with no tones went wrong); 大千 -1.75, with tones or without (over -2 one with no tones, 脚步哦 → 较多, so
+    // no slip that also spells as typed is read); the 14 keys -6, as much found as at -8 and two more than at -4;
+    // the 18 keys -4 (a key of one letter's place now weighs the key slipped onto: S1, 0 at -4)
+    private val slipCost: SlipCost = when {
+        letters == ZhuyinKeys.NINE -> SlipCost(floor = -2f)
+        letters == ZhuyinKeys.DACHEN -> SlipCost(floor = -1.75f)
+        letters == NineKeyLetters.G14 -> SlipCost(floor = -6f)
+        letters.isGrouped -> SlipCost()
+        else -> SlipCost(floor = -3f)
+    },
 ) : KeyedSegmenter {
 
     // the tables below made once for the settings that shape them, shared by the sessions made anew
@@ -286,8 +296,8 @@ class T9Segmenter(
     /**
      * [against] for the slips of [m], [found] each match's: the key slipped to weighed by where the
      * tap lies on it ([Touch] put onto [Near]: its edge nearest the key hit), in the dimensions the
-     * keyboard's own places have (the 14 keys' across alone, a layout's own across and down); a
-     * keyboard whose taps have no place (the 18 keys) weighs none.
+     * keyboard's own places have (the 14 and 18 keys' across alone, a layout's own across and down); a
+     * tap with no place (a group whose layout has lean="off", a click no touch made) weighs none.
      */
     private fun slipAgainst(m: SyllableMatches, found: List<Slip>, typed: String, at: Int, taps: FloatArray): FloatArray? {
         var any = false
@@ -302,8 +312,8 @@ class T9Segmenter(
             for (k in typed.indices) {
                 val tap = taps.getOrElse(at + k) { Float.NaN }
                 val code = if (k == slip.at) slip.meant else typed[k]
-                // an 18-key key has no place (Keyboard.placesTaps: its tap is NaN), so its letters are never weighed, as in against
-                if (tap.isNaN() || !letters.isCode(code) || letters.letters(code).length < 2) continue
+                // a tap with no place (NaN: a group not leaning) has its letters never weighed, as in against
+                if (tap.isNaN() || !letters.isCode(code) || !letters.weighs(code)) continue
                 val place = if (k == slip.at) placeOn(slip.touch, slip.near, tap) else tap
                 sum += letters.against(code, (choice shr (LETTER_BITS * k)) and LETTER_MASK, place)
             }
@@ -374,7 +384,7 @@ class T9Segmenter(
             for (k in typed.indices) {
                 val tap = taps.getOrElse(at + k) { Float.NaN }
                 // a letter typed as itself, a key of one letter: nothing to weigh
-                if (tap.isNaN() || !letters.isCode(typed[k]) || letters.letters(typed[k]).length < 2) continue
+                if (tap.isNaN() || !letters.isCode(typed[k]) || !letters.weighs(typed[k])) continue
                 sum += letters.against(typed[k], (choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
             }
             if (sum > 0f) any = true

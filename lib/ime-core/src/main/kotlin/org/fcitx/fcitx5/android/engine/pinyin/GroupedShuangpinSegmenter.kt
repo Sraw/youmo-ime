@@ -27,7 +27,9 @@ import java.util.TreeMap
  * group key around it, as likely as where it was tapped says ([SlipCost]), as [ShuangpinSegmenter]
  * reads them on the 26 keys: legal, costing more, where the groups as typed make a syllable or are
  * both read alone, which on groups is nearly always, so a tap in a key's middle reads none and one
- * at its edge towards another does (061-neighbour-groups). The nine keys' digits read none past -3,
+ * at its edge towards another does (061-neighbour-groups). The 18 and 14 keys read none past -5: none
+ * typed on target turns wrong to -6 (σ 0.15, the user's 11-16 rule), but past -5 a key took a sixth more arcs
+ * on the 18 keys (NeighbourKeyWorkTest; a tenth allowed, 061-neighbour-18key-impl-report §5); the nine keys' digits none past -3,
  * as pinyin's nine keys (6T, 061-neighbour-correction §7.2). A key with no place reads no slip.
  */
 class GroupedShuangpinSegmenter(
@@ -35,7 +37,7 @@ class GroupedShuangpinSegmenter(
     override val letters: NineKeyLetters,
     fuzzy: Set<Fuzzy> = emptySet(),
     private val neighbours: Boolean = false,
-    private val slipCost: SlipCost = if (letters == NineKeyLetters.NINE_SP) SlipCost(floor = -3f) else SlipCost(),
+    private val slipCost: SlipCost = if (letters == NineKeyLetters.NINE_SP) SlipCost(floor = -3f) else SlipCost(floor = -5f),
 ) : KeyedSegmenter {
 
     override val spellsFullPinyin: Boolean get() = false

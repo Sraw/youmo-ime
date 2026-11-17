@@ -37,6 +37,12 @@ class NineKeyLetters private constructor(
     fun letters(code: Char): String = codes.indexOf(code).let { if (it < 0) "" else keys[it] }
 
     /**
+     * Whether where a tap on [code]'s key fell weighs its letters: two letters a–z or more (the 18
+     * keys' L; is l alone, its ; 微软 双拼's ing). The engine, the app and the eval count alike.
+     */
+    fun weighs(code: Char): Boolean = letters(code).count { it in 'a'..'z' } > 1
+
+    /**
      * How far a tap at [at] across a key (0 its left edge, 1 its right) goes against its letter
      * [index] (of [letters]), 0 on that letter's half to 1 at the far edge. Two letters a key (the
      * 14 keys', tapped across alone: Keyboard.TAPS): the first is the left half, any other the

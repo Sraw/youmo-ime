@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -125,7 +126,8 @@ class HabitOrderReadsAlongTest {
         val random = Random(61)
         val syllables = listOf("ni", "hao", "wo", "men", "ta", "de", "shi", "zai", "jia", "li", "ji", "kua", "le", "ke", "kan", "wan", "xia", "mian", "ma", "ya")
         val counts = Counts()
-        val full = PinyinSegmenter(neighbours = true)
+        // the floor slips are read over on the keyboards that read most (-4): 全拼's own, -1.75, reads too few to hold
+        val full = PinyinSegmenter(neighbours = true, slipCost = SlipCost())
         val shuangpin = listOf(ShuangpinScheme.XIAOHE, ShuangpinScheme.ZIRANMA).map { ShuangpinSegmenter(it, neighbours = true) }
         val nine = T9Segmenter(abbreviations = false, neighbours = true)
         val grouped = listOf(NineKeyLetters.G18 to TouchBoxes.G18, NineKeyLetters.G14 to TouchBoxes.G14, NineKeyLetters.NINE_SP to TouchBoxes.NINE_SP)

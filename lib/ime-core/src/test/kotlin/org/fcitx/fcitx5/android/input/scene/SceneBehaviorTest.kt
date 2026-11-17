@@ -306,33 +306,41 @@ class SceneBehaviorTest {
     }
 
     // 060-render-v2 §15 按落点加权: the 14 keys' two-letter groups lean, as they did (GroupedKeyboard.tapped);
-    // the 18 keys' none (lean="off"); a group of one letter has nowhere to lean
+    // the 18 keys' too since 061-neighbour-18key (k18.xml had lean="off"); a group of one letter has nowhere to lean
     @Test
-    fun theFourteenKeysTwoLetterGroupsLeanTheEighteenKeysNone() {
+    fun theFourteenAndEighteenKeysTwoLetterGroupsLean() {
         val k14 = SceneGroups.leaning(layout("k14"), mapOf("grouped-bottom" to bottom))
         assertEquals(NineKeyLetters.G14.tag().split(',').filter { it.length >= 2 }.toSet(), k14)
-        assertEquals(emptySet<String>(), SceneGroups.leaning(layout("k18"), mapOf("grouped-bottom" to bottom)))
+        val g18 = NineKeyLetters.G18.tag().split(',').filter { it.length >= 2 }.toSet()
+        assertEquals(g18, SceneGroups.leaning(layout("k18"), mapOf("grouped-bottom" to bottom)))
         assertTrue(keys("k14").getValue("r1c1").lean)
-        assertTrue(keys("k18").values.none { it.lean })
-        // the engine has places for the 14 keys' codes alone (Keyboard.TAPS): G18's go as codes (P3)
+        val k18 = keys("k18").values.filter { it.letters != null }
+        assertEquals(g18.size, k18.count { it.lean })
+        assertTrue(k18.filter { !it.lean }.all { it.letters!!.group.length == 1 })
+        // the engine places the 14 keys' codes' taps (Keyboard.TAPS); G18's codes, 双拼's 18 keys', go as codes,
+        // pinyin's 18 keys' taps as codes of their own (Keyboard.pinyin18Tap, TAPS_18)
         assertTrue(NineKeyLetters.G14.tag().split(',').all { Keyboard.placesTaps(NineKeyLetters.G14.key(it[0])) })
         assertTrue(NineKeyLetters.G18.tag().split(',').none { Keyboard.placesTaps(NineKeyLetters.G18.key(it[0])) })
     }
 
-    // which groups lean on a keyboard: the views' as they always were (G14's two-letter groups, G18's none);
-    // the scene's by its layout's lean=, its groups the keyboard's; a layout of other groups gone by, lean= and all
+    // which groups lean on a keyboard: the views' as they always were (G14's two-letter groups, and G18's since
+    // 061-neighbour-18key); the scene's by its layout's lean=, its groups the keyboard's; a layout of other groups gone by, lean= and all
     @Test
     fun aKeyboardsLeaningGroupsAreItsLayoutsWhereTheSceneDrawsItAndItsGroupsAreTheKeyboards() {
         val twos = NineKeyLetters.G14.tag().split(',').filter { it.length >= 2 }.toSet()
+        val twos18 = NineKeyLetters.G18.tag().split(',').filter { it.length >= 2 }.toSet()
         assertEquals(twos, SceneGroups.builtInLeaning(NineKeyLetters.G14))
-        assertEquals(emptySet<String>(), SceneGroups.builtInLeaning(NineKeyLetters.G18))
+        assertEquals(twos18, SceneGroups.builtInLeaning(NineKeyLetters.G18))
         assertEquals(emptySet<String>(), SceneGroups.builtInLeaning(NineKeyLetters.NINE_SP))
         assertEquals(twos, SceneGroups.leaningOf(NineKeyLetters.G14, null))
         val frags = mapOf("grouped-bottom" to bottom)
         val offK14 = (LayoutReader.layout(SceneData.read("k14.xml").replace("letters=\"qw\"", "letters=\"qw\" lean=\"off\"")) as Parsed.Ok).value
         assertEquals(twos - "qw", SceneGroups.leaningOf(NineKeyLetters.G14, offK14, frags))
         // the 14 keys' layout on the 18 keys' keyboard: G18 kept, and its leaning
-        assertEquals(emptySet<String>(), SceneGroups.leaningOf(NineKeyLetters.G18, layout("k14"), frags))
+        assertEquals(twos18, SceneGroups.leaningOf(NineKeyLetters.G18, layout("k14"), frags))
+        // a layout of the 18 keys' own groups with lean="off" on one: that one alone left out
+        val offK18 = (LayoutReader.layout(SceneData.read("k18.xml").replace("letters=\"we\"", "letters=\"we\" lean=\"off\"")) as Parsed.Ok).value
+        assertEquals(twos18 - "we", SceneGroups.leaningOf(NineKeyLetters.G18, offK18, frags))
         // other groups (a 17-key layout's): the 14 keys' leaning as built in, not the layout's lean="off"
         val other = (LayoutReader.layout(SceneData.read("k14.xml").replace("letters=\"bn\"", "letters=\"bn\" lean=\"off\"").replace("letters=\"m\"", "letters=\"mz\"")) as Parsed.Ok).value
         assertTrue(SceneGroups.mismatch(SceneGroups.of(other, frags), NineKeyLetters.G14) != null)

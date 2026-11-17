@@ -224,8 +224,9 @@ class PinyinSegmenterTest {
         // a vowel slipped away, the keys left consonants alone, is read only where tapped near it:
         // with no place, keys that read as 简拼 are read as typed (061-neighbour-correction §4.5)
         assertFalse(slips.segment("zenmeyqng").let { g -> (0 until g.edgeCount).any { g.text(it) == "yqng" } })
+        // (over -4, as 双拼's 18 and 14 keys read: 全拼's own floor, -1.75, wants the tap nearer the corner)
         val q = TouchBoxes.tap(TouchBoxes.QWERTY, 'q', dx = 0.3f, dy = 0.4f)
-        val yang = slips.segment("zenmeyqng", null, TouchBoxes.touchesAt(9, 6, q))
+        val yang = PinyinSegmenter(neighbours = true, slipCost = SlipCost()).segment("zenmeyqng", null, TouchBoxes.touchesAt(9, 6, q))
         assertEquals(NEIGHBOUR, yang.flags(yang.edge("yqng", Kind.SYLLABLE), "yang"))
         // but input of consonants alone is 简拼: xhn is no slip for xun there
         assertFalse(slips.segment("wxhn").let { g -> (0 until g.edgeCount).any { g.text(it) == "xhn" } })

@@ -6,7 +6,8 @@
 # on the APKs installed by a run before, for several sets in a row.
 #   lib/ime-eval/run-on-device.sh [set=pinyin] [ime=engine-pinyin] [out-dir=build/eval]
 # A set tapped with a place (ime-eval's pinyin --touch … --touched lib/ime-eval/data/<name>.tsv, not committed) types
-# each key with its touch, as a finger's tap carries it (061-neighbour-correction). NINE=1 types a set of digits (ime-eval's
+# each key with its touch, as a finger's tap carries it (061-neighbour-correction), and with GROUPED=14 or 18 each key's
+# place across it where the set has one (a sixth column), as those keys send it (061-neighbour-18key). NINE=1 types a set of digits (ime-eval's
 # nine-key sets) as pinyin's nine keys send them, codes of their own, with ime=engine-pinyin (with ime=keyboard-us, as
 # English's nine keys send them); GROUPED=14 or 18 a set of
 # pinyin's 14 or 18 keys' codes (--scheme g14/g18) as those keys send them; sp18, sp14 or sp9 双拼's 18, 14 or nine

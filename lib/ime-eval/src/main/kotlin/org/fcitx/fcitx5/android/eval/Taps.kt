@@ -65,31 +65,28 @@ object Taps {
         return Spec(Hand.of(parts[0]), alpha, parts.getOrNull(2)?.toLong() ?: 1L)
     }
 
-    private val KEYS = NineKeyLetters.G14
-
     /**
-     * [samples] as typed on the 14 keys by [spec]'s hand: their input the keys' codes and the
-     * place of each tap; those with no one exact reading, or a letter on no key, dropped, as
-     * `t9 --keys 14` drops them.
+     * [samples] as typed on the 14 keys (or [keys]: the 18 keys', 061-neighbour-18key) by [spec]'s hand: their
+     * input the keys' codes and the place of each tap; those with no one exact reading, or a letter on no key,
+     * dropped, as `t9 --keys 14` drops them.
      */
-    fun convert(samples: List<Sample>, spec: Spec): List<Sample> = samples.mapIndexedNotNull { index, sample ->
+    fun convert(samples: List<Sample>, spec: Spec, keys: NineKeyLetters = NineKeyLetters.G14): List<Sample> = samples.mapIndexedNotNull { index, sample ->
         val reading = ExactReading.of(sample) { !Syllables.spelling(it)[0].isUpperCase() } ?: return@mapIndexedNotNull null
         val letters = reading.joinToString("") { Syllables.spelling(it.syllable) }
         // the keys as T9Set.convert presses them, so a weighted and an unweighted run type the same keys
-        val codes = T9Set.press(letters, T9Set.Presses.ONCE, KEYS) ?: return@mapIndexedNotNull null
+        val codes = T9Set.press(letters, T9Set.Presses.ONCE, keys) ?: return@mapIndexedNotNull null
         val random = Random(spec.seed * SEED_STRIDE + index)
         val taps = letters.mapIndexed { i, c ->
-            val group = KEYS.letters(codes[i])
-            // a key of one letter (L, M) sends no place, as the keyboard does: drawn all the same, so
-            // the draws of the rest stay the ones every run so far was measured with
-            val at = placed(spec.hand.tap(if (group.length < 2) CENTRE else if (group.indexOf(c) == 0) LEFT else RIGHT, random).coerceIn(0.0, 1.0))
-            if (group.length < 2) Float.NaN else at
+            val group = keys.letters(codes[i])
+            // a key of one letter (L, M, the 18 keys' L;) aimed at its centre: its place weighs nothing of its
+            // own, only a slip's from it (as the keyboard sends it, GroupedKeyboard.tapped)
+            placed(spec.hand.tap(if (!keys.weighs(codes[i])) CENTRE else if (group.indexOf(c) == 0) LEFT else RIGHT, random).coerceIn(0.0, 1.0))
         }
         sample.copy(input = codes, taps = taps)
     }
 
     // to the nearest of the places the keyboard sends (Keyboard.tapKey)
-    private fun placed(at: Double): Float = (at * (Keyboard.TAP_STEPS - 1)).roundToInt().toFloat() / (Keyboard.TAP_STEPS - 1)
+    internal fun placed(at: Double): Float = (at * (Keyboard.TAP_STEPS - 1)).roundToInt().toFloat() / (Keyboard.TAP_STEPS - 1)
 
     private const val SEED_STRIDE = 1_000_003L
     private const val CENTRE = 0.5

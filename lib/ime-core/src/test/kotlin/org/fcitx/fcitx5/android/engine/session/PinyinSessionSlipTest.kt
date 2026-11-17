@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme.Companion.XIAOHE
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -60,6 +61,10 @@ class PinyinSessionSlipTest {
         ),
     )
 
+    // the slips a session learns and pins, legal ones too: read over -4, as 双拼's 18 and 14 keys read them; 全拼's own
+    // floor, -1.75, reads no legal slip at all
+    private val loose = SlipCost()
+
     private fun session(segmenter: Segmenter, habits: RecordingHabits, spell: Boolean = false) =
         PinyinSession(data, segmenter, spell = spell, prediction = false, learnTo = LearnTo(habits))
 
@@ -98,11 +103,13 @@ class PinyinSessionSlipTest {
         assertEquals(listOf("nihao"), habits.codes())
     }
 
+    // on 双拼 (小鹤, tama typed as in 全拼), which reads a slip that also spells as typed: 全拼 reads none since the
+    // user's 11-16 floors (PinyinSegmenter.SLIP)
     @Test
     @Uat("PY-140")
     fun aLegalSlipPickedIsLearnedUnderTheKeysMeantNotThoseTyped() {
         val habits = RecordingHabits()
-        val s = session(PinyinSegmenter(neighbours = true), habits)
+        val s = session(ShuangpinSegmenter(XIAOHE, neighbours = true), habits)
         val touches = qwerty("tama").toMutableList().also { it[0] = TouchBoxes.tap(TouchBoxes.QWERTY, 't', dx = 0.35f) }
         s.tap("tama", touches)
         s.pick("呀吗")
@@ -115,7 +122,7 @@ class PinyinSessionSlipTest {
     @Uat("PY-140")
     fun aLegalSlipPickedRaisesNothingUnderTheKeysTyped() {
         val learner = Learner(data)
-        val s = PinyinSession(data, PinyinSegmenter(neighbours = true), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
+        val s = PinyinSession(data, ShuangpinSegmenter(XIAOHE, neighbours = true), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
         val towardY = { qwerty("tama").toMutableList().also { it[0] = TouchBoxes.tap(TouchBoxes.QWERTY, 't', dx = 0.35f) } }
         fun order() = s.tap("tama", towardY()).candidates.let { it.indexOf("他") to it.indexOf("呀") }
         assertTrue(order().let { (ta, ya) -> ya > ta && ta >= 0 })
@@ -169,12 +176,13 @@ class PinyinSessionSlipTest {
         assertEquals(listOf("mf".map(letters::key).joinToString("")), habits.codes())
     }
 
-    // and 大千's: ㄇㄚ with ㄇ tapped toward ㄋ, 那 learned under ㄋㄚ
+    // and 大千's: ㄇㄚ with ㄇ tapped toward ㄋ, 那 learned under ㄋㄚ (a slip that also spells as typed, read over -4:
+    // 大千's own floor, -1.75, reads none such, EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff)
     @Test
     @Uat("PY-150")
     fun onDachenTheSymbolMeantIsLearnedAsItsCode() {
         val habits = RecordingHabits()
-        val s = session(T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true), habits, spell = true)
+        val s = session(T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true, slipCost = loose), habits, spell = true)
         val m = ZhuyinKeys.symbolCode('ㄇ')
         val a = ZhuyinKeys.symbolCode('ㄚ')
         s.tap("$m$a", listOf(TouchBoxes.tap(TouchBoxes.DACHEN, m, dx = 0.45f), TouchBoxes.tap(TouchBoxes.DACHEN, a)))
@@ -209,7 +217,7 @@ class PinyinSessionSlipTest {
     fun aCommitInPartsHasEachPartsSlipInItsOwnCode() {
         val towardY = qwerty("tama").toMutableList().also { it[0] = TouchBoxes.tap(TouchBoxes.QWERTY, 't', dx = 0.35f) }
         val first = RecordingHabits()
-        session(PinyinSegmenter(neighbours = true), first).run {
+        session(PinyinSegmenter(neighbours = true, slipCost = loose), first).run {
             tap("tama", towardY)
             pick("呀")
             pick("吗")
@@ -218,7 +226,7 @@ class PinyinSessionSlipTest {
         // n tapped at its right edge, toward m: the second part's (not the last: a syllable still growing reads no slip)
         val towardM = qwerty("tanama").toMutableList().also { it[2] = TouchBoxes.tap(TouchBoxes.QWERTY, 'n', dx = 0.45f) }
         val second = RecordingHabits()
-        session(PinyinSegmenter(neighbours = true), second).run {
+        session(PinyinSegmenter(neighbours = true, slipCost = loose), second).run {
             tap("tanama", towardM)
             pick("他")
             pick("吗")
@@ -231,7 +239,7 @@ class PinyinSessionSlipTest {
     @Test
     fun aWordReadThroughASlipIsPinnedUnderTheKeysMeant() {
         val habits = RecordingHabits()
-        val s = session(PinyinSegmenter(neighbours = true), habits)
+        val s = session(PinyinSegmenter(neighbours = true, slipCost = loose), habits)
         val towardY = qwerty("tama").toMutableList().also { it[0] = TouchBoxes.tap(TouchBoxes.QWERTY, 't', dx = 0.35f) }
         val shown = s.tap("tama", towardY).candidates
         s.apply(Action.Pin(shown.indexOf("呀")))
@@ -244,7 +252,7 @@ class PinyinSessionSlipTest {
     @Test
     fun aWordOfTheUsersReadOnlyThroughLegalSlipsIsNotRaised() {
         val learner = Learner(data)
-        val s = PinyinSession(data, PinyinSegmenter(neighbours = true), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
+        val s = PinyinSession(data, PinyinSegmenter(neighbours = true, slipCost = loose), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
         repeat(2) {
             s.tap("yayama", qwerty("yayama"))
             s.pick("呀")

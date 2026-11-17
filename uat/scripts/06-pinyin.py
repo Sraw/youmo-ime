@@ -675,6 +675,10 @@ case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextT
 
 
 case("PY-150", needs="jvm:NeighbourSlipTest.dachenReadsASymbolAsTheOneNextToIt、PinyinSessionSlipTest.onDachenTheSymbolMeantIsLearnedAsItsCode、EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff、NeighbourTouchTest.dachensSymbolKeysGoWithTheSymbolKeysAround")(lambda d: None)
+case("PY-151", needs="jvm:EnginesZhuyinSlipTest.zhuyinsNineKeysReadASlipUnlessSlipsAreOff、NeighbourSlipTest.zhuyinsNineKeysReadAGroupAsTheOneNextToIt、NeighbourTouchTest.zhuyinsNineGroupKeysGoWithTheGroupKeysAround")(lambda d: None)
+
+
+case("PY-152", needs="jvm:GroupedKeyboard18Test.pinyinsTapGoesWithWhereItFellAndShuangpinsIsTheCodeAlone、EnginesImKeyboardsTest.pinyinsEighteenKeysTapsGoWithWhereTheyFell、KeyboardTapsTest.aPinyinEighteenKeysTapComesBackAsItsG18CodeAndPlace、NeighbourSlipTest.theEighteenKeysWeighTheLettersOfTheKeySlippedToByWhereTheTapFell")(lambda d: None)
 
 
 @case("PY-144", base="B0", visual=True)
@@ -738,19 +742,25 @@ def py144_steps(d, how):
 
 @case("PY-143")
 def py143(d):
-    # t tapped at 85% of its width, toward y (still on t): tama read as yama too (亚麻, 鸭毛 among the words); in the
-    # middle not
+    # t tapped at 85% of its width, toward y (still on t): tama spells as typed, so 全拼 (floor -1.75) reads no yama;
+    # in the middle neither. nihso with s at 12% of its width, toward a (hso spells nothing): read as nihao, its cost
+    # about -0.7 on a key 36-40 dp wide, over the floor
     ya = ("亚麻", "鸭毛", "压埋")
     keys_at(d, "tama", [(0.85, 0.5), None, None, None])
     edge = d.all_cands()
-    d.shot("kb", "t 点在靠 y 的边上打 tama：候选栏或展开后的第一页有「亚麻」这类 ya ma 的词")
+    d.shot("kb", "t 点在靠 y 的边上打 tama：候选栏和展开后的第一页没有「亚麻」这类 ya ma 的词")
     d.clear()
     keys_at(d, "tama", [None] * 4)
     mid = d.all_cands()
     d.clear()
-    check(any(w in edge for w in ya), f"t 靠 y 点的 tama，候选和展开后的第一页没有 ya ma 的词：{edge[:14]}")
+    keys_at(d, "nihso", [None, None, None, (0.12, 0.5), None])
+    slip = d.cands()
+    d.shot("kb", "s 点在靠 a 的边上打 nihso：首选「你好」")
+    d.clear()
+    check(not any(w in edge for w in ya), f"t 靠 y 点的 tama，候选里有 ya ma 的词（全拼不改读拼得成的）：{edge[:14]}")
     check(not any(w in mid for w in ya), f"四个键都点在正中的 tama，候选里有 ya ma 的词：{mid[:14]}")
-    return f"靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}"
+    check(slip[:1] == ["你好"], f"s 靠 a 点的 nihso，首选不是「你好」：{slip[:6]}")
+    return f"tama 靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}；nihso 靠边首选 {slip[:1]}"
 
 
 case("PY-145", needs="jvm:StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot")(lambda d: None)

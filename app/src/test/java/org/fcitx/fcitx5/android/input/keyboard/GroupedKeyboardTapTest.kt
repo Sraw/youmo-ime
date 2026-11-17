@@ -125,7 +125,8 @@ class GroupedKeyboardTapTest {
 
     // 060-render-p3 T9b (review L5): every one of the 14 keys sends what it did before T9a and T9b, wherever down
     // the key the finger came, at five places across: the characters as written down then (TAPS from U+F0200,
-    // 17 places a code; L and M, of one letter, their code from U+F8DA on alone), not as Keyboard reckons them now
+    // 17 places a code; L and M, of one letter, their code from U+F8DA on alone then, their place too since
+    // 061-neighbour-18key, for a slip from them), not as Keyboard reckons them now
     @Test
     fun theFourteenKeysTapsAreTheSameWhereverDownTheKey() = drawn {
         val across = listOf(0.1f, 0.25f, 0.5f, 0.75f, 0.9f)
@@ -257,10 +258,11 @@ class GroupedKeyboardTapTest {
     }
 
     @Test
-    fun aKeyOfOneLetterAndAClickNoTouchMadeSendTheCode() = drawn {
+    fun aKeyOfOneLetterHasItsPlaceAndAClickNoTouchMadeSendsTheCode() = drawn {
+        // M's place weighs nothing of M's own, only a slip from it onto BN's halves (T9Segmenter)
         val m = key("M")
         touch(m, m.width * 0.9f)
-        assertEquals(listOf<KeyAction>(code(g14Code('m'))), sent)
+        assertEquals(listOf<KeyAction>(KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(g14Code('m'), 0.9f)), KeyStates.Virtual)), sent)
         sent.clear()
         // TalkBack's double tap clicks with no touch
         key("BN").click()
@@ -306,7 +308,8 @@ class GroupedKeyboardTapTest {
     }
 
     private companion object {
-        // each key's character at 0.1, 0.25, 0.5, 0.75 and 0.9 across, as e3d3edbfd sent them
+        // each key's character at 0.1, 0.25, 0.5, 0.75 and 0.9 across, as e3d3edbfd sent them (L and M as
+        // 061-neighbour-18key: TAPS' l and m)
         val FOURTEEN_TAPS = listOf(
             "QW" to listOf(0xF0312, 0xF0314, 0xF0318, 0xF031C, 0xF031E),
             "ER" to listOf(0xF0246, 0xF0248, 0xF024C, 0xF0250, 0xF0252),
@@ -317,11 +320,11 @@ class GroupedKeyboardTapTest {
             "DF" to listOf(0xF0235, 0xF0237, 0xF023B, 0xF023F, 0xF0241),
             "GH" to listOf(0xF0268, 0xF026A, 0xF026E, 0xF0272, 0xF0274),
             "JK" to listOf(0xF029B, 0xF029D, 0xF02A1, 0xF02A5, 0xF02A7),
-            "L" to List(5) { 0xF8E5 },
+            "L" to listOf(0xF02BD, 0xF02BF, 0xF02C3, 0xF02C7, 0xF02C9),
             "ZX" to listOf(0xF03AB, 0xF03AD, 0xF03B1, 0xF03B5, 0xF03B7),
             "CV" to listOf(0xF0224, 0xF0226, 0xF022A, 0xF022E, 0xF0230),
             "BN" to listOf(0xF0213, 0xF0215, 0xF0219, 0xF021D, 0xF021F),
-            "M" to List(5) { 0xF8E6 },
+            "M" to listOf(0xF02CE, 0xF02D0, 0xF02D4, 0xF02D8, 0xF02DA),
         )
     }
 }

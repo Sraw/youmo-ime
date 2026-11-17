@@ -43,10 +43,11 @@ object SceneGroups {
 
     /**
      * The groups whose tap leans on [letters]' keyboard as built in, its layout gone by or none read:
-     * the 14 keys' groups of two letters, the 18 keys' none.
+     * the 14 keys' and the 18 keys' groups of two letters (the engine places 双拼's 18 keys' taps not,
+     * [org.fcitx.fcitx5.android.engine.runtime.Keyboard.pinyin18Tap]: theirs go as the code).
      */
     fun builtInLeaning(letters: NineKeyLetters): Set<String> =
-        if (letters == NineKeyLetters.G14) letters.tag().split(',').filter { it.length >= 2 }.toSet() else emptySet()
+        if (letters == NineKeyLetters.G14 || letters == NineKeyLetters.G18) letters.tag().split(',').filter { it.length >= 2 }.toSet() else emptySet()
 
     /**
      * The groups whose tap leans on [letters]' keyboard: its [layout]'s ([leaning]) where its groups are

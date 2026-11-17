@@ -60,13 +60,14 @@ import timber.log.Timber
  * the candidates as on the full keyboard.
  *
  * [NineKeyLetters.G18]: 双拼's 18 keys, Q WE RT Y U IO P, A SD FG H JK L;, Z XC V BN M, laid out
- * and typed the same way, its corners 1 to 0 then marks (iFlytek has no 18 keys to follow). Their
- * taps send the code alone: where across the key it fell is the 14 keys' only so far.
+ * and typed the same way, its corners 1 to 0 then marks (iFlytek has no 18 keys to follow). 双拼's
+ * taps send the code alone; pinyin's go with where across the key they fell, as the 14 keys' do
+ * ([Keyboard.pinyin18Tap], 061-neighbour-18key).
  *
  * [wire]: what a group's code goes out as. Pinyin's 14 keys and 双拼's 18 send the group's code itself;
  * pinyin's 18 keys ([NamePinyin18]) and 双拼's 14 ([NameShuangpin14]) send codes of their own
  * ([Keyboard.pinyin18Key], [Keyboard.shuangpin14Key]), each read by its input method's own session
- * of that keyboard (I1), no tap places. [semicolon]: whether a group shows its `;` (双拼's, ing to 微软); pinyin's 18 keys have none, their L key L alone, its long press no `;` or `:`.
+ * of that keyboard (I1); of them pinyin's 18 keys' taps alone carry a place ([tapped]). [semicolon]: whether a group shows its `;` (双拼's, ing to 微软); pinyin's 18 keys have none, their L key L alone, its long press no `;` or `:`.
  *
  * The keys are its layout's (`k14`, `k18`, a theme's in their place), their groups checked as it is made
  * ([grouping], SceneGroups.taken; 060-render-p3 T9b): the built-in groups, typed as above; where
@@ -189,15 +190,24 @@ class GroupedKeyboard private constructor(
         /**
          * [action], a group's [code], as tapped at [at] across its key ([Keyboard.tapKey]) where its
          * layout has the group lean ([leaning]: its key's lean=, 060-render-v2 §15) and the engine
-         * places a tap of its code (the 14 keys' and a layout's own groups': the 18 keys' send the code).
+         * places a tap of its code (the 14 keys' and a layout's own groups', and pinyin's 18 keys' as
+         * [Keyboard.pinyin18Tap]: 双拼's 18 keys, the same codes, send the code, 061-neighbour-18key); a key
+         * of one letter too where any group leans, for a slip from it onto one that does.
          * A layout's own group's code goes with where [down] the key it fell too (060-render-p3 T9b), its
          * cell the scene's; a click no touch made (NaN), its code alone.
          */
         internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters, leaning: Set<String>, down: Float = Float.NaN): KeyAction {
             val sym = (action as? KeyAction.SymAction)?.sym?.sym ?: return action
-            val c = (sym - UNICODE).takeIf { it in 0..Char.MAX_VALUE.code }?.toChar() ?: return action
-            val leans = letters.isCode(c) && letters.letters(c) in leaning && Keyboard.placesTaps(c)
+            val wired = sym - UNICODE
+            // pinyin's 18 keys' code past the BMP (Keyboard.PINYIN_18): its G18 code
+            val pinyin18 = Keyboard.keyedChar(wired)?.takeIf { wired in Keyboard.PINYIN_18 }
+            val c = pinyin18 ?: wired.takeIf { it in 0..Char.MAX_VALUE.code }?.toChar() ?: return action
+            // a key of one letter (Q, A, the 18 keys' L; …) weighs nothing of its own, but where it was tapped
+            // weighs the letters of a key it slipped from onto (T9Segmenter): placed where any group leans
+            val placed = pinyin18 != null || Keyboard.placesTaps(c)
+            val leans = letters.isCode(c) && placed && (letters.letters(c) in leaning || leaning.isNotEmpty() && !letters.weighs(c))
             if (at.isNaN() || !leans) return action
+            if (pinyin18 != null) return action.copy(sym = KeySym(UNICODE + Keyboard.pinyin18Tap(c, at)), states = KeyStates.Virtual)
             val own = c.code in NineKeyLetters.CUSTOM_BLOCK
             if (own && down.isNaN()) return action
             val sent = if (own) Keyboard.tapKey(c, at, down) else Keyboard.tapKey(c, at)

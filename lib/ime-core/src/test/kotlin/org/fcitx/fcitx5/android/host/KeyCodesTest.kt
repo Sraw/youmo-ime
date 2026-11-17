@@ -16,7 +16,7 @@ class KeyCodesTest {
     @Test
     fun everyKeyboardCodeIsInternal() {
         val codes = listOf(
-            KeyCodes.GROUPED, KeyCodes.G18, KeyCodes.NINE_SHUANGPIN, Keyboard.TAPS, Keyboard.LETTERS,
+            KeyCodes.GROUPED, KeyCodes.G18, KeyCodes.NINE_SHUANGPIN, Keyboard.TAPS, Keyboard.TAPS_18, Keyboard.LETTERS,
             Keyboard.NINE_DIGITS, Keyboard.NINE_LETTERS, Keyboard.INK..Keyboard.LOOKUP, Keyboard.STROKES,
             Keyboard.KEYED_CODES,
             Keyboard.SYLLABLES.first.code..Keyboard.SYLLABLES.last.code,

@@ -114,12 +114,12 @@ object InputMethodCatalog {
 
     /**
      * Whether [im] reads the grouped keyboard code [c] ([isCode]): pinyin the 14 keys' (a tap's
-     * with its place too), the 18 keys' and the nine keys' of its own ([Keyboard.KEYED_CODES]);
+     * with its place too), the 18 keys' (so too) and the nine keys' of its own ([Keyboard.KEYED_CODES]);
      * 双拼 the 18 keys', the nine keys' 双拼's and its 14 keys'. A code is one keyboard's alone, so
      * one another input method gets (the keyboard shown behind a switch) is dropped, never read.
      */
     fun readsCode(im: String, c: Int): Boolean = when {
-        c in Keyboard.TAPS || c in Keyboard.PLACES || c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 || c in Keyboard.ZHUYIN_NINE || c in Keyboard.ZHUYIN_FULL -> im == PINYIN
+        Keyboard.isTap(c) || c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PINYIN_NINE || c in Keyboard.PINYIN_18 || c in Keyboard.ZHUYIN_NINE || c in Keyboard.ZHUYIN_FULL -> im == PINYIN
         c in Keyboard.SHUANGPIN_14 -> im == SHUANGPIN
         else -> when (NineKeyLetters.ofCode(c)) {
             null -> false
@@ -129,7 +129,7 @@ object InputMethodCatalog {
     }
 
     /** Whether [c] is a grouped keyboard's code, some input method's to read ([readsCode]): never text for a field. */
-    fun isCode(c: Int): Boolean = c in NineKeyLetters.CODES || c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.TAPS || c in Keyboard.PLACES || c in Keyboard.KEYED_CODES
+    fun isCode(c: Int): Boolean = c in NineKeyLetters.CODES || c in NineKeyLetters.CUSTOM_BLOCK || Keyboard.isTap(c) || c in Keyboard.KEYED_CODES
 
     // with nothing typed ' is the app's: through the engine it would be a mark, ‘
     private fun separates(c: Int, composing: Boolean) = composing && c == SyllableGraph.SEPARATOR.code

@@ -447,6 +447,9 @@ private const val NANOS_PER_MILLI = 1_000_000
 /** Full pinyin without the Latin words. */
 private const val NO_LATIN = "no-latin"
 
+// the keyboards whose taps go with a place across the key (--taps)
+private val TAPPED = setOf(NineKeyLetters.G14, NineKeyLetters.G18)
+
 /** `table`'s preset unless given one: [TableRun.PRESETS]' plain, the options' defaults. */
 private const val DEFAULT_PRESET = "plain"
 
@@ -472,8 +475,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("user-counts") { it in setOf("full", "none", "multi") },
         valid("short-guard") { it in ON_OFF },
         valid("continuations") { it in ON_OFF },
-        // the taps type the 14 keys: a 14-key scheme
-        valid("taps") { runCatching { Taps.parse(it) }.isSuccess && scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14 },
+        // the taps type the 14 keys or the 18 keys: such a scheme
+        valid("taps") { runCatching { Taps.parse(it) }.isSuccess && scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) in TAPPED },
         valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
         // a merged dictionary's file is what is stale
         valid("stale") { "merged" in options },
@@ -576,10 +579,13 @@ private class RunOptions(options: Map<String, String>) {
     val abbreviations = options["sp-abbrev"] != "off"
     val abbrevPenalty = options["sp-abbrev"]?.toFloatOrNull() ?: Penalties().abbrev
 
-    /** The 14 keys tapped by a simulated hand ([Taps]): the set, full pinyin, typed so. */
+    /** The 14 or the 18 keys tapped by a simulated hand ([Taps]): the set, full pinyin, typed so. */
     val taps = options["taps"]?.let(Taps::parse)?.also {
-        require(scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) == NineKeyLetters.G14) { "--taps types the 14 keys: a 14-key --scheme, not $scheme" }
+        require(scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) in TAPPED) { "--taps types the 14 or the 18 keys: such a --scheme, not $scheme" }
     }
+
+    /** The keys [taps] types: the scheme's. */
+    val tapKeys: NineKeyLetters get() = T9Set.lettersOf(scheme!!)
 
     /** Taps with a place ([TouchSim]): each key where a simulated hand tapped it, the keys around it; read where [neighbours] is on. */
     val touch = options["touch"]?.also { require(taps == null) { "--touch or --taps, not both" } }
@@ -589,6 +595,9 @@ private class RunOptions(options: Map<String, String>) {
 
     /** Each syllable spelt out in the preedit, as the app shows 双拼 and the nine keys. */
     val spell = scheme != null && scheme != NO_LATIN
+
+    /** [touch]'s samples with each tap's place across its key where the app sends one ([TouchSim.placed]: the 14 and the 18 keys'). */
+    fun placed(samples: List<Sample>): List<Sample> = scheme?.takeIf { it in T9Set.SCHEMES }?.let { TouchSim.placed(samples, T9Set.lettersOf(it)) } ?: samples
 
     /**
      * Full pinyin reads the Latin words of [data] as the app does, unless the scheme is [NO_LATIN]:
@@ -657,9 +666,11 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
         // a data file each: its buffers are not to be shared
         val set = Halves.select(readSet(setPath), options.half)
         val selected = options.taps?.let { spec ->
-            Taps.convert(set, spec).also { require(it.isNotEmpty()) { "--taps: no sample of $setPath has one exact reading (a set already of codes?)" } }
+            Taps.convert(set, spec, options.tapKeys).also { require(it.isNotEmpty()) { "--taps: no sample of $setPath has one exact reading (a set already of codes?)" } }
         } ?: options.touch?.let { spec ->
             TouchSim.convert(set, spec).also { require(it.isNotEmpty()) { "--touch: no sample of $setPath has a key on that keyboard" } }
+                // the 14 and 18 keys' taps go with where across the key they fell, as the app sends them
+                .let(options::placed)
         } ?: set
         // the set as tapped, for the device's runner (EngineEvalRunner) to type the same
         options.touched?.let { path -> File(path).printWriter().use { w -> selected.forEach { w.println(EvalSet.line(it)) } } }

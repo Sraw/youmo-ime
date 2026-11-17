@@ -116,20 +116,20 @@ class TableSlipTest {
         // 你 by wq, 们 by wqiu; wqii leads on from wqi, so o toward i is read there but for the topping floor
         val wubi = dictionary("w 人", "wq 你", "wqiu 们", "wqii 他", "o 火", "oo 炎", "u 立")
         // wq is 你's whole code: o off-centre is the next code's (顶字), as a 五笔 typist types 简码 then on
-        val (commit, s) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.35f))
+        val (commit, s) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.3f))
         assertEquals("你", commit)
         assertEquals("o", s.preedit)
-        // nearer, i costing −0.34: past −0.5 but short of the floor (−0.1), still the next code's
+        // nearer, i costing −0.34: past the floor (−1), wqi, nothing committed
         val (nearer, after) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.44f))
-        assertEquals("你", nearer)
-        assertEquals("o", after.preedit)
+        assertEquals("", nearer)
+        assertEquals("wqi", after.preedit)
         // at the very edge toward i: wqi, nothing committed
         val (edge, read) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.49f))
         assertEquals("", edge)
         assertEquals("wqi", read.preedit)
         // a part of a code showing a character first (wqi: 他 of wqii), then the next code's key: the same, a tap
-        // off-centre (i costing −0.84, read under the empty code's −1.5) is the next code's
-        val (part, next) = session(TableOptions.WUBI, dictionary = wubi).tap("wqi", 'o', oTowardI(-0.35f))
+        // off-centre (i costing −1.13, read under the empty code's −1.5) is the next code's
+        val (part, next) = session(TableOptions.WUBI, dictionary = wubi).tap("wqi", 'o', oTowardI(-0.3f))
         assertEquals("他", part)
         assertEquals("o", next.preedit)
     }
@@ -237,8 +237,8 @@ class TableSlipTest {
         fun waiting() = TableSession(lone, TableOptions(noMatchAutoSelectLength = 0, autoSelectLength = 3), language = held, slips = TableSlips.SLIPS)
             .also { it.tap("ab", 'e', e(-0.45f)) }
         fun rTowardE(dx: Float) = Touch(dx, 0f, 36f, 50f, listOf(Near('e', -1f, 0f), Near('t', 1f, 0f)))
-        // the next key would commit 乙: r off-centre (e costing −0.84, read under the empty code's −1.5) is the next code's
-        val s = waiting().apply(Key('r', touch = rTowardE(-0.35f)))
+        // the next key would commit 乙: r off-centre (e costing −1.13, read under the empty code's −1.5) is the next code's
+        val s = waiting().apply(Key('r', touch = rTowardE(-0.3f)))
         assertEquals("乙", s.commit)
         assertEquals("r", s.preedit)
         // at the very edge, past the topping floor: read as e, abwe, nothing committed
@@ -276,7 +276,7 @@ class TableSlipTest {
     @Test
     fun ziranmaTopsAsWubiDoes() {
         val ziranma = dictionary("w 人", "wq 你", "wqiu 们", "o 火", "oo 炎")
-        val (commit, s) = session(TableOptions.ZIRANMA, dictionary = ziranma).tap("wq", 'o', oTowardI(-0.35f))
+        val (commit, s) = session(TableOptions.ZIRANMA, dictionary = ziranma).tap("wq", 'o', oTowardI(-0.3f))
         assertEquals("你", commit)
         assertEquals("o", s.preedit)
         assertEquals("wqi", session(TableOptions.ZIRANMA, dictionary = ziranma).tap("wq", 'o', oTowardI(-0.49f)).second.preedit)
@@ -286,9 +286,9 @@ class TableSlipTest {
     fun erbiNeverTopsAndItsPinyinKeyIsNeverRead() {
         val erbi = dictionary("ab 丙", "abr 甲", "abp 乙", "r 白", "e 月", "ee 朋")
         // ab is a whole code, but 二笔 tops nothing: e off-centre is read at the floor of an empty code
-        assertEquals("abr", session(TableOptions.ERBI, dictionary = erbi).tap("ab", 'e', e(0.35f)).second.preedit)
+        assertEquals("abr", session(TableOptions.ERBI, dictionary = erbi).tap("ab", 'e', e(0.3f)).second.preedit)
         // where the table tops (五笔), the same tap is the next code's
-        assertEquals("丙", session(TableOptions.WUBI, dictionary = erbi).tap("ab", 'e', e(0.35f)).first)
+        assertEquals("丙", session(TableOptions.WUBI, dictionary = erbi).tap("ab", 'e', e(0.3f)).first)
         // [ (拼音反查) at its edge toward p: no key of the codes, never read; it commits what is typed, the app's
         val bracket = Touch(-0.49f, 0f, 36f, 50f, listOf(Near('p', -1f, 0f), Near(']', 1f, 0f)))
         val (commit, s) = session(TableOptions.ERBI, dictionary = erbi).tap("ab", '[', bracket)

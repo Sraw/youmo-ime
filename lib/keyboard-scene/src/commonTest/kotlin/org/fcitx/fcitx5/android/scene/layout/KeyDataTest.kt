@@ -218,7 +218,7 @@ class KeyDataTest {
         // written: its own corner
         assertEquals(MarkContent.Symbol("("), marks.getValue("k17/hjk:up"))
         // not written: none
-        val bare = KeyData.of("x", read(text.replace("alt=\"{punct:(}\" letters=\"hjk\" lean=\"off\" swipe-up=\"(\"", "letters=\"hjk\" lean=\"off\"")), Forms.fragments.filterKeys { it == "grouped-bottom" }, KeyData.Mode.Own, basedOn = "k18")
+        val bare = KeyData.of("x", read(text.replace("alt=\"{punct:(}\" letters=\"hjk\" swipe-up=\"(\"", "letters=\"hjk\"")), Forms.fragments.filterKeys { it == "grouped-bottom" }, KeyData.Mode.Own, basedOn = "k18")
         assertEquals(-1, keys(bare.layout).getValue("r2c4").place)
         assertEquals(MarkContent.Empty, DefaultMarks.shortcuts(bare.layout, bare.fragments, DefaultMarks.variantOf(bare.layout, "k18")).getValue("k17/hjk:up"))
     }

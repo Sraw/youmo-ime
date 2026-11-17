@@ -46,6 +46,10 @@ class QuickPhraseKeysTest {
         // 18 keys: FG
         assertEquals("FGfg", chars(of(NineKeyLetters.G18.codes[9].code)))
         assertEquals("FGfg", chars(of(Keyboard.pinyin18Key(NineKeyLetters.G18.codes[9]))))
+        // pinyin's 18 keys' tap with where it fell (Keyboard.pinyin18Tap): the half's letter shown, the whole key's matched
+        val fg = of(Keyboard.pinyin18Tap(NineKeyLetters.G18.codes[9], 0.9f))
+        assertEquals('g'.code, fg.shown)
+        assertEquals("FGfg", chars(fg))
     }
 
     @Test

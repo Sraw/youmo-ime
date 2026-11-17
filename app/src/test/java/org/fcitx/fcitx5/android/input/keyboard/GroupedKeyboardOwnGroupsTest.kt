@@ -189,7 +189,7 @@ class GroupedKeyboardOwnGroupsTest {
         keyboard.touch(keyboard.shownKey("PQRS"), 0.75f, 0.25f)
         keyboard.touch(keyboard.shownKey("M"), 0.5f, 0.5f)
         keyboard.touch(keyboard.shownKey("ABC"), 0.9f, 0.5f)
-        assertEquals(listOf<KeyAction>(tap(codeOf("pq rs"), 0.75f, 0.25f), code(codeOf("m")), code(codeOf("abc"))), sent)
+        assertEquals(listOf<KeyAction>(tap(codeOf("pq rs"), 0.75f, 0.25f), tap(codeOf("m"), 0.5f, 0.5f), code(codeOf("abc"))), sent)
     }
 
     // review L3: two keys of the same letters each send their own code, read by their own rows
@@ -229,13 +229,15 @@ class GroupedKeyboardOwnGroupsTest {
         assertEquals(listOf<KeyAction>(tap(codeOf("bn"), 0.75f, 0.5f)), sent)
     }
 
+    // a key of one letter has its place where other groups lean (061-neighbour-18key), for a slip from it onto one
+    // that weighs its letters by it
     @Test
-    fun leanOffOneLetterAndAClickNoTouchMadeSendTheCodeAlone() {
+    fun leanOffAndAClickNoTouchMadeSendTheCodeAlone() {
         val keyboard = grouped()
         keyboard.touch(keyboard.shownKey("ABC"), 0.9f, 0.5f)
         keyboard.touch(keyboard.shownKey("M"), 0.9f, 0.5f)
         keyboard.shownKey("XYZ").click()
-        assertEquals(listOf<KeyAction>(code(codeOf("abc")), code(codeOf("m")), code(codeOf("xyz"))), sent)
+        assertEquals(listOf<KeyAction>(code(codeOf("abc")), tap(codeOf("m"), 0.9f, 0.5f), code(codeOf("xyz"))), sent)
         // a letter on two keys: each key its own group's code (a on AS and on ABC)
         keyboard.touch(keyboard.shownKey("AS"), 0.5f, 0.5f)
         assertEquals(codeOf("as"), Keyboard.tappedCode((sent.last() as KeyAction.SymAction).sym.sym - UNICODE))

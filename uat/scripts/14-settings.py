@@ -1169,7 +1169,7 @@ case("ST-93", needs="manual:主题制作网页；在电脑浏览器上手工跑�
 @case("ST-96", base="B0-设置")
 def st96(d):
     """纠错's summary on the device: keys tapped off-centre read by where they land, 双拼's full keyboard the
-    ü-key slip; only 注音九键 不适用 (the pinyin and 双拼 group keyboards and 注音全键盘 read a key off-centre too)"""
+    ü-key slip; no 不适用 line (注音九键 reads slips too since the user's 11-16)"""
     title = "纠正错拼和按偏的键"
     d.goto("通用输入")
     r = None
@@ -1184,8 +1184,7 @@ def st96(d):
     summary = " ".join(n.text for n in r.walk() if n.rid == "summary" and n.text)
     check(summary.startswith("按在键的边上、靠着旁边哪个键，也按那个键读") and "双拼全键盘还认 j、q、x、y 后的 u 按成了 ü 的键" in summary,
           f"说明不对：{summary}")
-    not_for = summary.split("不适用：")[-1] if "不适用：" in summary else ""
-    check(not_for == "拼音 · 注音九键。", f"不适用的不是只有注音九键：{summary}")
+    check("不适用" not in summary, f"说明里还有不适用：{summary}")
     d.shot("full", "纠正错拼和按偏的键的说明")
     return summary
 

@@ -240,8 +240,8 @@
 
 ### TBL-55 [P1] 顶字的键只在键边上才读成邻键；读过的码先不上屏
 - **前提**：B0-五笔，**纠正错拼和按偏的键** 开（默认）。
-- **操作**：打 e t n（「乃」的整码），再按 `j`，手指落在 `j` 靠 `h` 那边、离边还有一截；再来一次，手指落在 `j` 最靠 `h` 的边上，然后按空格；第三次同第二次，然后按 `w`。
-- **预期**：`etnj` 没有编码。离边一截时照旧顶字：「乃」上屏，`j` 开始新的编码。落在边上时读成 `etnh`（首选「用」不是「乃」、也不比它少见）：什么也不上屏，第一个候选「用」，打满且只有这一个字也不马上上屏，空格上屏「用」；或者按下一个编码的 `w`，「用」上屏一次，`w` 开始新的编码。打到想要的字排第一（编码没打完）再按下一个字的键，也一样只在键边上才改读，而且邻键打出的首选是同一个字时不改读。按原样有字的编码、编码第一个键、打满后的键、万能键 `z` 都不改。
+- **操作**：打 e t n（「乃」的整码），再按 `j`，手指落在 `j` 靠 `h` 那边、离边至少五分之一键宽（比边更靠近键的正中）；再来一次，手指落在 `j` 最靠 `h` 的边上，然后按空格；第三次同第二次，然后按 `w`。
+- **预期**：`etnj` 没有编码。离边五分之一键宽以上时照旧顶字：「乃」上屏，`j` 开始新的编码。落在边上时读成 `etnh`（首选「用」不是「乃」、也不比它少见）：什么也不上屏，第一个候选「用」，打满且只有这一个字也不马上上屏，空格上屏「用」；或者按下一个编码的 `w`，「用」上屏一次，`w` 开始新的编码。打到想要的字排第一（编码没打完）再按下一个字的键，也一样只在键边上才改读，而且邻键打出的首选是同一个字时不改读。按原样有字的编码、编码第一个键、打满后的键、万能键 `z` 都不改。
 - **JVM**：`TableSlipUatTest.wubisToppingKeyIsReadOnlyAtTheEdge`（真数据）+ ime-core `TableSlipTest.aKeyAfterAWholeCodeIsReadOnlyAtTheEdge`、`aKeyIsNeverReadAsOneLeadingToTheTextItWouldCommit`、`aWaitingCodeIsCommittedOnceWhereTheTableTops`、`ziranmaTopsAsWubiDoes`、`wubiPinyinReadsNoKeyAsOneLeadingToPinyinAlone`、`aKeyAfterAWholeCodeIsReadOnlyForACodeTheWordModelWeighsAsMuch`、`aCodeWithAKeyReadAsItsNeighbourNeverCommitsItself`、`aCodeWithEntriesIsNeverChanged`、`aCodesFirstKeyIsNeverRead`、`aFullCodesNextKeyStartsTheNextCode`、`theWildcardIsNeverReadAsAnotherKey`；设备上不跑（点在键边上的落点要模拟）。
 
 ### TBL-56 [P2] 关掉纠错时码表不纠按偏

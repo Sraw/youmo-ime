@@ -88,17 +88,22 @@ class NeighbourSlipTest {
         // tapped toward d it is no hao, though as typed hso spells nothing: the 0.6.0 rule would read it
         val towardD = segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's', dx = 0.45f)))
         assertFalse(towardD.slipsOf(2, 5).containsKey("hao"))
-        // in the middle what spells nothing still reads, at its cost
-        val middle = segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's'))).slipsOf(2, 5)
+        // in the middle, though it spells nothing, not: 全拼 reads none past -1.75, the loosest floor that turns no
+        // sentence typed on target wrong (the user's 11-16 rule); over the -4 the others read, at its cost
+        assertFalse(segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's'))).slipsOf(2, 5).containsKey("hao"))
+        val middle = PinyinSegmenter(neighbours = true, slipCost = SlipCost()).segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's'))).slipsOf(2, 5)
         assertTrue(middle.getValue("hao").let { it < -3f && it >= -4f })
     }
 
     @Test
     @Uat("PY-137")
     fun aLegalSlipIsReadOnlyNearTheKeyMeant() {
-        val segmenter = PinyinSegmenter(neighbours = true)
-        // tade: in the middle of t, no ya; near y, ya, costing 2 more than a slip that spells nothing
-        // (ta at the end may still become tai: no slip there, as before)
+        // 全拼 reads none: a legal slip costs 2 more, past its floor -1.75 wherever the tap fell
+        val full = PinyinSegmenter(neighbours = true)
+        assertFalse(full.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.49f))).anySlip())
+        // over -4 (as 双拼's 18 and 14 keys read): tade, in the middle of t, no ya; near y, ya, costing 2 more than a
+        // slip that spells nothing (ta at the end may still become tai: no slip there, as before)
+        val segmenter = PinyinSegmenter(neighbours = true, slipCost = SlipCost())
         assertFalse(segmenter.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't'))).anySlip())
         val near = segmenter.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.35f))).slipsOf(0, 2)
         assertTrue(near.getValue("ya") < -2f)
@@ -235,6 +240,61 @@ class NeighbourSlipTest {
         assertTrue(keys.segment(g18("f a"), null, touchesAt(2, 0, fg)).slipsOf(0, 2).containsKey("sa"))
     }
 
+    // 061-neighbour-18key: pinyin's 18 keys' taps go with where across the key they fell (Keyboard.pinyin18Tap), so a
+    // slip has the letters of the key slipped to weighed as the 14 keys' do: FG tapped at its left edge, toward SD, is
+    // put onto SD's right edge, so sa goes nearly a whole against s and da none; with no place (as before) neither, and FG's
+    // own fa and ga as tapped (f none, g most of a whole)
+    @Test
+    @Uat("PY-152")
+    fun theEighteenKeysWeighTheLettersOfTheKeySlippedToByWhereTheTapFell() {
+        val keys = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G18, neighbours = true)
+        val fg = tap(G18, NineKeyLetters.G18.key('f'), dx = -0.45f)
+        val typed = g18("f a")
+        fun against(taps: FloatArray?): Map<String, Float> {
+            val g = keys.segment(typed, taps, touchesAt(2, 0, fg))
+            val out = HashMap<String, Float>()
+            for (e in g.edges(0)) {
+                if (g.to(e) != 2) continue
+                val m = g.matches(e)
+                for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = g.against(e, i)
+            }
+            return out
+        }
+        val placed = against(floatArrayOf(0.05f, Float.NaN))
+        assertTrue(placed.toString(), placed.getValue("sa") > 0.8f)
+        assertEquals(0f, placed.getValue("da"), 1e-4f)
+        assertEquals(0f, placed.getValue("fa"), 1e-4f)
+        assertEquals(0.9f, placed.getValue("ga"), 1e-4f)
+        val none = against(null)
+        assertTrue(none.toString(), listOf("sa", "da", "fa", "ga").all { none.getValue(it) == 0f })
+    }
+
+    // a key of one letter has its place too where the keys lean (GroupedKeyboard.tapped), so a slip from it onto a key
+    // of two weighs that key's letters: A tapped at its right edge, toward SD (aa spells nothing), puts the tap onto
+    // SD's left edge, s's half: da a whole against d, sa none; and the place of a key of one letter weighs nothing of its own,
+    // L; (微软 双拼's ing) l alone however far right
+    @Test
+    @Uat("PY-152")
+    fun aKeyOfOneLetterHasItsPlaceForASlipFromItAlone() {
+        val keys = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G18, neighbours = true)
+        fun against(typed: String, taps: FloatArray, touches: Array<Touch?>?): Map<String, Float> {
+            val g = keys.segment(typed, taps, touches)
+            val out = HashMap<String, Float>()
+            for (e in g.edges(0)) {
+                if (g.to(e) != 2) continue
+                val m = g.matches(e)
+                for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = g.against(e, i)
+            }
+            return out
+        }
+        val a = tap(G18, NineKeyLetters.G18.key('a'), dx = 0.45f)
+        val slipped = against(g18("a a"), floatArrayOf(0.95f, 0.5f), touchesAt(2, 0, a))
+        assertTrue(slipped.toString(), slipped.getValue("da") > 0.8f)
+        assertEquals(0f, slipped.getValue("sa"), 1e-4f)
+        val l = against(g18("l a"), floatArrayOf(1f, 0.5f), null)
+        assertEquals(0f, l.getValue("la"), 1e-4f)
+    }
+
     // 双拼's 18 and 14 keys (061-neighbour-groups), each scheme's: [BN][F] (ben) with BN tapped at its right edge,
     // toward M, reads men too; in the middle, with no place or with the option off, nothing. 微软 has no 14 keys
     @Test
@@ -272,32 +332,36 @@ class NeighbourSlipTest {
     }
 
     // 注音大千 (061-neighbour-groups): a symbol key's neighbours the symbol keys around it, its tone keys none.
-    // ㄇㄚ with ㄇ tapped at its right edge, toward ㄋ, reads ㄋㄚ (na) too; in the middle nothing
+    // ㄈㄧ (spelling nothing) with ㄈ tapped at its right edge, toward ㄌ, reads ㄌㄧ (li) too; in the middle nothing.
+    // ㄇㄚ, which spells ma, with ㄇ toward ㄋ never: past 大千's floor -1.75 (the user's 11-16 rule), na costs 2 more
     @Test
     @Uat("PY-150")
     fun dachenReadsASymbolAsTheOneNextToIt() {
         val keys = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true)
-        val m = ZhuyinKeys.symbolCode('ㄇ')
-        val typed = "$m${ZhuyinKeys.symbolCode('ㄚ')}"
-        assertTrue(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, m, dx = 0.45f))).slipsOf(0, 2).containsKey("na"))
-        assertFalse(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, m))).anySlip())
+        val f = ZhuyinKeys.symbolCode('ㄈ')
+        val typed = "$f${ZhuyinKeys.symbolCode('ㄧ')}"
+        assertTrue(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, f, dx = 0.45f))).slipsOf(0, 2).containsKey("li"))
+        assertFalse(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, f))).anySlip())
         assertFalse(keys.segment(typed).anySlip())
-        assertFalse(T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN).segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, m, dx = 0.45f))).anySlip())
+        assertFalse(T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN).segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, f, dx = 0.45f))).anySlip())
+        val m = ZhuyinKeys.symbolCode('ㄇ')
+        assertFalse(keys.segment("$m${ZhuyinKeys.symbolCode('ㄚ')}", null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, m, dx = 0.49f))).anySlip())
         // ㄉ, between ㄅ and ˇ on the number row: ˇ to its right no neighbour, ㄅ to its left one
         val d = tap(TouchBoxes.DACHEN, ZhuyinKeys.symbolCode('ㄉ'))
         assertNull(d.near(ZhuyinKeys.toneCode(3)))
         assertTrue(d.near(ZhuyinKeys.symbolCode('ㄅ')) != null)
     }
 
-    // 注音九键 as the segmenter has it (the app gives its taps no place, so it reads none): [ㄖㄥㄩ][ㄅㄉㄚ] with ㄖㄥㄩ
-    // tapped at its left edge, toward ㄈㄌㄝ, reads fa and la; in the middle nothing
+    // 注音九键 (read since the user's 11-16, over -2): [ㄖㄥㄩ][ㄅㄉㄚ], spelling nothing as typed, with ㄖㄥㄩ
+    // tapped at its very left edge, toward ㄈㄌㄝ, reads fa and la; a little in (-0.45), past the floor, nothing
     @Test
     fun zhuyinsNineKeysReadAGroupAsTheOneNextToIt() {
         val keys = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.NINE, neighbours = true)
         val r = ZhuyinKeys.groupCode(10)
         val typed = "$r${ZhuyinKeys.groupCode(0)}"
-        val slips = keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.ZHUYIN_NINE, r, dx = -0.45f))).slipsOf(0, 2)
+        val slips = keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.ZHUYIN_NINE, r, dx = -0.49f))).slipsOf(0, 2)
         assertTrue(slips.toString(), slips.keys.containsAll(listOf("fa", "la")))
+        assertFalse(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.ZHUYIN_NINE, r, dx = -0.45f))).anySlip())
         assertFalse(keys.segment(typed, null, touchesAt(2, 0, tap(TouchBoxes.ZHUYIN_NINE, r))).anySlip())
         assertFalse(keys.segment(typed).anySlip())
     }
@@ -342,14 +406,14 @@ class NeighbourSlipTest {
     fun slipReadingsAreEdgesOfTheirOwn() {
         val graphs = listOf(
             PinyinSegmenter(neighbours = true).segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's', dx = -0.45f))),
-            PinyinSegmenter(neighbours = true).segment("tama", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.4f))),
-            ShuangpinSegmenter(XIAOHE, neighbours = true).segment("ta", null, touchesAt(2, 0, tap(QWERTY, 't', dx = 0.35f))),
+            PinyinSegmenter(neighbours = true, slipCost = SlipCost()).segment("tama", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.4f))),
+            ShuangpinSegmenter(XIAOHE, neighbours = true, slipCost = SlipCost()).segment("ta", null, touchesAt(2, 0, tap(QWERTY, 't', dx = 0.35f))),
             T9Segmenter(abbreviations = false, neighbours = true).segment("99", null, touchesAt(2, 1, tap(NINE, '9', dy = -0.4f))),
             NineKeyLetters.G18.let { l ->
                 GroupedShuangpinSegmenter(XIAOHE, l, neighbours = true).segment("bf".map(l::key).joinToString(""), null, touchesAt(2, 0, tap(G18, l.key('b'), dx = 0.45f)))
             },
             ZhuyinKeys.symbolCode('ㄇ').let { m ->
-                T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true)
+                T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, neighbours = true, slipCost = SlipCost())
                     .segment("$m${ZhuyinKeys.symbolCode('ㄚ')}", null, touchesAt(2, 0, tap(TouchBoxes.DACHEN, m, dx = 0.45f)))
             },
         )

@@ -117,6 +117,25 @@ object TouchSim {
     }
 
     /**
+     * [samples] with each tap's place across its key ([Sample.taps]) where the app sends one on [letters]'
+     * keyboard (GroupedKeyboard.tapped as built in: the 14 and the 18 keys' every key, one of one letter for
+     * a slip from it): `clamp(dx + 0.5, 0, 1)` to the nearest of the places the app sends ([Taps.placed]);
+     * NaN elsewhere, and none at all on another keyboard.
+     */
+    fun placed(samples: List<Sample>, letters: NineKeyLetters): List<Sample> {
+        if (letters != NineKeyLetters.G14 && letters != NineKeyLetters.G18) return samples
+        return samples.map { s ->
+            val touches = s.touches ?: return@map s
+            s.copy(
+                taps = s.input.indices.map { i ->
+                    val t = touches.getOrNull(i)
+                    if (t != null && letters.isCode(s.input[i])) Taps.placed((t.dx + HALF).toDouble().coerceIn(0.0, 1.0)) else Float.NaN
+                },
+            )
+        }
+    }
+
+    /**
      * A tap of [hand] aimed at the key [c] of [board], landing in one of the keys [onto] (itself, or
      * keys next to it, the first that has the tap): the key hit and the tap. Null where none of
      * [onto] is on the board or none lands so in [MAX_TRIES].
@@ -139,6 +158,7 @@ object TouchSim {
 
     // a row's width in QWERTY keys, and the 18 keys' last row's (GroupedKeyboard's Shape: 0.14 of the row)
     private const val ROW = 10f
+    private const val HALF = 0.5f
     private const val K18_LAST = 1.4f
     private const val ZHUYIN_ROW = KEY_H * 0.8f
     private const val SIGMA = 0.2f

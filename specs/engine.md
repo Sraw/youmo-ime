@@ -150,19 +150,26 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    place and `Segmenter.segment(input, taps, touches)` reads it. `SlipCost.of` scores reading a key as
    one around it: the log of how much likelier the tap is under a finger aimed at it than at the key
    hit (round Gaussians of σ 10 dp), never above 0, −2 more where the keys as typed spell a syllable
-   too (a legal slip, `ta` near `y`), none below −4 (−3 on the nine keys' digits: below it they cost the 6T more than
-   061-neighbour-correction §7.2 allows, below; −3 on 大千's keys too, a symbol each: below it they took a quarter more
-   arcs, 061-neighbour-groups). So a tap in a key's middle reads as typed and
+   too (a legal slip, `ta` near `y`), none below a floor of each keyboard's. −3 on the nine keys' digits (pinyin's and
+   双拼's): below it they cost the 6T more than 061-neighbour-correction §7.2 allows, below. The rest by the user's
+   2026-11-16 rule, the loosest floor that turns no sentence typed in the keys' middle (σ 0.15, both halves × seeds
+   1–3) wrong (061-neighbour-18key-impl-report §5): 全拼 −1.75 (`PinyinSegmenter.SLIP`) and 大千 −1.75, with tones or
+   without, so neither reads a legal slip; 双拼 on the full keyboard −3.75 (`ShuangpinSegmenter.SLIP`); the pinyin
+   18 keys −4; the pinyin 14 keys −6; 双拼's 18 and 14 keys −5 (to −6 none turned wrong, but past −5 a key on the
+   18 keys took a sixth more arcs, over the tenth allowed: `NeighbourKeyWorkTest`); 注音九键 −2. So a tap in a key's middle reads as typed and
    one at its edge reads the neighbour too. 全拼 (`PinyinSegmenter`: `SpellingIndex` has every
    one-letter substitution, the segmenter keeps those the touches allow; never a syllable still
    growing at the end of the input, nor consonants alone where tapped in the middle, 简拼 being
    read), 双拼 on the full keyboard (`ShuangpinSegmenter`), 九键 (`T9Segmenter`, 1 and 0 no
    neighbours) and the pinyin 14/18 keys (`T9Segmenter` over the groups, a tap put onto the key
-   meant at its edge nearest the key hit; 18 keys unweighted, the user's), 双拼's 18, 14 and nine keys
+   meant at its edge nearest the key hit, its letters weighed by where it lies there, the 18 keys' too
+   since 061-neighbour-18key, the user's 2026-11-16), 双拼's 18, 14 and nine keys
    (`GroupedShuangpinSegmenter`, by the same groups) and 大千 (`T9Segmenter` over `ZhuyinKeys.DACHEN`, a symbol
-   key's neighbours the symbol keys around it, a tone key none) read slips (061-neighbour-groups); 注音九键 does not
-   (with no tones typed one sentence of 983 typed on target went wrong, whatever the floor: its keyboard is no
-   `TypingKeys`). A key with no place (a hardware keyboard, TalkBack's double tap): 全拼 reads a
+   key's neighbours the symbol keys around it, a tone key none) read slips (061-neighbour-groups), and 注音九键
+   since the user's 2026-11-16 (`T9Segmenter` over `ZhuyinKeys.NINE`, a group key's neighbours the group keys
+   around it, floor -2: past it every slip that also spells as typed, so it reads only where the keys spell
+   nothing; the loosest that turns no sentence typed in the keys' middle (σ 0.15) wrong, with tones or without,
+   where -2.5 turned one with no tones; 061-neighbour-18key-impl-report). A key with no place (a hardware keyboard, TalkBack's double tap): 全拼 reads a
    slip only where the keys spell nothing (the 0.6.0 rule, `SlipCost.fixed`) and never consonants
    alone; the others none. The decoder adds the slip's cost in the arc's score where it scores the syllable (`step`,
    `startWords`), so `Lattice.same` sees it and a kept lattice is dropped where it changed; an arc over
@@ -543,7 +550,7 @@ are offered where nothing is learned (a password field, `Session.learning` false
   under which a setting says 「拼音 · 14 键」) is the grouped session: a `T9Segmenter` over
   `G14`, no abbreviations, `spell = true`, wrapped in `ForgetsInTables` as the nine keys are, no
   glide, no `u` stroke lookup (笔画筛选 wraps it as every pinyin session). It is made at the first code. `PINYIN_KEYS18` (`engine-pinyin#keys18`,
-  「拼音 · 18 键」) is the same over `G18`, fed `Keyboard.pinyin18Key`; `T9` (`engine-t9`) survives only
+  「拼音 · 18 键」) is the same over `G18`, fed `Keyboard.pinyin18Key` and its taps `Keyboard.pinyin18Tap`; `T9` (`engine-t9`) survives only
   as pinyin's nine-keys session (「拼音 · 九键」), fed `Keyboard.PINYIN_NINE` — never a listed input
   method (0.4's 九键拼音 is merged into pinyin by `NineKeysMerge`, run from `KotlinHost.mergeNineKeys`
   when the profile is read; each read of a 0.4 profile merges it, but pinyin's keyboard is set and
@@ -628,8 +635,8 @@ setting either: it reads the codes.
   简拼 in the middle (a key alone only where it and the next make no syllable) and no
   spelling slip, not even ü typed with its own key (the user's 2026-11-03). With `neighbours` (纠错 on,
   061-neighbour-groups) it reads a key tapped by its neighbour's edge as that key, as `T9Segmenter` does
-  over pinyin's groups: each key's touch onto the key meant (`slipped`), its cost `SlipCost`'s (floor −4,
-  −3 on the nine keys' digits as on pinyin's); a pair read through a slip is marked `ABBREVIATED` and
+  over pinyin's groups: each key's touch onto the key meant (`slipped`), its cost `SlipCost`'s (floor −5 on the
+  18 and 14 keys, −3 on the nine keys' digits as on pinyin's; above); a pair read through a slip is marked `ABBREVIATED` and
   carries its slips, as 全键盘 双拼's do.
   It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
   bar's initials: the scheme's initials on the key's letters, 自然码's v zh) and `started` (a
@@ -674,7 +681,17 @@ setting either: it reads the codes.
   held as unreadable, not writable or a failed write is pinned again at the next start; direct boot
   settles nothing. Learning under a dropped scheme (`sp:Ziguang`, `spk:Ziguang:…`) is kept as it
   is, listed and forgotten by its old name (`ShuangpinNames` names all eight).
-- No tap position on G18 yet; `Keyboard.TAPS` leaves indices 26–51 for it (design k14-tap §1.4).
+- Pinyin's 18 keys' taps (061-neighbour-18key, the user's 2026-11-16) are a block of their own,
+  `Keyboard.TAPS_18` (U+F0500 on, `pinyin18Tap(code, at) = TAPS_18.first + (code − G18_BLOCK.first) × 17 +
+  round(at × 16)`), not `TAPS`' indices 26–51 the design left (k14-tap §1.4): 双拼's 18 keys send the same G18
+  codes, so a tap there would read as 双拼's; as `PINYIN_18` is pinyin's alone (`KeyboardPair.pinyinKeyed` →
+  `PINYIN_KEYS18`), so are its taps. Decoded, typed letters and quick phrase as `TAPS` (`Keyboard.isTap`,
+  `untapped`, `typedLetter`). Every key sends one where the layout leans; only a key of two letters a–z
+  (`NineKeyLetters.weighs`: WE RT IO SD FG JK XC BN; not pinyin's L, the group `l;`) has its own letters weighed by it,
+  and the engine, the app and the eval count alike. A key of one letter's place is for a slip from it alone: the key
+  slipped onto has its letters weighed by where the tap lies on it (`T9Segmenter.slipAgainst`, `placeOn`; the code
+  review's S1). Measured (ime-eval `--touch k18:…` with `TouchSim.placed`, held-out py18, rerank+refine,
+  s0.2/s0.3 × seeds 1–3): dev/design/061-neighbour-18key-impl-report.md.
 - **A layout's own groups** (060-render-p3 T9a, the engine part; T9b, the app's: app.md, grouped keys).
   `NineKeyLetters.custom(groups)` (each a key's `letters=`, rows apart by a space): `problem` refuses
   groups that leave a letter of a–z on no key (ü as v), a key of 0 or more than 5 letters (a–z, `;`), a
@@ -719,7 +736,8 @@ setting either: it reads the codes.
   (`SyllableGraph.isSeparator`); `SyllableGraph.tone(edge)` reads it after the edge. On 大千 a space after a
   syllable with no tone is tone 1 (`KeyedSegmenter.tonesBySpace`), else it picks the first candidate. With 纠错
   on 大千 reads a symbol key tapped by its neighbour's edge as that one too (`ZhuyinKeyboard` a `TypingKeys` there,
-  tone keys none; 061-neighbour-groups); 注音九键 reads no slip.
+  tone keys none; 061-neighbour-groups); so does 注音九键 a group key by the group keys around it (its group
+  codes, since the user's 2026-11-16).
 - **Keys and bar.** 注音九键 has the tones ˉ ˊ ˇ ˋ a key each down the left (˙ on ˉ's long press and
   swipe); the key after ㄖㄥㄩ's group is 分词 (tone 0) while something is typed, else a comma as punctuation
   maps it. A tone with nothing typed is not read (`PinyinSession.reads`): it types nothing. The bar's
@@ -750,7 +768,7 @@ the code's end, the wildcard, the pinyin key, a selection key or an end key, nor
 nor as one of them. Where the key would commit something (`TableSession.topped`: the first candidate shown,
 as `autoCommit` takes it, by 顶字 or for a code that waits, below; a 简码, or a part of a code that shows the
 character first, then the next code's first key, typed so on purpose most often) only past
-`SLIPS.toppingFloor` (−0.1: −0.5 changed a word typed on target, 覅 → 要饭) and for a key whose code's first table entry is another text the word model
+`SLIPS.toppingFloor` (−1: the loosest that changes no word typed in the keys' middle, σ 0.15, five tables, both plans, seeds 1–3, both halves, where −1.5 changed one; a looser hand changes a few, 覅 → 要饭; −0.1 read a third as many slips) and for a key whose code's first table entry is another text the word model
 weighs at least as much (the table's first, not the order the session would show: that is weighed only for
 the code typed). Codes read toward pinyin entries alone (五笔拼音) are not read. A code with a key so read
 (`TableSlips.marks`, a bit per place, moved as keys are put in and deleted) never commits itself as it is

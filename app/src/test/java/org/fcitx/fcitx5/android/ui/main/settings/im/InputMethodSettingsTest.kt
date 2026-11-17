@@ -178,9 +178,9 @@ class InputMethodSettingsTest {
         assertEquals(emptyList<String>(), notFor(EngineSettings.EMOJI))
         assertEquals(emptyList<String>(), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
-        // pinyin's nine, 14 and 18 keys, 双拼's grouped keyboards and 大千 read a key tapped by its neighbour's edge
-        // (061-neighbour-correction, 061-neighbour-groups); 注音九键 nothing
-        assertEquals(listOf(InputMethodCatalog.ZHUYIN_NINE), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
+        // pinyin's nine, 14 and 18 keys, 双拼's grouped keyboards and both zhuyin keyboards read a key tapped by its
+        // neighbour's edge (061-neighbour-correction, 061-neighbour-groups; 注音九键 since the user's 11-16)
+        assertEquals(emptyList<String>(), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
         // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
         val fuzzy = rows.filterIsInstance<Flags>().single()
         assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE)), fuzzy.notFor)

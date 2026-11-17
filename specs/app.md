@@ -980,10 +980,13 @@ that swipes no corner gets its row with no first. `letters` keep their rows (`"p
 where a tap leans and, P3, where the default label draws; the built-ins write their labels (`QW`, one
 word centred), so no label is drawn by the rows yet. Whether a tap leans (按落点加权) is the layout's:
 a group of two letters or more without `lean="off"` (`SceneGroups.leaning`, read whichever draws the
-keys), the 18 keys writing `lean="off"`; a layout whose groups are not the keyboard's, or none read, leans
-as built in (`SceneGroups.leaningOf`: G14's two-letter groups); the engine places taps of G14's codes and a
-layout's own codes alone (`Keyboard.placesTaps`), so 双拼's 14 keys (sent as `shuangpin14Key`) and the built-in
-18 keys send the code only, as before; the built-in 14 keys' taps are their `TAPS` character, wherever down the key.
+keys; k18.xml wrote `lean="off"` until 061-neighbour-18key); a layout whose groups are not the keyboard's, or none
+read, leans as built in (`SceneGroups.leaningOf`: G14's and G18's two-letter groups); the engine places taps of G14's
+codes and a layout's own codes (`Keyboard.placesTaps`), and pinyin's 18 keys' as `Keyboard.pinyin18Tap`, so 双拼's 14
+keys (sent as `shuangpin14Key`) and 18 keys send the code only, as before; the built-in 14 keys' taps are their `TAPS`
+character, wherever down the key. A key of one letter a–z (`NineKeyLetters.weighs`: L, M, Q, the 18 keys' `l;`, a
+layout's own) sends its place too where any group of the layout leans: it weighs nothing of its own, but a slip from it
+onto a key of two has that key's letters weighed by where the tap lies on it (T9Segmenter, 061-neighbour-18key S1).
 
 The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
 `NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by
@@ -1245,7 +1248,7 @@ finger came down: `KeyGesture.downAt` (x / the key's cell width, `KeyGesture.Key
 made `clickAt` at ACTION_UP before `resetState` (NaN if the touch left the key or swiped past the
 threshold; a few pixels' MOVE keep it), cleared once the click returns and at DOWN and CANCEL;
 `BaseKeyboard.pressed(clickAt, action)`, which `GroupedKeyboard` overrides, sends `Keyboard.tapKey`
-for it where k14.xml has the group lean (its `lean=`, above). TalkBack's click, a swipe's own Tap, L and M send the code alone; a swipe its corner (1–0, `~ ! @ ?`), a
+for it where k14.xml has the group lean (its `lean=`, above); pinyin's 18 keys `Keyboard.pinyin18Tap` where k18.xml does. TalkBack's click and a swipe's own Tap send the code alone (L and M their place too, above); a swipe its corner (1–0, `~ ! @ ?`), a
 digit as a keypad key; a long press one row as the nine keys' (`Q W 1 q w`), the letters' full
 keyboard symbols above. `'` is the separator key, ⌫ backspace, no ⇧, no glide. No 中/英 (R16 F4346,
 owner 2026-10-26): English is the language key's round or the space's long press, as on the full
@@ -1301,8 +1304,8 @@ Every place that ended the engine's preedit in the field goes by `EditingSession
 ours or let go of. The engine's context reads leave the code out (`beforeCode`/`afterCode`). The
 setting asks first (`ManagedPreferenceUi.Confirm`, the list's OK/Cancel note).
 
-Pinyin's 18 keys (`Keys18`) are the grouped keyboard over `G18`, sending `Keyboard.pinyin18Key(code)`
-(L; is just L on pinyin); 双拼's 18 keys (`shuangpinKeyboard == Keys18`) the same keyboard with 双拼's
+Pinyin's 18 keys (`Keys18`) are the grouped keyboard over `G18`, sending `Keyboard.pinyin18Key(code)`, a tap
+`Keyboard.pinyin18Tap(code, at)` (a key of one letter too, its place for a slip from it; L; is just L on pinyin); 双拼's 18 keys (`shuangpinKeyboard == Keys18`) the same keyboard with 双拼's
 codes, and 双拼's 14 keys (`Keys14`) the 14 keys' groups sending `Keyboard.shuangpin14Key(code)`; each
 with the syllable strip and the 32 dp row. 九键双拼 (`NineKeys`) is `T9Keyboard`
 built for 双拼: its digits send `NINE_SP`'s codes, its 1 key `'` while typing, a wider

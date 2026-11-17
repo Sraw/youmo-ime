@@ -77,10 +77,12 @@ class EngineEvalRunner {
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val samples = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->
             lines.filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
-                // input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches]], as EvalSet reads it: each key's touch a space
-                // apart, `-` none (pinyin --touch … --touched writes them; 061-neighbour-correction)
+                // input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches[<TAB>places]]], as EvalSet reads it: each key's
+                // touch a space apart, `-` none (pinyin --touch … --touched writes them; 061-neighbour-correction),
+                // each key's place across it as the 14 and 18 keys send it, `-` none (061-neighbour-18key)
                 val fields = line.split('\t')
-                Sample(fields[0], fields.getOrElse(3) { "" }, fields.getOrNull(4)?.split(' ')?.map(Touch::parse))
+                val places = fields.getOrNull(5)?.split(' ')?.map { it.toFloatOrNull() ?: Float.NaN }
+                Sample(fields[0], fields.getOrElse(3) { "" }, fields.getOrNull(4)?.split(' ')?.map(Touch::parse), places)
             }.toList()
         }
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
@@ -162,7 +164,7 @@ class EngineEvalRunner {
             val touch = sample.touches?.getOrNull(i)
             when {
                 nine -> fcitx.sendKey(KeySym(UNICODE + if (english) Keyboard.nineKey(c, upper = false) else Keyboard.pinyinNineKey(c)), KeyStates.Virtual, touch = touch)
-                grouped != null -> fcitx.sendKey(KeySym(UNICODE + wired(grouped!!, c)), KeyStates.Virtual, touch = touch)
+                grouped != null -> fcitx.sendKey(KeySym(UNICODE + wired(grouped!!, c, sample.places?.getOrNull(i) ?: Float.NaN)), KeyStates.Virtual, touch = touch)
                 touch != null -> fcitx.sendKey(c.toString(), touch = touch)
                 else -> fcitx.sendKey(c)
             }
@@ -204,9 +206,11 @@ class EngineEvalRunner {
         }
     }.toList()
 
-    // what the grouped keyboard [board] sends for the code [c] the engine reads
-    private fun wired(board: String, c: Char): Int = when (board) {
-        "18" -> Keyboard.pinyin18Key(c)
+    // what the grouped keyboard [board] sends for the code [c] the engine reads, tapped [at] across its key (NaN: no
+    // place), as GroupedKeyboard.tapped sends the 14 and 18 keys'
+    private fun wired(board: String, c: Char, at: Float): Int = when (board) {
+        "18" -> if (at.isNaN()) Keyboard.pinyin18Key(c) else Keyboard.pinyin18Tap(c, at)
+        "14" -> if (at.isNaN()) c.code else Keyboard.tapKey(c, at)
         "sp14" -> Keyboard.shuangpin14Key(c)
         "zy9" -> Keyboard.ZHUYIN_NINE.first { Keyboard.keyedChar(it) == c }
         "zy" -> Keyboard.ZHUYIN_FULL.first { Keyboard.keyedChar(it) == c }
@@ -214,7 +218,7 @@ class EngineEvalRunner {
     }
 
     /** A line of an evaluation set as it is typed: [input] after [context], the text before the cursor ("" for none). */
-    private data class Sample(val input: String, val context: String, val touches: List<Touch?>? = null)
+    private data class Sample(val input: String, val context: String, val touches: List<Touch?>? = null, val places: List<Float>? = null)
 
     private companion object {
         const val UID = 0

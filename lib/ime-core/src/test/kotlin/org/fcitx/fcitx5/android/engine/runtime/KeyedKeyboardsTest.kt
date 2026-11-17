@@ -19,7 +19,7 @@ import org.junit.Test
 class KeyedKeyboardsTest {
 
     // a layout's own keyboard's codes and taps too (060-render-p3 T9b: pinyin's own-keys session)
-    private val codes = (NineKeyLetters.CODES + Keyboard.TAPS + Keyboard.KEYED_CODES + NineKeyLetters.CUSTOM_BLOCK + Keyboard.PLACES).toSortedSet()
+    private val codes = (NineKeyLetters.CODES + Keyboard.TAPS + Keyboard.TAPS_18 + Keyboard.KEYED_CODES + NineKeyLetters.CUSTOM_BLOCK + Keyboard.PLACES).toSortedSet()
 
     @Test
     fun aCodeAnInputMethodReadsGoesToOneOfItsKeyedSessionsAndNoOtherCode() {

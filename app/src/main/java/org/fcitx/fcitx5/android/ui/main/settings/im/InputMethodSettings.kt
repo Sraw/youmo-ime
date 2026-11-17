@@ -311,13 +311,10 @@ object InputMethodSettings {
             R.string.shared_section_pinyin, listOf(
                 // pinyin's nine, 14 and 18 keys (a layout's own groups too) read a key tapped by its neighbour's edge as
                 // that key (061-neighbour-correction, the user's Q3/Q4), 双拼's grouped keyboards and 大千 too
-                // (061-neighbour-groups; 双拼's ü typed with its own key is read on the full keyboard alone); 注音九键
-                // nothing: one sentence typed on target there with no tones went wrong. The tables follow it too,
-                // reading a slip only where the key would lead nowhere (TableSlips, 061-neighbour-table)
-                Toggle(
-                    "${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary,
-                    notFor = listOf(InputMethodCatalog.ZHUYIN_NINE),
-                ),
+                // (061-neighbour-groups; 双拼's ü typed with its own key is read on the full keyboard alone), 注音九键
+                // since the user's 11-16. The tables follow it too, reading a slip only where the key would lead
+                // nowhere (TableSlips, 061-neighbour-table)
+                Toggle("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}", text(R.string.im_typos), R.string.im_typos_summary),
                 // u and v are both on 8 of pinyin's nine keys; zhuyin's keep ㄨ and ㄩ apart (ㄌㄨ for ㄌㄩ is a slip there)
                 Flags(EngineSettings.FUZZY, R.string.im_fuzzy, R.string.im_fuzzy_none, FUZZY, notFor = mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE))),
             )

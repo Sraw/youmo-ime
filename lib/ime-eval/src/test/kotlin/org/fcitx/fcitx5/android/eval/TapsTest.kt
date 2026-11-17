@@ -26,9 +26,10 @@ class TapsTest {
 
     @Test
     fun aPerfectHandTapsEachLettersCentre() {
-        // n i h a o: right, right, right, left, left; L and M keys of one letter with no place, as sent
+        // n i h a o: right, right, right, left, left; L and M keys of one letter at their centre, as sent
+        // (where they fell weighs only a slip's from them)
         assertEquals(listOf(0.75f, 0.75f, 0.75f, 0.25f, 0.25f), taps("perfect")[0].taps)
-        assertEquals(listOf(Float.NaN, 0.25f, Float.NaN, 0.25f), taps("perfect")[2].taps)
+        assertEquals(listOf(0.5f, 0.25f, 0.5f, 0.25f), taps("perfect")[2].taps)
     }
 
     @Test
