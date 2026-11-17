@@ -27,8 +27,9 @@ fun startedHost(side: KotlinHost.EngineSide, firstRun: Boolean = true, beforeSta
 /**
  * A keyboard on [host] with the input context onBindInput activates made first: the harness starts
  * input without a binding, and focus needs one. Not started: the caller sets what it reads first.
+ * [api]: what the keyboard calls, [host] or a wrapper of it; jobs wait for [host] to be up either way.
  */
-fun keyboardOn(host: KotlinHost) = KeyboardHarness(host = host).also { h ->
+fun keyboardOn(host: KotlinHost, api: HostApi = host) = KeyboardHarness(host = api, ready = host).also { h ->
     h.service.postFcitxJob { activate(1, "org.example.app") }
 }
 

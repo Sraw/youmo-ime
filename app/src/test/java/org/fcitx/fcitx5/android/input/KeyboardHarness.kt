@@ -85,8 +85,8 @@ import org.robolectric.shadows.ShadowPopupMenu
 class KeyboardHarness(
     theme: Theme? = TestThemes.PixelLight,
     im: InputMethodEntry = PINYIN,
-    /** A real host to type through (a [KotlinHost] on a scripted engine) in place of [api]: its own events, its own answers. */
-    host: HostApi? = null,
+    /** A real host to type through (a [KotlinHost] on a scripted engine) in place of [api]; [ready] the one a job waits on, a wrapper's too. */
+    host: HostApi? = null, ready: org.fcitx.fcitx5.android.core.KotlinHost? = host as? org.fcitx.fcitx5.android.core.KotlinHost,
     /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
     keyboards: ImKeyboards.Chosen? = null,
     /**
@@ -115,7 +115,7 @@ class KeyboardHarness(
         TestShelves.use()
         keyboards?.let(::setKeyboards)
         codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
-        val connection = host?.let { HarnessConnection(scope, it) } ?: FakeHostConnection(scope, api)
+        val connection = host?.let { HarnessConnection(scope, it, ready) } ?: FakeHostConnection(scope, api)
         HostDaemon.testConnection = { connection }
         // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)
         try {
@@ -957,15 +957,14 @@ class KeyboardHarness(
     }
 
     // the daemon's connection to a real host, which answers on its own thread
-    private class HarnessConnection(override val lifecycleScope: CoroutineScope, val host: HostApi) : HostConnection {
+    private class HarnessConnection(override val lifecycleScope: CoroutineScope, val host: HostApi, val ready: org.fcitx.fcitx5.android.core.KotlinHost?) : HostConnection {
         override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
         // as the daemon's: a host not up yet (a test pressing before it starts) does it once it is
         override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
             // the wait timed alone, not [block]; a plain error, which a cancelled job could not swallow. Timed on the
             // caller's dispatcher: on the paused main looper that is the test's clock (after()/advance() run it on,
             // idle() does not), not real time
-            if (host is org.fcitx.fcitx5.android.core.KotlinHost)
-                withTimeoutOrNull(READY_TIMEOUT_MS) { host.lifecycle.whenReady { } } ?: error("the host not up in $READY_TIMEOUT_MS ms")
+            ready?.let { withTimeoutOrNull(READY_TIMEOUT_MS) { it.lifecycle.whenReady { } } ?: error("the host not up in $READY_TIMEOUT_MS ms") }
             return block(host)
         }
         override fun runIfReady(block: suspend HostApi.() -> Unit) {

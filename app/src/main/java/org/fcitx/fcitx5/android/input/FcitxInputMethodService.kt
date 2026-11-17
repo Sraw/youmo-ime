@@ -1205,11 +1205,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (voice) voiceAsk.posting()
         return postFcitxJob {
             if (!stillIn(asked, text)) {
-                if (voice) lifecycleScope.launch { voiceAsk.landed(inField = false) }
+                if (voice) lifecycleScope.launch(Dispatchers.Main) { voiceAsk.landed(inField = false) }
                 return@postFcitxJob
             }
             commitAndReset(address)
-            lifecycleScope.launch {
+            // posted, never run in place: the engine's commit of what was typed comes to the main thread as an event
+            // posted when fcitx sent it, so this goes in after it. A job runs on Dispatchers.Default here, where it was
+            // posted anyway; Main pins the order wherever the job runs. The tests' jobs run on the main thread: one
+            // whose host calls answered before it waited ran this in place (Main.immediate), first: `.你` for 你.
+            lifecycleScope.launch(Dispatchers.Main) {
                 if (!stillIn(asked, text)) {
                     if (voice) voiceAsk.landed(inField = false)
                     return@launch

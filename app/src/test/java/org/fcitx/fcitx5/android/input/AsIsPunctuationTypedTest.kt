@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.HostConfig
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.keyboardOn
@@ -122,12 +124,19 @@ class AsIsPunctuationTypedTest {
         internal.keyLists.setValue(KeyLists.of(mapOf(KeyId("fn/comma") to list)).serialize())
     }
 
-    private fun on(im: String) {
+    // the host's answers to select and reset in before the job could wait on them, as on a loaded machine: the job,
+    // on the main thread here, went on at once and put its text in ahead of the engine's commit still on its way (.你)
+    private fun answeringAtOnce(host: KotlinHost): HostApi = object : HostApi by host {
+        override suspend fun select(idx: Int, text: String?) = runBlocking { host.select(idx, text) }
+        override suspend fun reset(drop: Boolean) = runBlocking { host.reset(drop) }
+    }
+
+    private fun on(im: String, atOnce: Boolean = false) {
         home = File(appContext.filesDir, "as-is").apply { deleteRecursively() }
         // the unit tests have no assets, the built-in table with them: the marks it converts as the user's table
         File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(". 。\n, ，\n? ？\n( （\n) ）\n")
         fcitx = startedHost(side(home))
-        h = keyboardOn(fcitx)
+        h = keyboardOn(fcitx, if (atOnce) answeringAtOnce(fcitx) else fcitx)
         up = true
         h.start()
         h.service.postFcitxJob {
@@ -173,6 +182,17 @@ class AsIsPunctuationTypedTest {
         typeLetters("ni")
         h.longPress(comma()!!, pick = ".")
         until("你. typed", { h.field.text.toString() }) { h.field.text.toString() == "你." }
+    }
+
+    // the job's host calls done before it waited on them: the candidate, which the engine's commit puts in, still first
+    @Test
+    fun theCandidateGoesFirstWhenTheHostAnswersAtOnce() {
+        commaList(marked = true)
+        on(InputMethodCatalog.PINYIN, atOnce = true)
+        typeLetters("ni")
+        h.longPress(comma()!!, pick = ".")
+        until("both typed", { h.field.text.toString() }) { h.field.text.length == 2 }
+        assertEquals("你.", h.field.text.toString())
     }
 
     @Test
