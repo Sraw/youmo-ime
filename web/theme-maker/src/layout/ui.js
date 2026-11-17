@@ -11,6 +11,7 @@
   const F = window.YoumoForm;
   const $ = (id) => document.getElementById(id);
   const ICONS = JSON.parse($('youmo-engine-icons').textContent);
+  const EXAMPLES = JSON.parse($('youmo-layout-examples').textContent);
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
   const FONTS = { key: '"Youmo Latin", "Youmo Han", sans-serif' };
 
@@ -937,11 +938,14 @@
 
   // ---- 新建 ----
 
+  // what 新建 starts from: a built-in board's id, or an example (`{id, label, note, xml}`)
   let base = 'qwerty';
   function chooseBase(b) {
     base = b;
     for (const btn of $('bases').children) btn.setAttribute('aria-pressed', String(btn.dataset.base === b));
-    const s = LM.suggested(b);
+    for (const btn of $('layout-examples').children) btn.setAttribute('aria-pressed', String(typeof b !== 'string' && btn.dataset.example === b.id));
+    $('new-note').textContent = typeof b === 'string' ? '' : b.note;
+    const s = LM.suggested(b, FORMAT);
     $('new-name').value = s.name;
     $('new-id').value = s.id;
     $('new-problem').textContent = '';
@@ -955,7 +959,7 @@
       $('new-problem').textContent = why;
       return;
     }
-    set(LM.fromBuiltin(E, base, id, name), { fresh: true });
+    set(typeof base === 'string' ? LM.fromBuiltin(E, base, id, name) : LM.fromExample(E, base, id, name), { fresh: true });
     edited = true;
     keep();
     $('new-panel').close();
@@ -1051,9 +1055,19 @@
       btn.addEventListener('click', () => chooseBase(b));
       $('bases').append(btn);
     }
+    for (const ex of EXAMPLES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.example = ex.id;
+      btn.textContent = ex.label;
+      btn.title = ex.note;
+      btn.addEventListener('click', () => chooseBase(ex));
+      $('layout-examples').append(btn);
+    }
     $('new-make').addEventListener('click', makeNew);
+    $('help-button').addEventListener('click', () => $('help-panel').showModal());
     $('new-open').addEventListener('click', async () => { if (await openFile()) $('new-panel').close(); });
-    $('new-panel').addEventListener('close', () => { if (!history) set(LM.fromBuiltin(E, 'qwerty', LM.suggested('qwerty').id, LM.suggested('qwerty').name), { fresh: true }); });
+    $('new-panel').addEventListener('close', () => { if (!history) set(LM.fromBuiltin(E, 'qwerty', LM.suggested('qwerty', FORMAT).id, LM.suggested('qwerty', FORMAT).name), { fresh: true }); });
     chooseBase('qwerty');
   }
 

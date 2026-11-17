@@ -31,7 +31,7 @@
      */
     set: (d, select, prop, v) => panels.next(d, F.setProp(d.xml, select, prop, v == null ? null : v === 'none' ? 'none' : TEXT[prop] ? TEXT[prop](v) : String(v))),
     /**
-     * The cascade check: where key [target].key of [board] gets each property in [env] ([target] as E.sources
+     * The cascade check: where key [target].key of [board] (an app board's id, or a layout of the user's) gets each property in [env] ([target] as E.sources
      * takes it: `{key, part?, states?}`): `[{property, value, select, line}]`, the value as the winning style
      * writes it, the style found by its place among the styles (two on one line are two).
      */
@@ -107,7 +107,7 @@
       return;
     }
     const env = api.envJson(ops.envOf(api.env(), chosen.scene));
-    const rows = ops.sources(api.engine, F, api.doc(), theme, picked.board, env, { key: picked.key, part: part || null, states: chosen.state ? [chosen.state] : [] });
+    const rows = ops.sources(api.engine, F, api.doc(), theme, picked.layout || picked.board, env, { key: picked.key, part: part || null, states: chosen.state ? [chosen.state] : [] });
     const where = [chosen.scene ? label(F.SCENES, chosen.scene) : '', chosen.state ? label(F.STATES, chosen.state) : ''].filter(Boolean).join('、');
     el.append(h('h3', { textContent: '「' + picked.key + '」' + (part ? ' ' + part : '') + (where ? '（' + where + '）' : '') + '实际生效的值' }));
     if (chosen.scene === 'field=password') el.append(h('p', { className: 'muted', textContent: '密码框按预览的输入框算' }));

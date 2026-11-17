@@ -586,3 +586,28 @@ test('背景: an animated WebP the app plays is kept as picked (animated="true")
   const again = P.background.ops.setPicture(d, { type: 'jpg', src: enc('jpg'), cuts: { portrait: cut, landscape: cut } });
   assert.ok(!/animated=/.test(again.xml));
 });
+
+// 061-custom-layout §10 (W3): 环境 › 键盘 › 打开 .layout, the theme drawn on a layout of the user's
+test('a .layout opened for the preview: read as the app reads it, drawn with the theme, its keys styled by its own id', () => {
+  const file = readFileSync(join(here, '..', 'examples', 'layouts', 'k17.layout'));
+  const own = M.openLayout(E, new Uint8Array(file));
+  assert.deepEqual([own.id, own.name], ['k17', '17 键']);
+  // a byte-order mark is no matter
+  assert.equal(M.openLayout(E, new Uint8Array([0xef, 0xbb, 0xbf, ...file])).id, 'k17');
+  const d = M.doc(F.setProp(M.fromBuiltin(E, 'material').xml, 'k17/hjk', 'fill', '#ff0000'));
+  const r = M.check(E, d, own.layout, M.envJson(M.ENV), null);
+  assert.deepEqual(r.problems.filter((p) => p.level === 'error'), []);
+  assert.ok(r.scene.json().keys.some((k) => k.id === 'hjk'), 'the layout drawn, not a board of the app');
+  const fill = E.sources(own.layout, r.theme, M.envJson(M.ENV), { widget: 'key', key: 'hjk' }).sources.find((s) => s.property === 'fill');
+  assert.equal(F.styles(d.xml)[fill.order].select, 'k17/hjk');
+  // what it refuses, said
+  assert.throws(() => M.openLayout(E, new Uint8Array([0x50, 0x4b, 3, 4])), /主题包/);
+  assert.throws(() => M.openLayout(E, new Uint8Array(E.layoutFormat().limits.bytes + 1)), /布局最大 64 KB/);
+  assert.throws(() => M.openLayout(E, new Uint8Array([0xff, 0xfe])), /UTF-8/);
+  assert.throws(() => M.openLayout(E, enc('<keyboard xmlns="https://youmo-ime/layout/1" id="x"><row><key/></row></keyboard>')), /第 1 行：/);
+  // a built-in board's id (or a fragment's): the app's own, which the import refuses
+  const text = file.toString('utf8');
+  for (const id of ['qwerty', 'number', 'grouped-bottom']) {
+    assert.throws(() => M.openLayout(E, enc(text.replace('id="k17"', 'id="' + id + '"'))), new RegExp('id「' + id + '」和 App 自带的键盘重名'));
+  }
+});

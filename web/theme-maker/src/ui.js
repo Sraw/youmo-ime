@@ -32,7 +32,13 @@
   let env = Object.assign({}, M.ENV);
   let scene = null;
   let pressed = null;
-  let picked = null; // the key tapped last: {board, key}, the 按键 page's 选中的这个键
+  let picked = null; // the key tapped last: {board, key, layout}, the 按键 page's 选中的这个键 (layout: the one drawn, an id or own's)
+  // the layout 环境 › 键盘 › 打开 .layout opened (061-custom-layout §10): `{id, name, layout}`, drawn while 键盘 is OWN
+  let own = null;
+  const OWN = '@own';
+  const OPEN_LAYOUT = '@open';
+  const boardDrawn = () => (env.board === OWN && own ? own.layout : env.board);
+  const boardName = () => (env.board === OWN && own ? own.id : env.board);
   let theme = null; // the engine's reading of the document as the preview last drew it
   let tab = PANELS.length ? PANELS[0].id : 'source';
   let assets = { key: null, images: {}, fonts: {}, cuts: {} };
@@ -464,7 +470,7 @@
   function popupOf(m) {
     if (!env.show || !scene || !theme) return null;
     const keys = scene.json().keys;
-    const k = (picked && picked.board === env.board && keys.find((x) => x.id === picked.key)) || keys[Math.floor(keys.length / 3)];
+    const k = (picked && picked.board === boardName() && keys.find((x) => x.id === picked.key)) || keys[Math.floor(keys.length / 3)];
     if (!k) return null;
     const [l, t, r] = k.bounds;
     const label = k.label || 'a';
@@ -491,6 +497,13 @@
   }
   let checked = null;
 
+  // a number board of the user's as the app shows it from 123 (a pad named, as exportCheck does for the app's): not the
+  // engine's warning of a pad not given
+  function ownEnv(board) {
+    const e = M.envJson(env);
+    if (typeof board === 'object' && board.family === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
+    return e;
+  }
   function preview() {
     const d = history.current;
     const canvas = $('preview');
@@ -498,8 +511,9 @@
     const fonts = measured.fonts;
     // a tap changes only what is pressed: the theme read and the scene built as they were
     const envKey = JSON.stringify(env);
-    const r = checked && checked.d === d && checked.env === envKey && checked.m === m ? checked.r : M.check(E, d, env.board, M.envJson(env), m.ok ? m.measurer : null);
-    checked = { d, env: envKey, m, r };
+    const board = boardDrawn();
+    const r = checked && checked.d === d && checked.env === envKey && checked.board === board && checked.m === m ? checked.r : M.check(E, d, board, ownEnv(board), m.ok ? m.measurer : null);
+    checked = { d, env: envKey, board, m, r };
     scene = r.scene;
     theme = r.theme;
     showProblems(r.problems);
@@ -668,6 +682,31 @@
       input.oncancel = () => ok(null); // the dialog closed with nothing picked
       input.click();
     });
+  }
+
+  /**
+   * 环境 › 键盘 › 打开 .layout… (061-custom-layout §10): a layout of the user's drawn with the theme, its keys picked by
+   * its own id (`<id>/<key>`, a style the app also gives the keys it keeps of its based-on board). Not kept in the draft:
+   * a draft restored draws 26 键.
+   */
+  async function openLayout() {
+    const f = await pick($('layout-input'));
+    if (!f) return;
+    try {
+      own = M.openLayout(E, new Uint8Array(await f.arrayBuffer()));
+    } catch (e) {
+      toast('打不开这个布局：' + (e.message || e));
+      return;
+    }
+    // a key picked on a layout of this id is of the one replaced: picked anew
+    if (picked && picked.board === own.id) picked = null;
+    const sel = $('env-board');
+    for (const o of [...sel.options]) if (o.value === OWN) o.remove();
+    sel.add(new Option(own.name + '（' + own.id + '.layout）', OWN), sel.querySelector('option[value="' + OPEN_LAYOUT + '"]'));
+    env.board = OWN;
+    fillEnvForm();
+    keep();
+    if (history) { preview(); showTab(); }
   }
 
   async function openFile() {
@@ -979,6 +1018,11 @@
       Object.assign(env, { w: num('env-w', env.w), h: num('env-h', env.h), density: num('env-density', env.density) });
       if (e && /env-(w|h|density)/.test(e.target.id)) env.device = 'custom';
     }
+    if ($('env-board').value === OPEN_LAYOUT) {
+      // 打开 .layout…: the board shown till one is opened
+      $('env-board').value = env.board;
+      openLayout();
+    }
     Object.assign(env, {
       landscape: $('env-landscape').checked, board: $('env-board').value, form: $('env-form-kind').value, shift: $('env-shift').value,
       field: $('env-field').value, ime: $('env-ime').value, show: $('env-show').value, bar: $('env-bar').value, panel: $('env-sheet').value,
@@ -998,6 +1042,7 @@
     $('env-device').add(new Option('自定义', 'custom'));
     const boards = new Set(E.layouts());
     for (const b of M.BOARDS) if (boards.has(b)) $('env-board').add(new Option(BOARD_LABEL[b] || b, b));
+    $('env-board').add(new Option('打开 .layout…', OPEN_LAYOUT));
     for (const f of M.FORMS) $('env-form-kind').add(new Option(FORM_LABEL[f], f));
     $('env-form').addEventListener('change', readEnvForm);
     $('env').addEventListener('click', () => $('env-panel').showModal());
@@ -1096,8 +1141,8 @@
       if (!history) return;
       pressed = keyAt(e);
       const before = picked;
-      if (pressed) picked = { board: env.board, key: pressed };
-      $('picked').textContent = picked ? '选中的键：' + picked.key + '（' + (BOARD_LABEL[picked.board] || picked.board) + '）' : '';
+      if (pressed) picked = { board: boardName(), key: pressed, layout: boardDrawn() };
+      $('picked').textContent = picked ? '选中的键：' + picked.key + '（' + (BOARD_LABEL[picked.board] || (own && own.id === picked.board ? own.name : picked.board)) + '）' : '';
       preview();
       // the tab follows another key picked, its values put in place (a field being typed in keeps its text)
       if (picked !== before && (!before || before.key !== picked.key || before.board !== picked.board)) refreshTab();
@@ -1129,6 +1174,8 @@
       if (answer === 'restore') {
         try {
           if (kept.env) env = Object.assign({}, M.ENV, kept.env);
+          // a layout opened is not kept: its board the default's
+          if (env.board === OWN) env.board = M.ENV.board;
           fillEnvForm();
           history = new M.History(kept.doc);
           await changed(true);

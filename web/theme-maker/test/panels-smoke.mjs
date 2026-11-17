@@ -4,6 +4,7 @@
 // and PR (unit_test.yml, with the runner's Chrome; R25 B13); it needs a Chromium (no jsdom here: no npm).
 // Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
 // (default: Playwright's headless shell, as pixel-smoke.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
+import { readFileSync } from 'node:fs';
 import { serve } from '../dev/serve.mjs';
 import { browser, chromium } from './pixel-smoke.mjs';
 
@@ -309,6 +310,39 @@ async function main() {
     const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);
     check(/docs\/theme-maker\.md/.test(help) && /docs\/theme-format\.md/.test(help), 'help: open with its links: ' + help);
     await js(`document.getElementById('help-panel').close()`);
+    // 061-custom-layout §10 (W3): 环境 › 键盘 › 打开 .layout: the theme drawn on a layout of the user's, a key of it picked
+    // by its own id, its values' sources found on it
+    const k17 = readFileSync(new URL('../examples/layouts/k17.layout', import.meta.url), 'utf8');
+    await js(`(() => {
+      for (const id of ['env-bar', 'env-show', 'env-sheet']) { const s = document.getElementById(id); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); }
+      const inp = document.getElementById('layout-input');
+      inp.click = function () { const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(k17)}], 'k17.layout')); this.files = dt.files; this.onchange(); };
+      const s = document.getElementById('env-board'); s.value = '@open'; s.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await wait(1000);
+    const board = await js(`[document.getElementById('env-board').value, document.getElementById('env-board').selectedOptions[0].textContent]`);
+    check(board[0] === '@own' && /^17 键（k17\.layout）$/.test(board[1]), '环境 › 键盘 › 打开 .layout: 17 键 drawn: ' + board);
+    await js(`(() => {
+      const c = document.getElementById('preview'); const r = c.getBoundingClientRect();
+      const at = { clientX: r.left + r.width * 0.7, clientY: r.top + r.height * 0.375, bubbles: true, pointerId: 1 };
+      c.dispatchEvent(new PointerEvent('pointerdown', at)); c.dispatchEvent(new PointerEvent('pointerup', at));
+    })()`);
+    await wait(500);
+    const pickedOwn = await js(`document.getElementById('picked').textContent`);
+    check(/选中的键：hjk（17 键）/.test(pickedOwn), 'a key of it picked: ' + pickedOwn);
+    await js(`document.querySelector('#tabs [data-tab=keys]').click()`);
+    await wait(300);
+    // 范围 › 选中的键: the changes written for the picked key by the layout's own id
+    await js(`(() => {
+      const r = [...document.querySelectorAll('#tab-keys select')].find((s) => [...s.options].some((o) => o.value === 'picked'));
+      r.value = 'picked'; r.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await wait(300);
+    const keysTab = await js(`[document.querySelector('#tab-keys .selector code') ? document.querySelector('#tab-keys .selector code').textContent : '', document.querySelectorAll('#tab-keys table.sources tr').length]`);
+    check(String(keysTab[0]).includes('k17/hjk'), '按键: the key picked named by the layout\'s id: ' + keysTab);
+    check(keysTab[1] > 0, '按键: the sources of hjk on it: ' + keysTab);
+    await js(`(() => { const s = document.getElementById('env-board'); s.value = 'qwerty'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(500);
     await js(`(() => { window.__saved = 0; const u = URL.createObjectURL; URL.createObjectURL = (b) => { window.__saved++; return u(b); }; })()`);
     const edit = (f) => js(`(() => { const s = document.getElementById('source'); s.value = (${f})(s.value); s.dispatchEvent(new Event('input')); })()`);
     await edit(`(t) => t.replace('<style select="key"', '<style select="key" sticker="none"')`);
@@ -331,6 +365,12 @@ async function main() {
     await wait(300);
     const stopped = await js(`[!document.getElementById('export-panel').open, window.__saved, document.getElementById('problems').textContent]`);
     check(stopped[0] && stopped[1] === 1 && /nope\.png/.test(stopped[2]), '保存 with an error: nothing saved, the error in 问题: ' + JSON.stringify(stopped.slice(0, 2)));
+    // a phone's width with the top bar's link to the layout maker (W3): on two lines, nothing past the screen, each link one line
+    await b.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 760, deviceScaleFactor: 2, mobile: true });
+    await wait(500);
+    const top = await js(`[document.documentElement.scrollWidth, ...[...document.querySelectorAll('#top a.link')].map((a) => Math.round(a.getBoundingClientRect().height))]`);
+    check(top[0] <= 360 && top.slice(1).every((h) => h < 24), '360 px: the top bar within the screen, its links one line each: ' + top);
+    await b.send('Emulation.clearDeviceMetricsOverride');
   } finally {
     await b.close();
     server.close();

@@ -419,7 +419,7 @@ Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with 
 `panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
 held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`), and `examples/` (`examples.json` and a folder of each example, put in the
-maker's `youmo-examples` block); both run `src/lib.js` (everything the tests hold to the app's
+maker's `youmo-examples` block); and `layout/index.html`, the layout maker (061-custom-layout §12; `src/layout/`: its `page.html`, `style.css`, `layout-maker.js`, `layout-edit.js`, `ui.js`, with the maker's engine, `form.js` and `maker.js`), its examples `examples/layouts/` (`layouts.json` and a `.layout` each, put in its `youmo-layout-examples` block as they are, with `name=` as the label; `ExampleLayoutsTest` in keyboard-scene checks each clean and holds its scenes, upright, turned, compact and split, the number one in each of its pads, to `src/commonTest/data/example-layouts/` on the JVM and in node). The maker and classic run `src/lib.js` (everything the tests hold to the app's
 3.0 rules and zip). Neither page is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
 both from their sources (`web/theme-maker/.gitignore` keeps them out): the sources put in, each page's
 generated blocks read from `generated/<id>.json` (each carries only the ones its `page.html` has a slot
@@ -443,7 +443,8 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 (`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
-`fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` beside it) with `assemble.mjs --engine <file>`.
+`fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
+`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine and its size to 2,000,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser at 1280 and 360 px: new from a base and from each example, editing, save, help.
 
 ### The engine in the page (060-render-p3 W1)
 

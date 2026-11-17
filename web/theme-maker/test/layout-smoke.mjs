@@ -5,7 +5,8 @@
 // by the buttons and dragged (a finger only after 300 ms), its width by its right edge, a character key added, its
 // actions (a shared name's read-only), keys merged into a group, the app's bottom row made the layout's own, rows,
 // 整块, 信息, the page at a phone's 360 px; by the keyboard (Delete, the arrows, Ctrl+Z in a field the field's), a field
-// kept focused over its commit, the selection following its key over an undo, a finger's tap and swipe. CI runs it with the runner's Chrome, as panels-smoke.mjs.
+// kept focused over its commit, the selection following its key over an undo, a finger's tap and swipe; 新建 from an
+// example (W3) and at 360 px, the help. CI runs it with the runner's Chrome, as panels-smoke.mjs.
 // Run: node web/theme-maker/test/layout-smoke.mjs [chromium]   (SHOT=<file.png>: the page's picture saved there)
 // Exit 0 all kept, 1 not, 2 not run (no Chromium).
 import { writeFileSync } from 'node:fs';
@@ -422,8 +423,33 @@ async function main() {
     await js(`document.querySelector('#tabs [data-tab=row]').click()`);
     await finger(await at('r1c5'), { ...(await at('r1c5')), y: (await at('r1c5')).y + 120 }, 0);
     check((await js(`document.getElementById('tab-row').hidden`)) === false, 'a swipe over the preview: the 行 tab still shown');
+    // W3: 新建 at a phone's width (the examples' cards too) and from an example; help
+    await js(`document.querySelector('#file-menu [data-act=new]').click()`);
+    await wait(300);
+    const dialogWide = await js(`[document.documentElement.scrollWidth, document.getElementById('new-panel').getBoundingClientRect().right, document.querySelectorAll('#layout-examples button').length]`);
+    check(dialogWide[0] <= 360 && dialogWide[1] <= 360 && dialogWide[2] === 3, '新建 at 360 px: three examples, nothing wider than the screen: ' + dialogWide);
     await b.send('Emulation.clearDeviceMetricsOverride');
     await wait(300);
+    await js(`document.querySelector('#layout-examples [data-example=azerty]').click()`);
+    const offered = await js(`[document.getElementById('new-id').value, document.getElementById('new-name').value, document.getElementById('new-note').textContent, document.querySelector('#layout-examples [data-example=azerty]').getAttribute('aria-pressed'), document.querySelector('#bases [data-base=qwerty]').getAttribute('aria-pressed')]`);
+    check(offered[0] === 'my-azerty' && offered[1] === '我的AZERTY' && /法语/.test(offered[2]) && offered[3] === 'true' && offered[4] === 'false', '从示例开始: AZERTY chosen, its id, name and note offered: ' + offered);
+    await js(`document.getElementById('new-make').click()`);
+    await until(`!document.getElementById('new-panel').open`, '新建 from an example did not close');
+    const fromExample = await source();
+    check(/id="my-azerty"/.test(fromExample) && /based-on="qwerty"/.test(fromExample) && !/<meta|<!--/.test(fromExample) && /<row split="halves">\s*<key id="a"/.test(fromExample), 'a layout from AZERTY: its id, the example\'s rows, no <meta>');
+    check(/^0 个错误/.test(await count()) || (await count()) === '没有', 'AZERTY: no errors: ' + (await count()));
+    await js(`document.querySelector('#file-menu [data-act=new]').click()`);
+    await js(`document.querySelector('#layout-examples [data-example=big-number]').click()`);
+    await js(`document.getElementById('new-make').click()`);
+    await until(`!document.getElementById('new-panel').open`, '新建 from 大按键数字键盘 did not close');
+    await wait(500);
+    const bigPad = await js(`[document.getElementById('env-pad-label').hidden, document.getElementById('preview').width > 0, document.getElementById('count').textContent]`);
+    check(bigPad[0] === false && bigPad[1] && (/^0 个错误/.test(bigPad[2]) || bigPad[2] === '没有'), '大按键数字键盘: drawn on its pads, no errors: ' + bigPad);
+    await js(`document.getElementById('help-button').click()`);
+    await wait(200);
+    const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);
+    check(/docs\/layout-maker\.md/.test(help) && /docs\/layout-format\.md/.test(help), 'help: open with its links: ' + help);
+    await js(`document.querySelector('#help-panel button[value=close]').click()`);
 
     // the picture: a new 18 keys upright
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);

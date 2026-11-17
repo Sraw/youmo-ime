@@ -18,9 +18,13 @@ button:disabled { opacity: .4; cursor: default; }
 button[aria-pressed="true"], button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .muted { color: var(--muted); font-size: 12px; }
 .grow { flex: 1; }
-.link { color: var(--accent); font-size: 12px; }
+.link { color: var(--accent); font-size: 12px; white-space: nowrap; }
 #top { display: flex; gap: 4px; align-items: center; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); position: relative; }
 #top .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30vw; }
+/* a phone's width: the top bar's buttons and links on two lines rather than past the screen or a link one character a line */
+@media (max-width: 480px) {
+  #top { flex-wrap: wrap; }
+}
 .menu { position: absolute; top: 100%; left: 8px; z-index: 5; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
 .menu[hidden] { display: none; }
 .menu button { border: 0; text-align: left; }

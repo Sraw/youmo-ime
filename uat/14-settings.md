@@ -978,3 +978,22 @@
 - **操作**：弹出键盘看提示；看 **外观 → 布局** 和 **输入法 → 拼音 → 键盘**。
 - **预期**：两块都在布局页（「day · 日 17」「night · 夜 18」）；拼音的 **键盘** 是「day · 日 17（自定义）」；提示两行：「主题「day」带的日 17已放进 外观 → 布局，拼音正在用」「深色主题「night」带的夜 18也在列表里，没有换上」。只一个主题带这块时，不管它在浅色还是深色那边，都换上它。
 - **JVM**：`ThemeLayoutsToListTest.bothSlotsPacksOfOneBoardTheShownOnesChosenTheOthersToldOf`、ime-core `ThemeLayoutSwitchTest.both slots' packs with the same board, the shown one's switched in, the other's aside as Q15 has it`；设备上不跑。
+
+### ST-177 [P1] 网页示例「17 键」：导入、用在拼音上，HJK 一个键打字
+- **前提**：B0-设置，没导入过布局；「下载」里有 `web/theme-maker/examples/layouts/k17.layout`（网页键盘布局页「从示例开始」的 17 键原文件）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框，点 **导入**；问「现在就用在 拼音 上吗？」时点 **用**；到测试页用拼音看键盘；点 **HJK**、再点 **A**，看候选；点空格。
+- **预期**：确认框「导入布局 17 键？」，能用在拼音的键盘，没有要注意的地方。只有拼音能用，所以直接问「现在就用在 拼音 上吗？」。拼音的键盘第二行是 A、SD、FG、HJK、L 五个键（没有单独的 H、JK），第一、三行和 18 键一样；点 HJK、A 后预编辑是 ha、ja、ka 里的一个，有中文候选，空格上屏一个汉字。
+- **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（keyboard-scene，JVM 和 JS）、`GroupedKeyboardOwnGroupsTest`（自己分组的键盘把组告诉引擎）；网页：`test/layout-maker.test.mjs`（17 键的结构、从示例新建）。
+
+### ST-178 [P1] 网页示例「AZERTY」：拼音、英文都用它
+- **前提**：B0-设置，没导入过布局；「下载」里有 `web/theme-maker/examples/layouts/azerty.layout`。
+- **操作**：导入它，「现在就用在」里勾 **拼音**、**英文**，点 **确定**；到测试页用拼音看键盘，点 N、I，看候选，点空格；切到英文，点 A、Z、N 后面的 **'**。
+- **预期**：「现在就用在」列出拼音、双拼、英文、五笔等码表。键盘第一行从左是 A Z E R T Y U I O P，第二行 Q S D F G H J K L M，第三行 W X C V B N 后面一个 **'**。拼音点 N、I 有中文候选，空格上屏汉字；英文打出 `az'`。
+- **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`（拼音、双拼、英文、码表都能用，没有警告）、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（分体时第三行分成两半不缩小）；网页：`test/layout-maker.test.mjs`（AZERTY 的行，双拼、码表时出 `;` `*`）。
+
+### ST-179 [P1] 网页示例「大按键数字键盘」：123 和小数框用它，电话框照旧
+- **前提**：B0-设置，没导入过布局；「下载」里有 `web/theme-maker/examples/layouts/big-number.layout`（`pads="full digits decimal"`）。
+- **操作**：导入它，看确认框，问「现在就用作数字键盘吗？」时点 **用**；到测试页普通框点 **123**，看键盘，点 1、2、⌫、5；再到小数框（`#decimal`）、电话框看数字键盘。
+- **预期**：确认框写「数字键盘：123、只有数字、小数」。卡片下写「用在：数字键盘」。123 打开的是它：一行四个键（1 2 3 ⌫），回车竖着占两行，左下是 **符**、**返回**，没有 `=`、`,`；点 1、2、⌫、5 打出 15。小数框也是它，6 右边是 `.`；电话框还是 App 自带的数字键盘。
+- **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（每种输入框各画一次）、`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`；网页：`test/layout-maker.test.mjs`（大按键数字键盘的几何和 pads）。
+

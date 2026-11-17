@@ -2546,3 +2546,143 @@ def st173(d):
     check(not d.screen().find(text="UAT 数字"), "删除后卡片还在")
     check(number_ones(d) == ["1"], "删掉后 123 的数字键盘不是自带的")
     return "确认框写数字键盘正在用它、换回内置的；删后 123 是自带的"
+
+
+# ---------------------------------------------------------------- 网页的布局示例 (061-custom-layout §12.4, W3)
+
+
+EXAMPLES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "examples", "layouts")
+
+
+def push_example(d, name):
+    """the layout maker's example web/theme-maker/examples/layouts/<name>.layout into 下载, as the page has it"""
+    d.sh(f"rm -f /sdcard/Download/{name}*.layout")
+    d.adb("push", os.path.join(EXAMPLES, f"{name}.layout"), f"/sdcard/Download/{name}.layout")
+    d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.layout")
+    time.sleep(1)
+
+
+def scene_keys(d):
+    """the keyboard on screen: each key's scene id and its bounds"""
+    return {n.key: n.b for n in d.need_keyboard().walk() if n.clickable and n.key}
+
+
+def han(text):
+    return any("一" <= c <= "鿿" for c in text or "")
+
+
+def types_a_word(d, keys):
+    """[keys] (centres) tapped on the test page under pinyin, then space: a candidate offered, the field's text"""
+    for xy in keys:
+        d.tap(xy, 0.8)
+    offered = [c for c in d.candidates() if han(c)]
+    check(offered, f"没有中文候选：{d.candidates()[:6]}")
+    d.tap(d.keys(refresh=True)["space"], 1.0)
+    text = d.field_text() or ""
+    d.clear()
+    return text
+
+
+@case("ST-177", base="B0-设置", mutates=True, visual=True)
+def st177(d):
+    push_example(d, "k17")
+    import_layout(d, "k17")
+    check(d.wait_text("导入布局 17 键？", timeout=8, where="all"), f"没出导入确认：{d.screen().texts('all')[:10]}")
+    check(d.screen().find(contains="拼音", where="all"), f"确认框没写能用在拼音：{d.screen().texts('all')[:16]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    check(d.wait_text("现在就用在 拼音 上吗？", timeout=6, where="all"), f"没直接问用在拼音：{d.screen().texts('all')[:10]}")
+    d.tap_text("用", where="all", scroll=False, after=2.0)
+    check(layout_card(d, "17 键"), "导入后列表里没有 17 键")
+    check(d.wait_text("用在：拼音", timeout=5, where="all"), f"卡片下没写「用在：拼音」：{d.screen().texts()[:20]}")
+    d.step("拼音用 17 键：第二行 A SD FG HJK L")
+    d.open_page("text")
+    keys = scene_keys(d)
+    check("hjk" in keys and "r2c4" not in keys and "r2c5" not in keys, f"键盘不是 17 键：{sorted(keys)[:30]}")
+    y = (keys["hjk"][1] + keys["hjk"][3]) / 2
+    row = sorted(k for k, b in keys.items() if b[1] < y < b[3])
+    check(row == ["hjk", "r2c1", "r2c2", "r2c3", "r2c6"], f"第二行不是 A SD FG HJK L：{row}")
+    d.shot("ime", "拼音用网页示例 17 键：H 和 JK 并成 HJK")
+    centre = lambda b: ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    text = types_a_word(d, [centre(keys["hjk"]), centre(keys["r2c1"])])
+    check(han(text), f"HJK A 空格没上屏汉字：{text!r}")
+    return f"确认框能用在拼音；直接问用在拼音；第二行 A SD FG HJK L；HJK A 空格上屏「{text}」"
+
+
+@case("ST-178", base="B0-设置", mutates=True, visual=True)
+def st178(d):
+    push_example(d, "azerty")
+    import_layout(d, "azerty")
+    check(d.wait_text("导入布局 AZERTY？", timeout=8, where="all"), f"没出导入确认：{d.screen().texts('all')[:10]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    check(d.wait_text("现在就用在", timeout=6, where="all", contains=True), f"导入后没问现在就用在哪：{d.screen().texts('all')[:10]}")
+    for im in ("拼音", "双拼", "英文", "五笔等码表"):
+        check(d.screen().find(text=im, where="all"), f"现在就用在 里没有{im}")
+    for im in ("拼音", "英文"):
+        d.tap_text(im, where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    check(layout_card(d, "AZERTY"), "导入后列表里没有 AZERTY")
+    check(d.wait_text("用在：拼音、英文", timeout=5, where="all"), f"卡片下没写「用在：拼音、英文」：{d.screen().texts()[:20]}")
+    d.step("拼音：AZERTY 的三行")
+    d.open_page("text")
+    keys = scene_keys(d)
+    def row_of(k):
+        y = (keys[k][1] + keys[k][3]) / 2
+        return [i for i, b in sorted(keys.items(), key=lambda kv: kv[1][0]) if b[1] < y < b[3]]
+    check(row_of("a")[:10] == list("azertyuiop"), f"第一行不是 AZERTYUIOP：{row_of('a')}")
+    check(row_of("q")[:10] == list("qsdfghjklm"), f"第二行不是 QSDFGHJKLM：{row_of('q')}")
+    third = row_of("w")
+    check(third[third.index("w"):third.index("w") + 7] == ["w", "x", "c", "v", "b", "n", "quote"], f"第三行不是 W X C V B N '：{third}")
+    d.shot("ime", "拼音用网页示例 AZERTY")
+    centre = lambda b: ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    text = types_a_word(d, [centre(keys["n"]), centre(keys["i"])])
+    check(han(text), f"N I 空格没上屏汉字：{text!r}")
+    d.step("英文：a z '")
+    d.switch_im("英文")
+    keys = scene_keys(d)
+    for k in ("a", "z", "quote"):
+        d.tap(centre(keys[k]), 0.8)
+    typed = d.field_text() or ""
+    d.clear()
+    d.switch_im("拼音")
+    check(typed.startswith("az'"), f"英文打出的不是 az'：{typed!r}")
+    return f"能用在拼音、双拼、英文；三行是 AZERTYUIOP / QSDFGHJKLM / WXCVBN'；拼音 N I 上屏「{text}」；英文打出 {typed!r}"
+
+
+@case("ST-179", base="B0-设置", mutates=True, visual=True)
+def st179(d):
+    push_example(d, "big-number")
+    import_layout(d, "big-number")
+    check(d.wait_text("导入布局 大按键数字键盘？", timeout=8, where="all"), f"没出导入确认：{d.screen().texts('all')[:10]}")
+    check(d.screen().find(contains="数字键盘：123、只有数字、小数", where="all"), f"确认框没写管哪几种：{d.screen().texts('all')[:16]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    check(d.wait_text("现在就用作数字键盘吗？", timeout=6, where="all"), f"没问现在就用作数字键盘：{d.screen().texts('all')[:10]}")
+    d.tap_text("用", where="all", scroll=False, after=2.0)
+    check(layout_card(d, "大按键数字键盘"), "导入后列表里没有 大按键数字键盘")
+    check(d.wait_text("用在：数字键盘", timeout=5, where="all"), f"卡片下没写「用在：数字键盘」：{d.screen().texts()[:20]}")
+    d.step("123：一行四个键，回车跨两行")
+    d.open_page("text")
+    d.tap(d.keys(refresh=True)["123"], 1.0)
+    keys = scene_keys(d)
+    check("=" not in keys and "," not in keys and "space" in keys, f"123 的数字键盘不是大按键的：{sorted(keys)}")
+    y = (keys["1"][1] + keys["1"][3]) / 2
+    first = [k for k, b in sorted(keys.items(), key=lambda kv: kv[1][0]) if b[1] < y < b[3]]
+    check(first == ["1", "2", "3", "backspace"], f"第一行不是 1 2 3 ⌫：{first}")
+    tall, one = keys["enter"][3] - keys["enter"][1], keys["1"][3] - keys["1"][1]
+    check(tall > 1.8 * one, f"回车没跨两行：高 {tall}，1 键高 {one}")
+    d.shot("ime", "123 用网页示例大按键数字键盘：一行四个，回车跨两行")
+    centre = lambda b: ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    for k in ("1", "2", "backspace", "5"):
+        d.tap(centre(keys[k]), 0.6)
+    typed = d.field_text() or ""
+    d.clear()
+    check(typed == "15", f"1 2 ⌫ 5 打出的不是 15：{typed!r}")
+    d.step("小数框用它，电话框用自带的")
+    d.open_page("decimal")
+    keys = scene_keys(d)
+    check("." in keys and "=" not in keys and "space" in keys, f"小数框的数字键盘不是大按键的：{sorted(keys)}")
+    d.open_page("tel")
+    keys = scene_keys(d)
+    # the app's phone pad: enter one row tall
+    check("enter" in keys and "1" in keys and keys["enter"][3] - keys["enter"][1] < 1.5 * (keys["1"][3] - keys["1"][1]),
+          f"电话框的数字键盘不是自带的：{sorted(keys)}")
+    return "确认框写 123、只有数字、小数；卡片写用在：数字键盘；123 一行四个、回车跨两行、1 2 ⌫ 5 打出 15；小数框是它，电话框是自带的"

@@ -6,13 +6,14 @@
 // Run: node --test web/theme-maker/test/layout-maker.test.mjs   (needs ./gradlew :lib:keyboard-scene:youmoEngine)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { assemble, blockOf, ENGINE, LAYOUT_SRC, NO_ENGINE } from '../tools/assemble.mjs';
+import { assemble, blockOf, ENGINE, LAYOUT_SRC, layoutExamplesJson, NO_ENGINE } from '../tools/assemble.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, '..', 'src');
@@ -27,7 +28,7 @@ const material = E.readTheme(E.themeSource('material'), null, null).theme;
 const enc = (t) => new TextEncoder().encode(t);
 const fresh = (base = 'k18') => LM.fromBuiltin(E, base, 'my-' + base, '我的' + LM.BASE_LABEL[base]);
 
-test('the page is made of src/layout/ and the shared scripts, runs only its own by their hashes, and links the theme maker (not back yet)', () => {
+test('the page is made of src/layout/ and the shared scripts, runs only its own by their hashes, and the theme maker and it link each other', () => {
   const page = assemble(LAYOUT_SRC);
   assert.equal(blockOf(page, 'youmo-engine'), NO_ENGINE);
   assert.equal(blockOf(page, 'youmo-lib'), null, 'no theme library: the layout maker reads no theme files');
@@ -43,8 +44,12 @@ test('the page is made of src/layout/ and the shared scripts, runs only its own 
   assert.ok(!/unsafe-inline'[^;]*;/.test(/script-src [^;]*;/.exec(csp)[0]));
   assert.deepEqual(/script-src ([^;]*);/.exec(csp)[1].split(' '), run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"));
   assert.match(page, /<a class="link" href="\.\.\/">主题制作<\/a>/);
-  // the theme maker links it once it goes up with its help and examples (§14, W3): till then Pages leaves it out too
-  assert.doesNotMatch(assemble(), /href="layout\//, 'the theme maker links it only from W3');
+  // up with its help and examples (§14, W3): the theme maker's top bar links it, and Pages puts it up
+  assert.match(assemble(), /<a class="link" href="layout\/">键盘布局<\/a>/);
+  assert.match(page, /<button id="help-button">帮助<\/button>/);
+  const help = /<dialog id="help-panel">[\s\S]*?<\/dialog>/.exec(page)[0];
+  assert.ok(help.includes('docs/layout-format.md') && help.includes('docs/layout-maker.md'), 'the help links the docs');
+  assert.equal(blockOf(page, 'youmo-layout-examples'), layoutExamplesJson());
   // built: the build's engine, the rest the same
   const built = assemble(LAYOUT_SRC, ENGINE);
   const rest = (p) => p.replace(/<script id="youmo-engine">[\s\S]*?<\/script>/, '').replace(/script-src [^;]*;/, '');
@@ -115,8 +120,8 @@ test('the 新建 dialog refuses an id or a name the app would', () => {
   assert.equal(LM.nameProblem('17 键', FORMAT), null);
   assert.ok(LM.nameProblem('  ', FORMAT));
   assert.ok(LM.nameProblem('x'.repeat(25), FORMAT));
-  assert.deepEqual(LM.suggested('nine'), { id: 'my-nine', name: '我的九键' });
-  for (const b of FORMAT.bases) assert.equal(LM.idProblem(LM.suggested(b).id, FORMAT), null, b);
+  assert.deepEqual(LM.suggested('nine', FORMAT), { id: 'my-nine', name: '我的九键' });
+  for (const b of FORMAT.bases) assert.equal(LM.idProblem(LM.suggested(b, FORMAT).id, FORMAT), null, b);
 });
 
 test('the <keyboard> and <meta> are changed in place, a <meta> made first and taken out when left with nothing', () => {
@@ -559,4 +564,111 @@ test('a key the scene shows found where it is written: once, twice (each its whe
   const q = fresh('qwerty');
   assert.deepEqual(LE.atLine(q, LM.lineOfKey(q, 'e')), { row: 0, index: 2 });
   assert.equal(LE.atLine(q, 1), null);
+});
+
+// §12.4 从示例开始 (W3): examples/layouts/, each a layout the app takes as it is, put in the page by assemble.mjs
+const EXAMPLES = JSON.parse(layoutExamplesJson());
+
+test('an example\'s label is its keyboard\'s name= as XML reads it: not one in a comment, entities undone', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'layout-examples-'));
+  try {
+    writeFileSync(join(dir, 'layouts.json'), JSON.stringify([{ id: 'x', note: 'n' }]));
+    writeFileSync(join(dir, 'x.layout'), '<?xml version="1.0"?>\n<!-- <keyboard id="x" name="not this"> -->\n' +
+      '<keyboard xmlns="https://youmo-ime/layout/1" id="x" name="A &amp; B &#x4e2d;" family="letters"/>');
+    const [x] = JSON.parse(layoutExamplesJson(dir));
+    assert.equal(x.label, 'A & B 中');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+const example = (id) => EXAMPLES.find((x) => x.id === id);
+const drawn = (l, input) => {
+  const s = E.buildScene(l, material, { width: 1080, height: 700, density: 2.625, input }, fixed);
+  assert.ok(s.ok, JSON.stringify(s.problems));
+  return s.scene.json().keys;
+};
+
+test('the examples: 17 键, AZERTY, 大按键数字键盘, each its name its label, checked clean where it says it is used', () => {
+  assert.deepEqual(EXAMPLES.map((x) => [x.id, x.label]), [['k17', '17 键'], ['azerty', 'AZERTY'], ['big-number', '大按键数字键盘']]);
+  const used = { k17: [['pinyin'], []], azerty: [['pinyin', 'shuangpin', 'english', 'table'], []], 'big-number': [[], ['full', 'digits', 'decimal']] };
+  for (const x of EXAMPLES) {
+    assert.ok(x.note, x.id);
+    assert.equal(LM.info(x.xml).id, x.id, 'the file is its id');
+    const r = E.checkLayout(x.xml, FORMAT.version, material);
+    assert.deepEqual([...r.errors].map((f) => f.key), [], x.id);
+    assert.deepEqual([...r.warnings].map((f) => f.key), [], x.id + ': not even a warning, as an example');
+    assert.deepEqual([[...r.ims], [...r.pads]], used[x.id], x.id);
+    assert.equal(r.minApp, '0.6.1');
+    const m = LM.info(x.xml).meta;
+    assert.equal(m.license, 'CC0-1.0', x.id);
+    assert.equal(m['min-app'], '0.6.1', x.id);
+    assert.ok(m.description, x.id);
+    assert.ok(Buffer.byteLength(x.xml) < FORMAT.limits.bytes);
+  }
+});
+
+test('17 键: 18 键 with H and JK one key of its own name, its own corner; the rest the app\'s 18 键 keys', () => {
+  const x = example('k17').xml;
+  const keys = drawn(E.readOwnLayout(x).layout, { ime: 'pinyin' });
+  const letters = keys.filter((k) => k.letters);
+  assert.equal(letters.length, 17);
+  const hjk = keys.find((k) => k.id === 'hjk');
+  assert.equal(hjk.label, 'HJK');
+  assert.equal(hjk.alt, '(');
+  assert.equal(hjk.shortcut, 'k17/hjk');
+  for (const k of letters.filter((k) => k.id !== 'hjk')) assert.match(k.shortcut, /^g18\//, k.id);
+  // the groups: every letter once, but not 18 键's: pinyin only
+  assert.equal(letters.map((k) => k.letters || '').join('').replace(/;/g, '').split('').sort().join(''), 'abcdefghijklmnopqrstuvwxyz');
+});
+
+test("AZERTY: the French rows, the app's letter keys, ' after N; ; and * after it where 双拼 or a table asks", () => {
+  const x = example('azerty').xml;
+  const l = E.readOwnLayout(x).layout;
+  const rows = (keys) => [0, 175, 350].map((y) => keys.filter((k) => k.bounds[1] === y).map((k) => k.id).join(' '));
+  const pinyin = drawn(l, { ime: 'pinyin' });
+  assert.deepEqual(rows(pinyin), ['a z e r t y u i o p', 'q s d f g h j k l m', 'shift w x c v b n quote backspace']);
+  for (const k of pinyin.filter((k) => /^[a-z]$/.test(k.id))) assert.equal(k.shortcut, 'full/' + k.id);
+  assert.deepEqual(rows(drawn(l, { ime: 'shuangpin', schemeTypes: ['semicolon'] })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'shift w x c v b n quote semicolon backspace']);
+  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'cangjie', tableExtra: 'star' })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'lookup w x c v b n quote star backspace']);
+  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'wubi', tableExtra: 'semicolon' })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'lookup w x c v b n quote semicolon backspace']);
+  // English: Shift's case, no 分词
+  assert.equal(drawn(l, { ime: 'english' }).find((k) => k.id === 'a').label, 'a');
+});
+
+test('大按键数字键盘: four columns, ⏎ two rows high, . only where the field takes one, 符 返回 bottom left', () => {
+  const l = E.readOwnLayout(example('big-number').xml).layout;
+  const full = drawn(l, { field: 'number', pad: 'full' });
+  assert.deepEqual(full.map((k) => k.id), ['1', '2', '3', 'backspace', '4', '5', '6', '.', '7', '8', '9', 'enter', 'symbols', 'back', '0', 'space']);
+  const enter = full.find((k) => k.id === 'enter');
+  assert.deepEqual(enter.bounds.map(Math.round), [810, 350, 1080, 700]);
+  assert.deepEqual(full.find((k) => k.id === '5').bounds.map(Math.round), [270, 175, 540, 350]);
+  assert.ok(!drawn(l, { field: 'number', pad: 'digits' }).some((k) => k.id === '.'));
+  assert.ok(drawn(l, { field: 'number', pad: 'decimal' }).some((k) => k.id === '.'));
+  assert.deepEqual([full[12].label, full[13].label], ['符', '返回']);
+});
+
+test('the id and name offered are cut to the format\'s limits', () => {
+  const long = LM.suggested({ id: 'a'.repeat(28) + '-bcd', label: '很'.repeat(30) }, FORMAT);
+  assert.equal(long.id, 'my-' + 'a'.repeat(28));
+  assert.equal(long.name.length, FORMAT.limits.name);
+  assert.equal(LM.idProblem(long.id, FORMAT), null);
+  assert.equal(LM.nameProblem(long.name, FORMAT), null);
+});
+
+test('a layout from an example: its id and name, the example\'s notes and <meta> gone, its own keys named by the new id', () => {
+  for (const x of EXAMPLES) {
+    const s = LM.suggested(x, FORMAT);
+    assert.deepEqual(s, { id: 'my-' + x.id, name: '我的' + x.label });
+    assert.equal(LM.idProblem(s.id, FORMAT), null);
+    assert.equal(LM.nameProblem(s.name, FORMAT), null);
+    const xml = LM.fromExample(E, x, s.id, s.name);
+    const i = LM.info(xml);
+    assert.deepEqual([i.id, i.name, i.family, i.basedOn], [s.id, s.name, LM.info(x.xml).family, LM.info(x.xml).basedOn]);
+    assert.doesNotMatch(xml, /<!--|<meta/);
+    assert.doesNotMatch(xml, new RegExp('shortcut="' + x.id + '/'));
+    const r = E.checkLayout(xml, FORMAT.version, null);
+    assert.deepEqual([...r.errors].map((f) => f.key), [], x.id);
+  }
+  assert.match(LM.fromExample(E, example('k17'), 'my-k17', '我的17 键'), /<key id="hjk"[^>]* shortcut="my-k17\/hjk"/);
+  assert.match(LM.fromExample(E, example('azerty'), 'fr', 'FR'), /<key id="a"[^>]* shortcut="full\/a"/);
 });

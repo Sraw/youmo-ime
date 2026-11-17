@@ -537,7 +537,34 @@
   }
 
   /**
-   * What is wrong with [d] drawn on [board] in [env] (EnvJson): `[{level: "error"|"warning", line, message}]`,
+   * A `.layout` file's [bytes] as 环境 › 键盘 draws the theme on it (061-custom-layout §10): `{id, name, layout}`, the
+   * layout as the engine's readOwnLayout reads it; throws with what the page says otherwise (a zip, past the app's
+   * size, not UTF-8, one that does not read: its first problem; one of a built-in board's id). A layout the checker would
+   * refuse otherwise is still drawn.
+   */
+  function openLayout(E, bytes) {
+    if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包（.theme），不是 .layout 布局文件');
+    const max = E.layoutFormat().limits.bytes;
+    if (bytes.length > max) throw new Error('文件 ' + bytes.length + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
+    let text;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch (e) {
+      throw new Error('不是 UTF-8 文本');
+    }
+    const r = E.readOwnLayout(text.replace(/^\uFEFF/, ''));
+    if (!r.ok) {
+      const p = r.problems[0];
+      throw new Error((p && p.line ? '第 ' + p.line + ' 行：' : '') + (p ? p.message : '读不出'));
+    }
+    // the app's own board of this id is what 键盘 lists already, and a style picked on it would be that board's: the app's
+    // import refuses it too (LayoutCheck id-built-in)
+    if (E.layoutSource(r.layout.id) != null) throw new Error('id「' + r.layout.id + '」和 App 自带的键盘重名，App 不会导入它：换一个 id');
+    return { id: r.layout.id, name: r.layout.name, layout: r.layout };
+  }
+
+  /**
+   * What is wrong with [d] drawn on [board] (an app board's id, or a layout of the user's as readOwnLayout reads it) in [env] (EnvJson): `[{level: "error"|"warning", line, message}]`,
    * the theme's own, then the scene's; `theme` and `scene` where they were made. An [env] with `marks` is drawn with
    * those whole (none of the defaults filled in for a member it leaves out); one without, with the board's default
    * marks (defaultMarksOf).
@@ -556,7 +583,8 @@
     add('error', r.problems);
     add('warning', r.warnings);
     if (!r.ok) return { problems, theme: null, scene: null };
-    const layout = layoutOf(E, d, board, (list) => add('warning', list));
+    // a layout of the user's (环境 › 键盘 › 打开 .layout, 061-custom-layout §10) drawn as it is: the pack's own boards only replace the app's
+    const layout = typeof board === 'string' ? layoutOf(E, d, board, (list) => add('warning', list)) : board;
     const marks = env.marks ? null : defaultMarksOf(E, layout, env);
     const drawn = marks ? Object.assign({}, env, { marks }) : env;
     const s = E.buildScene(layout, r.theme, drawn, measurer || E.fixedMeasurer());
@@ -731,6 +759,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

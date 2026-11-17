@@ -101,6 +101,32 @@ export function examplesJson(dir = EXAMPLES) {
   })).replace(/</g, '\\u003c');
 }
 
+/** The layout maker's examples (§12.4 从示例开始): examples/layouts/, layouts.json (`[{id, note}]`) and each `<id>.layout`. */
+export const LAYOUT_EXAMPLES = join(EXAMPLES, 'layouts');
+
+const XML_ENTITIES = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" };
+
+/** [text], an attribute's value as written, as XML reads it: its five entities and character references undone. */
+export function unescapeXml(text) {
+  return text.replace(/&(?:#x([0-9a-fA-F]+)|#([0-9]+)|(lt|gt|amp|quot|apos));/g, (m, hex, dec, named) =>
+    named ? XML_ENTITIES[named] : String.fromCodePoint(parseInt(hex ?? dec, hex ? 16 : 10)));
+}
+
+/**
+ * The layout maker's youmo-layout-examples block: each example of [dir] as `{id, label, note, xml}`, its label the
+ * layout's name=, in layouts.json's order.
+ */
+export function layoutExamplesJson(dir = LAYOUT_EXAMPLES) {
+  const list = JSON.parse(readFileSync(join(dir, 'layouts.json'), 'utf8'));
+  return JSON.stringify(list.map(({ id, note }) => {
+    const xml = readFileSync(join(dir, id + '.layout'), 'utf8');
+    // the root's name= as XML reads it: not one in a comment, its entities undone
+    const name = /<keyboard\b[^>]*\sname=(?:"([^"]*)"|'([^']*)')/.exec(xml.replace(/<!--[\s\S]*?-->/g, ''));
+    if (!name) throw new Error(id + '.layout has no name=');
+    return { id, label: unescapeXml(name[1] ?? name[2]), note, xml };
+  })).replace(/</g, '\\u003c');
+}
+
 /**
  * The page made of [src]'s files, the generated blocks of [gen] (their folder, generated/), the
  * engine of [engine] (its file; null: NO_ENGINE), the fonts of [fonts] (their folder).
@@ -119,6 +145,8 @@ export function assemble(src = join(root, 'src'), engine = null, fonts = join(ro
   if (seen.has('engine')) text.engine = engine == null ? NO_ENGINE : engineText(engine);
   // the examples (060-render-p3 M4, 从示例开始): examples/, each a pack's files, in examples.json's order
   if (seen.has('examples')) text.examples = examplesJson();
+  // the layout maker's (§12.4): examples/layouts/
+  if (seen.has('layout-examples')) text['layout-examples'] = layoutExamplesJson();
   // the editing's tabs (060-render-p3 §5.1): every file of src/panels/, in their names' order, in one script
   if (seen.has('panels')) text.panels = readdirSync(join(src, 'panels')).filter((f) => f.endsWith('.js')).sort().map((f) => read(join(src, 'panels', f))).join('\n');
   // a page's other scripts (the maker's maker.js): each slot of page.html no other text fills, src/<slot>.js; a page

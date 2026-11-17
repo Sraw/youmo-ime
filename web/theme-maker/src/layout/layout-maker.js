@@ -157,8 +157,17 @@
     return n.length && n.length <= format.limits.name ? null : '名字要 1–' + format.limits.name + ' 个字符';
   }
 
-  /** The id and name a layout from [base] is offered first. */
-  const suggested = (base) => ({ id: 'my-' + base, name: '我的' + BASE_LABEL[base] });
+  /**
+   * The id and name a layout from [base] (or an example, `{id, label}`) is offered first, each within [format]'s limits
+   * (an example's long id cut, no hyphen left at its end).
+   */
+  function suggested(base, format) {
+    const from = typeof base === 'string' ? { id: base, label: BASE_LABEL[base] } : base;
+    return {
+      id: ('my-' + from.id).slice(0, format.limits.id).replace(/-+$/, ''),
+      name: ('我的' + from.label).slice(0, format.limits.name),
+    };
+  }
 
   /**
    * A new layout from the app's board [base] (§12.4 从内置键盘开始): the board as LayoutWriter writes it (its includes
@@ -171,6 +180,23 @@
     xml = setKeyboard(xml, 'id', id);
     xml = setKeyboard(xml, 'name', name.trim());
     xml = setKeyboard(xml, 'based-on', base);
+    return xml;
+  }
+
+  /**
+   * A new layout from an example (§12.4 从示例开始; [example]: `{id, xml}` of examples/layouts/) under [id] and [name]: the
+   * example as LayoutWriter writes it (its notes gone), its `<meta>` gone (the author's and the version are the example's,
+   * not the new layout's), its own keys' names (`<example id>/<key>`, §9) the new id's.
+   */
+  function fromExample(E, example, id, name) {
+    const r = E.readOwnLayout(example.xml);
+    if (!r.ok) throw new Error('example ' + example.id + ' unread');
+    let xml = E.writeLayout(r.layout);
+    const meta = F.elements(xml, 'meta')[0];
+    if (meta) xml = xml.slice(0, meta.start).replace(/\n[ \t]*$/, '') + xml.slice(meta.end);
+    xml = xml.split(' shortcut="' + example.id + '/').join(' shortcut="' + id + '/');
+    xml = setKeyboard(xml, 'id', id);
+    xml = setKeyboard(xml, 'name', name.trim());
     return xml;
   }
 
@@ -370,7 +396,7 @@
 
   root.YoumoLayoutMaker = {
     BASE_LABEL, FAMILY_LABEL, PAD_LABEL, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
-    words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, openText, fileName, saveCheck,
+    words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, fromExample, openText, fileName, saveCheck,
     restoreEnv, shape, envJson, check, lineOfKey,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

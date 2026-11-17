@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  布局编辑器的示例「AZERTY」：法语键盘的字母排法，改自 App 的 26 键（qwerty）。
+  第 1 行 A Z E R T Y U I O P，第 2 行 Q S D F G H J K L M（十个），第 3 行 ⇧ W X C V B N ' ⌫（⇧ 和 ⌫ 各占一半剩下的宽）；' 在拼音里是分词，英文里打出 '。
+  字母键的名字照旧（full/a…），长按、上下滑和 App 的 26 键共用，在 App 的 按键字符和快捷键 里改；' 是新键（azerty/quote）。
+  微软双拼、码表要的 ; 或 * 键接在 ' 后面（App 的 26 键在 L 后面）。拼音、双拼、英文、码表都能用。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="azerty" name="AZERTY" family="letters" based-on="qwerty" columns="10" arrange="rows" on-split="split">
+  <meta author="幽默输入法" version="1.0" license="CC0-1.0" min-app="0.6.1" description="法语的字母排法：A Z E R T Y，Q 在第 2 行，M 在 L 后面"/>
+  <defaults kind="letter" text-size="23"/>
+  <row split="halves">
+    <key id="a" label="{case:a}" send="a" shortcut="full/a"><variant when="roots" label="{root:a}"/></key>
+    <key id="z" label="{case:z}" send="z" shortcut="full/z"><variant when="roots" label="{root:z}"/></key>
+    <key id="e" label="{case:e}" send="e" shortcut="full/e"><variant when="roots" label="{root:e}"/></key>
+    <key id="r" label="{case:r}" send="r" shortcut="full/r"><variant when="roots" label="{root:r}"/></key>
+    <key id="t" label="{case:t}" send="t" shortcut="full/t"><variant when="roots" label="{root:t}"/></key>
+    <key id="y" label="{case:y}" send="y" shortcut="full/y"><variant when="roots" label="{root:y}"/></key>
+    <key id="u" label="{case:u}" send="u" shortcut="full/u"><variant when="roots" label="{root:u}"/></key>
+    <key id="i" label="{case:i}" send="i" shortcut="full/i"><variant when="roots" label="{root:i}"/></key>
+    <key id="o" label="{case:o}" send="o" shortcut="full/o"><variant when="roots" label="{root:o}"/></key>
+    <key id="p" label="{case:p}" send="p" shortcut="full/p"><variant when="roots" label="{root:p}"/></key>
+  </row>
+  <row split="halves">
+    <key id="q" label="{case:q}" send="q" shortcut="full/q"><variant when="roots" label="{root:q}"/></key>
+    <key id="s" label="{case:s}" send="s" shortcut="full/s"><variant when="roots" label="{root:s}"/></key>
+    <key id="d" label="{case:d}" send="d" shortcut="full/d"><variant when="roots" label="{root:d}"/></key>
+    <key id="f" label="{case:f}" send="f" shortcut="full/f"><variant when="roots" label="{root:f}"/></key>
+    <key id="g" label="{case:g}" send="g" shortcut="full/g"><variant when="roots" label="{root:g}"/></key>
+    <key id="h" label="{case:h}" send="h" shortcut="full/h"><variant when="roots" label="{root:h}"/></key>
+    <key id="j" label="{case:j}" send="j" shortcut="full/j"><variant when="roots" label="{root:j}"/></key>
+    <key id="k" label="{case:k}" send="k" shortcut="full/k"><variant when="roots" label="{root:k}"/></key>
+    <key id="l" label="{case:l}" send="l" shortcut="full/l"><variant when="roots" label="{root:l}"/></key>
+    <key id="m" label="{case:m}" send="m" shortcut="full/m"><variant when="roots" label="{root:m}"/></key>
+  </row>
+  <row split="halves">
+    <key id="shift" role="shift" kind="function" width="fill" icon="{shift-icon}" a11y="a11y_key_shift" shortcut="shift"
+         send="caps" double-tap="caps:lock" when="!table !composing"/>
+    <key id="apostrophe" role="apostrophe" kind="function" width="fill" label="分词" text-size="16" a11y="a11y_key_separator"
+         send="'" shortcut="separator" when="composing !table"/>
+    <key id="lookup" role="lookup" kind="function" width="fill" label="拼" text-size="18" text-style="bold"
+         send="code:U+F0104" when="table !looking-up"/>
+    <key id="lookup-on" role="lookup-on" kind="enter" face="keep" width="fill" label="拼" text-size="18" text-style="bold"
+         send="code:U+F0104" when="table looking-up"/>
+    <key id="w" label="{case:w}" send="w" shortcut="full/w"><variant when="roots" label="{root:w}"/></key>
+    <key id="x" label="{case:x}" send="x" shortcut="full/x"><variant when="roots" label="{root:x}"/></key>
+    <key id="c" label="{case:c}" send="c" shortcut="full/c"><variant when="roots" label="{root:c}"/></key>
+    <key id="v" label="{case:v}" send="v" shortcut="full/v"><variant when="roots" label="{root:v}"/></key>
+    <key id="b" label="{case:b}" send="b" shortcut="full/b"><variant when="roots" label="{root:b}"/></key>
+    <key id="n" label="{case:n}" send="n" shortcut="full/n"><variant when="roots" label="{root:n}"/></key>
+    <key id="quote" label="'" send="'" mark="false" shortcut="azerty/quote"/>
+    <!-- 双拼方案打 ; 时（微软）、码表的额外码键：接在 ' 后面，⇧ 和 ⌫ 让出地方；分体时接在右半后面 -->
+    <key id="semicolon" role="semicolon" label=";" send=";" mark="false" split="after" when="ime=shuangpin scheme-types=semicolon, table-extra=semicolon"/>
+    <key id="star" role="star" label="*" send="*" mark="false" split="after" when="table-extra=star"/>
+    <key id="backspace" role="backspace" kind="function" width="fill" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <row>
+    <key id="symbols" role="symbols" kind="function" width="1.2" label="符" text-size="16" text-style="bold"
+         send="layout:Symbol" shortcut="symbols"/>
+    <key id="numbers" role="numbers" kind="function" width="1.2" label="123" text-size="16" text-style="bold"
+         send="layout:Number" shortcut="numbers"/>
+    <key id="comma" role="comma" kind="function" label="{comma}" send="," shortcut="comma" when="!field=url|email"/>
+    <key id="slash" role="slash" kind="function" label="/" send="commit:/" mark="false" when="field=url">
+      <popup from="none"/>
+    </key>
+    <key id="at" role="at" kind="function" label="@" send="commit:@" mark="false" when="field=email">
+      <popup from="none"/>
+    </key>
+    <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
+         badge="{hold-badge}" sound="space" send="sym:space" swipe-axis="both" shortcut="space"/>
+    <key id="period" role="period" kind="function" label="{period}" send="." shortcut="period" when="!field=url|email"/>
+    <key id="dot" role="dot" kind="function" label="." send="commit:." mark="false" when="field=url|email">
+      <popup from="none"/>
+    </key>
+    <key id="domain" role="domain" kind="function" width="1.4" label=".com" text-size="16" send="commit:.com" mark="false"
+         when="field=url|email">
+      <popup from="list" as-is="true">
+        <item text=".com"/><item text=".cn"/><item text=".net"/><item text=".org"/>
+      </popup>
+    </key>
+    <key id="lang" role="lang" kind="letter" class="alt-text" icon="language" a11y="a11y_key_switch_language" shortcut="lang"
+         send="lang" when="lang-key"/>
+    <key id="enter" role="enter" kind="enter" face="special" width="1.5" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return" shortcut="return" when="!composing, !table">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
+    <key id="confirm" role="confirm" kind="enter" face="keep" width="1.5" label="{confirm}" text-size="16" text-style="bold"
+         sound="return" send="sym:Return" shortcut="return" when="composing table">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
+  </row>
+</keyboard>
