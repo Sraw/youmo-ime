@@ -77,13 +77,27 @@ fun Test.unitTestSettings() {
     })
     // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
     systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
+    // read from disk, not the classpath: each an input, so an edit to it alone runs the tests again rather than
+    // leaving them up to date. The fixtures (Fixtures, BackupUatTest, PinyinDictManagerTest)
+    inputs.dir(rootProject.file("uat/fixtures")).withPropertyName("uatFixtures")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    // the strokes' names (StrokeNamesTest), the docs' settings tables (SettingsPagesTest), the punctuation table
+    // the app ships (ChinesePunctuation: assets are not on the unit tests' classpath)
+    inputs.files(
+        rootProject.file("lexicon/stroke-order.tsv"), rootProject.file("docs/settings.md"), rootProject.file("docs/words.md"),
+        file("src/main/host-assets/pkgdata/punctuation/punc.mb.zh_CN"),
+    ).withPropertyName("repoFiles").withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    // the Room schemas each version was exported as (ClipboardDatabaseMigrationTest)
+    inputs.dir(file("schemas")).withPropertyName("roomSchemas")
+        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
     systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
     systemProperty("enginePaint.out", layout.buildDirectory.dir("w1-pixel").get().asFile.path)
     systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
-    // the built-in themes' files (src/commonMain/themes) and Transparent's, test data (src/commonTest/data): TestThemes
+    // the built-in themes' files (src/commonMain/themes, raw resources too) and the scene's test data (src/commonTest/data:
+    // TestThemes' Transparent, EnginePaintTest, the k17 and qwerty-060 layouts)
     systemProperty("scene.src", rootProject.file("lib/keyboard-scene/src").path)
-    inputs.file(rootProject.file("lib/keyboard-scene/src/commonTest/data/transparent.xml")).withPropertyName("transparentTheme")
+    inputs.dir(rootProject.file("lib/keyboard-scene/src/commonTest/data")).withPropertyName("sceneTestData")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
     inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")

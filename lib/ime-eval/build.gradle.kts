@@ -99,6 +99,8 @@ val uatTest = tasks.register<Test>("uatTest") {
 
 tasks.test {
     systemProperty("youmo.engines.hostThreadStrict", "true")
+    // the OpenCC dictionaries, read from disk (ChineseConverterGoldenTest): an edit to them alone runs it again
+    inputs.dir(rootProject.file("lib/ime-dict-tool/opencc")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("opencc")
 }
 
 dependencies {
