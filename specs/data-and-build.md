@@ -50,7 +50,7 @@ BUILDING.md's 5 GB counts the Gradle daemon beside it) and three table compiles 
 | `AndroidLib…`, `AndroidBase…` | library and shared Android defaults |
 | `EngineDataPlugin` | downloads (SHA-256 pinned) and compiles the engine's data into generated assets, stored uncompressed (see below) |
 | `AssetPacksPlugin` | the resource packs (below): `packTextPack`, `packVoicePack` (`packs` both), `releaseBundles`; the trusted public keys into `BuildConfig.PACK_KEYS` |
-| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which the voice pack's build needs for now: the pinned release is the offline model; the APK and the text pack build without it; its files held to `gradle/voice-pack-v<voice.version>.sha256`, so a directory of another pack version fails the build rather than ship under this one), hotword list, `app/voice-pack/` (the pack's README and the polish tagger's licence, CC BY-SA 4.0) |
+| `VoiceDataPlugin` | the voice pack's files: the recognizer's models, the polish tagger (from `youmo.voiceModelDir`, which the voice pack's build needs for now: the pinned release is the offline model; the APK and the text pack build without it; its files held to `gradle/voice-pack-v<voice.version>.sha256`, so a directory of another pack version fails the build rather than ship under this one), hotword list |
 | `HandwritingDataPlugin` | `:lib:handwriting` (onnxruntime, `pickFirst` with sherpa-onnx's identical copy) and the handwriting models (the text pack's) |
 | `BuildMetadataPlugin` | build time and git hash into `BuildConfig` (the data release names are `EngineDataPlugin`'s fields) |
 | `DetektConventionPlugin` | detekt on every Kotlin module, one config, a baseline per module |
@@ -156,6 +156,15 @@ an evaluation set in `lib/ime-eval`. It measures, and it helps choose parameters
 language model's mix weight (`engine-data.sh`'s score counts its chat and dialog sets) and
 `Predictor.USER_WEIGHT`. No model or dictionary is trained on it. New third-party data gets an
 entry in `app/licenses/libraries/` and in README's data section.
+
+The one exception is the voice pack's polish tagger (voice pack v2, 0.6.0's, shipped again in 0.6.1
+after v3's retrained tagger was found worse; `dev/design/060-tagger-data-licenses.md`): fine-tuned from
+HFL's chinese-electra-180g-small-ex (Apache-2.0) on MagicData-RAMC's transcripts (CC BY-NC-ND 4.0),
+RealTalk-CN (CC BY-NC-SA 4.0), CS2W (CC BY-SA 4.0, its sentences RAMC's) and text made from FineWeb-2.
+So the voice pack is licensed apart from the app, for non-commercial use only (CC BY-NC-SA 4.0); the
+APK and the text pack follow the rule above. It is disclosed on the licences page
+(`VoiceFeature.credits`, `voice_tagger_credit`) and in README's data section. KeSpeech
+(non-commercial) and RAMC's test speakers only measure, and help choose checkpoints.
 
 ### `lexicon/`
 

@@ -2221,8 +2221,8 @@ resets it and ends the engine's window.
   「sorry」 (「I'm sory.。」); on ascend's 142 texts with English it changed letters in 10, guarded
   in 0, the Chinese unchanged; repeated English words (「big big」) are no longer taken out.
   A number's character, Chinese (`NUMBER_CHARS`) or an ASCII digit, is never deleted (replaced it may
-  be: 2个 as 两个); 0.6.1's tagger has no ASCII digit in its vocabulary, so a hotword's digits
-  (「iPhone15」) read as <unk> (`VoicePolishTest.aHotwordsDigitsAreNeverDeleted`).
+  be: 2个 as 两个); the tagger's vocabulary has the digits 1–8 alone, so a hotword's 0 and 9
+  (「iPhone10」) read as <unk> (`VoicePolishTest.aHotwordsDigitsAreNeverDeleted`).
   `apply` stays voice-eval's tags.py to the letter (`guard = false` for its goldens).
 
 ## Strings and languages

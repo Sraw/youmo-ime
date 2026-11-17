@@ -1280,7 +1280,7 @@
     <string name="voice_no_microphone">无法使用麦克风</string>
     <string name="voice_recognition_failed">语音识别出错</string>
     <string name="voice_model_credit">语音识别：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）与 silero VAD 运行</string>
-    <string name="voice_tagger_credit">语音整理（口头禅、标点、数字）：本项目的模型，由 Chinese ELECTRA（哈工大讯飞联合实验室）用 AliMeeting 和 FineWeb-2 训练</string>
+    <string name="voice_tagger_credit">语音整理（口头禅、标点、数字）：本项目训练的模型，由 Chinese ELECTRA small（哈工大讯飞联合实验室）微调，训练数据是 MagicData-RAMC、RealTalk-CN、CS2W 的转写和用 FineWeb-2 句子合成的口语。语音包单独授权，仅供非商业使用（CC BY-NC-SA 4.0）；应用的代码仍按它自己的许可（LGPL-2.1-or-later）</string>
     <string name="voice_hold_listening">正在听…</string>
     <string name="voice_hold_preparing">准备中…</string>
     <string name="voice_hold_silent">麦克风没有声音</string>

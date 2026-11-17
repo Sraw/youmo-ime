@@ -1310,7 +1310,7 @@
     <string name="voice_no_microphone">The microphone cannot be used</string>
     <string name="voice_recognition_failed">Speech recognition failed</string>
     <string name="voice_model_credit">Speech recognition: X-ASR zh-en (Gilgamesh-J); run with sherpa-onnx (k2-fsa) and silero VAD</string>
-    <string name="voice_tagger_credit">Voice polish (fillers, punctuation, numbers): this project\'s model, trained from Chinese ELECTRA (HFL) on AliMeeting and FineWeb-2</string>
+    <string name="voice_tagger_credit">Voice polish (fillers, punctuation, numbers): this project\'s model, fine-tuned from Chinese ELECTRA small (HFL) on transcripts of MagicData-RAMC, RealTalk-CN and CS2W and on speech-like text made from FineWeb-2 sentences. The voice pack is licensed apart from the app, for non-commercial use only (CC BY-NC-SA 4.0); the app\'s code keeps its own licence (LGPL-2.1-or-later)</string>
     <string name="voice_hold_listening">Listening…</string>
     <string name="voice_hold_preparing">Getting ready…</string>
     <string name="voice_hold_silent">No sound from the microphone</string>

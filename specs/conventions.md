@@ -18,7 +18,9 @@
   compatibility shims for it. Change whatever should change; prefer the proper fix over a shim.
 - **Licences.** Nothing research-only or non-commercial ships, and nothing that ships is trained on
   it (LCCC only measures, and helps choose parameters such as the model's mix weight). Check a
-  dataset's README/data card as well as its LICENSE, and a model's training data.
+  dataset's README/data card as well as its LICENSE, and a model's training data. One exception,
+  disclosed: the voice pack's polish tagger (v2, 0.6.0's) is trained on non-commercial data, so the
+  voice pack is licensed for non-commercial use only (data-and-build.md "Licences of what ships").
 - **Privacy.** Nothing is read from or learned in sensitive fields (`FieldPolicy`; the address bar
   reads around the cursor to suggest and keeps nothing, app.md "Permissions and privacy"); a backup is a
   plain zip, so what an app marks sensitive stays out of it.

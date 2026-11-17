@@ -91,7 +91,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      * Two more that hold whatever the model (060-pending-decisions L574, the owner's, 2026-11-10; N-kd3b broke
      * both, and which edge sentences a retrain gets right varies run to run): a Chinese number's character
      * ([NUMBER_CHARS]) is never deleted (「一点一点」 lost an 一), nor an ASCII digit (a hotword's or English
-     * output's, 「iPhone15」: 0.6.1's tagger has no digit in its vocabulary, so it reads each as <unk>), and [num] (if
+     * output's, 「iPhone10」: the tagger's vocabulary has 1–8 alone, so it reads 0 and 9 as <unk>), and [num] (if
      * given) marks nothing inside an idiom of [IDIOMS] (「十全十美」 written 10全十美). A number character's
      * replacement still applies: the rule is no deletion, and an op writing another word for it (二 as 两, a
      * misheard 十 as 是, 2个 as 两个) is the polish's.

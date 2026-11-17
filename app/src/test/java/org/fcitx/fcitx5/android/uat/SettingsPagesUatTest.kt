@@ -441,11 +441,15 @@ class SettingsPagesUatTest {
         assertRows(
             "the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice" to
                 credited("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
-            "the polish tagger is AliMeeting's derived work: CC BY-SA, its README (in the pack too) linked" to
-                credited(s(R.string.voice_tagger_credit), "CC-BY-SA-4.0", "https://github.com/Sraw/youmo-ime/blob/main/app/voice-pack/README.txt"),
-            "AliMeeting, the tagger's real and seam data: CC BY-SA asks for the source's notice, its creator named" to
-                credited("AliMeeting (Alibaba Group; Yu et al., M2MeT, ICASSP 2022)", "CC-BY-SA-4.0", "https://www.openslr.org/119/"),
-            "the tagger was trained from Chinese ELECTRA small, Apache-2.0" to
+            "the polish tagger is trained on non-commercial data: the voice pack is CC BY-NC-SA, apart from the app's code" to
+                credited(s(R.string.voice_tagger_credit), "CC-BY-NC-SA-4.0", "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
+            "MagicData-RAMC, its transcripts trained on: non-commercial, no derivatives" to
+                credited("MagicData-RAMC (Magic Data Technology)", "CC-BY-NC-ND-4.0", "https://www.openslr.org/123/"),
+            "RealTalk-CN, trained on: non-commercial, share-alike" to
+                credited("RealTalk-CN (BAAI)", "CC-BY-NC-SA-4.0", "https://huggingface.co/datasets/BAAI/RealTalk-CN"),
+            "CS2W, trained on: its sentences RAMC's" to
+                credited("CS2W (Guo et al., EMNLP 2023; sentences from MagicData-RAMC)", "CC-BY-SA-4.0", "https://github.com/guozishan/CS2W"),
+            "the tagger was fine-tuned from Chinese ELECTRA small, Apache-2.0" to
                 credited("Chinese ELECTRA (hfl/chinese-electra-180g-small-ex-discriminator)", "Apache-2.0", "https://github.com/ymcui/Chinese-ELECTRA"),
         )
     }

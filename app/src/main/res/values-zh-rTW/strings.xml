@@ -1280,7 +1280,7 @@
     <string name="voice_no_microphone">無法使用麥克風</string>
     <string name="voice_recognition_failed">語音辨識出錯</string>
     <string name="voice_model_credit">語音辨識：X-ASR 中英模型（Gilgamesh-J）；由 sherpa-onnx（k2-fsa）與 silero VAD 執行</string>
-    <string name="voice_tagger_credit">語音整理（口頭禪、標點、數字）：本專案的模型，由 Chinese ELECTRA（哈工大訊飛聯合實驗室）以 AliMeeting 和 FineWeb-2 訓練</string>
+    <string name="voice_tagger_credit">語音整理（口頭禪、標點、數字）：本專案訓練的模型，由 Chinese ELECTRA small（哈工大訊飛聯合實驗室）微調，訓練資料是 MagicData-RAMC、RealTalk-CN、CS2W 的轉寫和以 FineWeb-2 句子合成的口語。語音包另行授權，僅供非商業使用（CC BY-NC-SA 4.0）；應用程式的程式碼仍依其自身授權（LGPL-2.1-or-later）</string>
     <string name="voice_hold_listening">正在聽…</string>
     <string name="voice_hold_preparing">準備中…</string>
     <string name="voice_hold_silent">麥克風沒有聲音</string>

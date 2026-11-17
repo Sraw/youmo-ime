@@ -48,7 +48,7 @@ rm -rf lib/fcitx5 lib/fcitx5-chinese-addons
 
 - libime 发布的词典和码表文本源，rime-stroke 的笔画表；
 - Unicode 的 `emoji-test.txt`、CLDR 的 `annotations/zh.xml`（表情），kfcd/chaizi 的 `chaizi-jt.txt`（拆字）；字卡的笔顺不下载，是仓库里的 `lexicon/stroke-order.tsv`；
-- 语音包的识别模型、词表和语音整理模型（`polish-tagger.ort`、`polish-tagger.json`）不下载，取自 `youmo.voiceModelDir` 指的本机目录，这个目录里的文件要和语音包当前版本的清单 `gradle/voice-pack-v<N>.sha256`（N 是 `app/packs.properties` 的 `voice.version`）一致，不一致时构建失败并说是哪个文件；语音包里还带着 `app/voice-pack/` 的说明和许可全文；
+- 语音包的识别模型、词表和语音整理模型（`polish-tagger.ort`、`polish-tagger.json`）不下载，取自 `youmo.voiceModelDir` 指的本机目录，这个目录里的文件要和语音包当前版本的清单 `gradle/voice-pack-v<N>.sha256`（N 是 `app/packs.properties` 的 `voice.version`）一致，不一致时构建失败并说是哪个文件。语音整理模型训练用了只许非商业使用的数据（MagicData-RAMC、RealTalk-CN，见 README「许可与数据」），所以语音包单独授权、仅供非商业使用（CC BY-NC-SA 4.0）；
 - 本仓库 release 里的数据，每类一个，版本写在 `build-logic` 里：
 
 | release | 内容 | 放进资源包的 |
@@ -151,7 +151,7 @@ The build downloads its data and checks the SHA-256 of each file:
 
 - the dictionary and code table text sources published by libime, and rime-stroke's stroke table;
 - Unicode's `emoji-test.txt` and CLDR's `annotations/zh.xml` (emoji), kfcd/chaizi's `chaizi-jt.txt` (拆字); a character card's stroke orders are not downloaded but `lexicon/stroke-order.tsv` in the repository;
-- for the voice pack, X-ASR's original model archive (for its token list) and silero VAD; the voice pack's recognizer model, its tokens and the polish tagger (`polish-tagger.ort`, `polish-tagger.json`) are not downloaded but taken from the local directory `youmo.voiceModelDir` names, whose files must be the ones the voice pack's version lists in `gradle/voice-pack-v<N>.sha256` (N: `voice.version` of `app/packs.properties`; the build fails naming the file that differs); the voice pack also carries `app/voice-pack/`'s README and licence text;
+- for the voice pack, X-ASR's original model archive (for its token list) and silero VAD; the voice pack's recognizer model, its tokens and the polish tagger (`polish-tagger.ort`, `polish-tagger.json`) are not downloaded but taken from the local directory `youmo.voiceModelDir` names, whose files must be the ones the voice pack's version lists in `gradle/voice-pack-v<N>.sha256` (N: `voice.version` of `app/packs.properties`; the build fails naming the file that differs). The polish tagger is trained on data allowed for non-commercial use only (MagicData-RAMC, RealTalk-CN; README's "Licences and data"), so the voice pack is licensed apart from the app, for non-commercial use only (CC BY-NC-SA 4.0);
 - this repository's data releases, one of each kind, their versions pinned in `build-logic`:
 
 | Release | What | In the packs as |

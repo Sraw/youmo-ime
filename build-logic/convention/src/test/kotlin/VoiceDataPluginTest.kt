@@ -43,24 +43,15 @@ class VoiceDataPluginTest {
             writeText("# the pack's model files\n" + (localFiles + "bpe.model").joinToString("") { "${sha256Of(local.resolve(it))}  $it\n" })
         }
 
-    private fun task(local: File?, listing: File, notices: File = noticeDir()): VoiceDataPlugin.CopyVoiceModels {
+    private fun task(local: File?, listing: File): VoiceDataPlugin.CopyVoiceModels {
         val project = ProjectBuilder.builder().withProjectDir(folder.newFolder()).build()
         val task = project.tasks.register("copyVoiceModels", VoiceDataPlugin.CopyVoiceModels::class.java).get()
         if (local != null) task.local.set(local)
         task.expected.set(listing)
-        task.notices.set(notices)
         task.hotwords.set(folder.newFile().apply { writeText("新 词\n") })
         task.vad.set(folder.newFile().apply { writeText("vad") })
         task.outputDir.set(folder.root.resolve("voice-assets"))
         return task
-    }
-
-    /** the notices as app/voice-pack has them, and what else a directory gathers (Finder's, an editor's) */
-    private fun noticeDir(): File = folder.newFolder().apply {
-        resolve("README.txt").writeText("readme")
-        resolve("LICENSE-CC-BY-SA-4.0.txt").writeText("licence")
-        resolve(".DS_Store").writeText("finder")
-        resolve("README.txt~").writeText("backup")
     }
 
     // the pinned release is the offline model, which the streaming recognizer cannot load
@@ -84,22 +75,8 @@ class VoiceDataPluginTest {
         }
         assertEquals("▁中\t-1.5\n", out.resolve("bpe.vocab").readText())
         assertEquals("vad", out.resolve("silero_vad.onnx").readText())
-        // the polish tagger is CC BY-SA 4.0: the pack carries its notice and licence
-        assertEquals("readme", out.resolve("README.txt").readText())
-        assertEquals("licence", out.resolve("LICENSE-CC-BY-SA-4.0.txt").readText())
-        // and nothing else of the notices' directory: what goes in changes the signed pack's sum
-        assertTrue(!out.resolve(".DS_Store").exists() && !out.resolve("README.txt~").exists())
-    }
-
-    // the pack carries the tagger's notice and licence (CC BY-SA 4.0): without either, no pack
-    @Test
-    fun aNoticeMissingBuildsNoPack() {
-        for (name in VoiceDataPlugin.NOTICE_FILES) {
-            val local = localDir("local-$name")
-            val notices = noticeDir().apply { resolve(name).delete() }
-            val e = assertThrows(name, GradleException::class.java) { task(local, listingOf(local, "v-$name.sha256"), notices).copy() }
-            assertTrue(e.message, e.message!!.contains(name))
-        }
+        // what goes in is the pack's content (its sum): the released v2 had these files and no others
+        assertEquals((localFiles + listOf("bpe.vocab", "hotwords.txt", "silero_vad.onnx")).toSet(), out.list()!!.toSet())
     }
 
     // shasum writes lower case, a listing written by hand may be upper: the same sums
@@ -113,12 +90,12 @@ class VoiceDataPluginTest {
         assertTrue(folder.root.resolve("voice-assets/voice/polish-tagger.ort").isFile)
     }
 
-    // youmo.voiceModelDir is a machine's own: pointed at another version's models (0.6.0's tagger
-    // after voice.version went to 3), the build fails rather than pack them under this version
+    // youmo.voiceModelDir is a machine's own: pointed at another version's models (another tagger
+    // than the version's), the build fails rather than pack them under this version
     @Test
     fun aDirectoryNotTheListedVersionsBuildsNoPack() {
         val rows = listOf<Pair<String, (File, File) -> Unit>>(
-            "another tagger (the 0.6.0 one under v3)" to { local, _ -> local.resolve("polish-tagger.ort").writeText("old") },
+            "another tagger than the version's" to { local, _ -> local.resolve("polish-tagger.ort").writeText("old") },
             "a recognizer file changed" to { local, _ -> local.resolve("encoder.ort").writeText("other") },
             "the bpe model the vocabulary is read from changed" to { local, _ -> local.resolve("bpe.model").writeText("other") },
             "a file missing from the directory" to { local, _ -> local.resolve("polish-tagger.json").delete() },
@@ -150,11 +127,6 @@ class VoiceDataPluginTest {
         val listed = root.resolve(VoiceDataPlugin.listing(version)).readLines().filter { it.isNotBlank() && !it.startsWith("#") }
             .map { it.trim().split(Regex("\\s+"))[1] }.toSet()
         assertEquals((localFiles + VoiceDataPlugin.BPE_MODEL).toSet(), listed)
-        val notices = root.resolve("app/${VoiceDataPlugin.NOTICE_DIR}")
-        assertTrue(notices.resolve("LICENSE-CC-BY-SA-4.0.txt").readText().startsWith("Attribution-ShareAlike 4.0 International"))
-        // the directory is the notices the pack takes, no more (one added there would not be packed); a Mac's .DS_Store
-        // and an editor's backup, not committed, are none (R26 F8328)
-        assertEquals(VoiceDataPlugin.NOTICE_FILES.toSet(), notices.list()!!.filterNot { it.startsWith(".") || it.endsWith("~") }.toSet())
     }
 
     // youmo.voiceModelDir: ~/ taken as home (a home with a $ in it kept as it is), an absolute path kept

@@ -1184,7 +1184,7 @@ def st90(d):
     return f"空格上星的红点 {n}，换回内置后 {m}"
 
 
-case("ST-82", needs="release:要 0.6.0 的语音包 v2（用不上，直接说）和一个比手机上旧、用得上的签名文字包（v1）；发版时在发布包上手工跑（问框、保留、替换、转屏）")(lambda d: None)
+case("ST-82", needs="release:发版时手工跑：A、B 在 debug 包上（测试密钥签的语音包 v1，用不上，直接说；比手机上旧、用得上的文字包 v1，问框、保留、替换、转屏；只有 debug 包认测试密钥），C 在发布包上（装着 0.6.1 测试版语音包 v3 时导入 0.6.0 的语音包 v2，先问、替换）")(lambda d: None)
 case("ST-83", needs="manual:要切系统深色模式并点主题卡；规则由 ThemePackListingTest 查，在模拟器或真机上手工跑")(lambda d: None)
 case("ST-84", needs="manual:要从 from-app.theme 改出 monokai.theme；规则由 ThemePackImportTest 查，提示在设备上手工看")(lambda d: None)
 case("ST-85", needs="release:要打 v0.6.0-beta1 标签构建的包；发测试版时跑，规则由 ThemePackMinAppTest 查")(lambda d: None)

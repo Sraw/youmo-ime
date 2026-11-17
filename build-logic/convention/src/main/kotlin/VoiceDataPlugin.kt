@@ -44,10 +44,8 @@ import javax.inject.Inject
  *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
  *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
  * - silero VAD (MIT): whether what was heard is speech at all (VoiceQuiet).
- * - The polish tagger (ours, 060-voice-tagger.md; retrained on licence-clean data for 0.6.1,
- *   061-tagger-retrain.md, so CC BY-SA 4.0 as AliMeeting is): drops fillers and words taken back, adds marks,
+ * - The polish tagger (ours, 060-voice-tagger.md): drops fillers and words taken back, adds marks,
  *   writes numbers in digits (its num head), as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
- *   The pack carries its README and licence ([NOTICE_DIR]).
  * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
  *   apart by spaces as the dict tool's `hotwords` writes them (HotwordSpelling.spelled), and the
  *   model's BPE vocabulary, which sherpa-onnx encodes them with, read out of its SentencePiece model.
@@ -97,15 +95,6 @@ class VoiceDataPlugin : Plugin<Project> {
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
 
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
-
-        /** the app project's directory of [NOTICE_FILES] */
-        internal const val NOTICE_DIR = "voice-pack"
-
-        /**
-         * The pack's README and the polish tagger's licence (CC BY-SA 4.0), into `voice/` as they are; named, so
-         * nothing else of [NOTICE_DIR] (a .DS_Store, an editor's backup) goes into the signed pack
-         */
-        internal val NOTICE_FILES = listOf("README.txt", "LICENSE-CC-BY-SA-4.0.txt")
 
         /** the model files voice pack [version] has of [LOCAL_PROPERTY]'s directory, by SHA-256 (the root project's) */
         internal fun listing(version: Int) = "gradle/voice-pack-v$version.sha256"
@@ -167,7 +156,6 @@ class VoiceDataPlugin : Plugin<Project> {
                 local.set(target.layout.projectDirectory.dir(homed(localDir.get(), System.getProperty("user.home"))))
             }
             expected.set(target.rootProject.layout.projectDirectory.file(listing(version)))
-            notices.set(target.layout.projectDirectory.dir(NOTICE_DIR))
             this.hotwords.set(hotwords.flatMap { it.outputFile })
             this.vad.set(vad.flatMap { it.outputFile })
             outputDir.set(target.layout.buildDirectory.dir("generated/voice-assets"))
@@ -208,7 +196,7 @@ class VoiceDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The model (ORT), its tokens and the tagger (from [local], as [expected] lists them), the hotwords, the VAD and the [notices], as `voice/` of the voice pack. */
+    /** The model (ORT), its tokens and the tagger (from [local], as [expected] lists them), the hotwords and the VAD, as `voice/` of the voice pack. */
     @DisableCachingByDefault(because = "linking is quicker than the cache would be")
     abstract class CopyVoiceModels : DefaultTask() {
         /** [LOCAL_PROPERTY]'s directory (`~/` taken as home): without it [copy] fails */
@@ -221,10 +209,6 @@ class VoiceDataPlugin : Plugin<Project> {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val expected: RegularFileProperty
-
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.RELATIVE)
-        abstract val notices: DirectoryProperty
 
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
@@ -254,15 +238,10 @@ class VoiceDataPlugin : Plugin<Project> {
             out.resolve("bpe.vocab").writeText(vocabulary(local.resolve(BPE_MODEL).readBytes()))
             hotwords.get().asFile.copyTo(out.resolve("hotwords.txt"))
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
-            for (name in NOTICE_FILES) {
-                val notice = notices.get().asFile.resolve(name)
-                if (!notice.isFile) throw GradleException("voice: no $NOTICE_DIR/$name, which the voice pack carries")
-                notice.copyTo(out.resolve(name))
-            }
         }
 
         // the directory is a machine's own, not in the repo: a pack under this version with another
-        // version's model would ship it silently (the tagger's licence with it)
+        // version's model would ship it silently
         // (a listing missing for the version is Gradle's to say: expected is an @InputFile)
         private fun check(local: File, listing: File) {
             val sums = listing.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.associate { line ->

@@ -259,8 +259,8 @@ class VoicePolishTest {
 
     @Test
     fun aHotwordsDigitsAreNeverDeleted() {
-        // 0.6.1's tagger has no ASCII digit in its vocabulary (0.6.0's had 1–8): each reads as <unk>, and what it
-        // labels one is no reading of it; a hotword or English the recognizer writes with digits keeps them all
+        // the tagger's vocabulary has the ASCII digits 1–8 alone: 0 and 9 read as <unk>, and what it labels one is no
+        // reading of it; a hotword or English the recognizer writes with digits keeps them all, as a Chinese number's
         fun deletesDigits() = VoicePolishStream(tags, { t ->
             VoicePolishStream.Labels(IntArray(t.size) { if (t[it] in '0'.code..'9'.code || t[it] == '嗯'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size))
         })

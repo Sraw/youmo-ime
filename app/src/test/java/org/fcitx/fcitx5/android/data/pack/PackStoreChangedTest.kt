@@ -6,15 +6,20 @@ package org.fcitx.fcitx5.android.data.pack
 
 import android.net.Uri
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackRequirement
 import org.fcitx.fcitx5.android.pack.PackShelf
+import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.pack.Refusal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -181,6 +186,61 @@ class PackStoreChangedTest {
             PackStore.restartHost = restart
             TestShelves.use()
             root.deleteRecursively()
+        }
+    }
+
+    // 0.6.1's test builds took voice pack v3, which 0.6.1 went back on (its v2 is 0.6.0's): a v3 kept from them is
+    // of the format this build reads and not below its minVersion, so it stays in use, the page saying v3, nothing
+    // failing; the released v2 over it is an older pack over a newer one, asked about, and 替换 makes it the one used
+    @Test
+    @Uat("ST-82")
+    fun aTestBuildsVoicePackV3StaysInUseTillTheReleasedV2ReplacesIt() {
+        val dir = Files.createTempDirectory("packs").toFile()
+        val format = BuildConfig.PACK_VOICE_FORMAT
+        val app = TestShelves.requirements + (PackKind.VOICE to PackRequirement(format, BuildConfig.PACK_VOICE_MIN_VERSION))
+        // the v3 imported under the test build, which took voice packs from v3; then this app's start
+        val beta = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements + (PackKind.VOICE to PackRequirement(format, 3))).apply { load() }
+        assertTrue(beta.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
+        assertTrue(beta.import(TestShelves.pack(PackKind.VOICE, version = 3, format = format).inputStream()) is ImportResult.Imported)
+        val shelf = PackShelf(dir, listOf(TestShelves.packs.publicKey), app).apply { load() }
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        try {
+            PackStore.useShelf(shelf)
+            val context = RuntimeEnvironment.getApplication()
+            val before = shelf.status(PackKind.VOICE)
+            val voiceDir = PackStore.dir(PackKind.VOICE)
+            val file = File(dir, "youmo-voice-v2.youmopack").apply { writeBytes(TestShelves.pack(PackKind.VOICE, version = 2, format = format)) }
+            val asked = mutableListOf<Pair<Int, Int>>()
+            val result = runBlocking {
+                PackStore.import(context.contentResolver, Uri.fromFile(file)) { new, there -> asked += new.version to there.version; true }
+            }
+            assertRows(
+                "this build takes the voice pack from v2" to { assertEquals(2, BuildConfig.PACK_VOICE_MIN_VERSION) },
+                "the test build's v3 is still used: its models read" to {
+                    assertTrue("$before", before is PackStatus.Ready && before.manifest.version == 3)
+                    assertNotNull(voiceDir)
+                },
+                "the packs page says v3 is there" to {
+                    assertEquals(context.getString(R.string.pack_status_ready, 3), PackImports.describe(context, before))
+                },
+                "the released v2 over it is asked about, as an older pack over a newer one" to { assertEquals(listOf(2 to 3), asked) },
+                "替换: imported, told as replacing the newer v3" to {
+                    assertEquals(
+                        context.getString(R.string.pack_imported_older, context.getString(R.string.pack_voice), 2, 3),
+                        PackImports.describe(context, PackImports.Outcome(file.name, result)),
+                    )
+                },
+                "v2 is the one used" to {
+                    val after = shelf.status(PackKind.VOICE)
+                    assertTrue("$after", after is PackStatus.Ready && after.manifest.version == 2)
+                    assertNotNull(PackStore.dir(PackKind.VOICE))
+                },
+            )
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+            dir.deleteRecursively()
         }
     }
 }

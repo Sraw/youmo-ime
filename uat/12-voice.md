@@ -100,9 +100,9 @@
 
 ### VO-15 [P1] 关于页列出语音模型用到的数据
 - **前提**：B0-设置（导入了语音包），**⋮ → 关于**。
-- **操作**：点"第三方库许可证"，找 LibriSpeech、语音整理、AliMeeting、Chinese ELECTRA。
-- **预期**：列着 LibriSpeech，许可是 CC BY 4.0（CC-BY-4.0），链接到 openslr.org/12；「语音整理（口头禅、标点、数字）：本项目的模型……」许可是 CC-BY-SA-4.0，链接到仓库里的 `app/voice-pack/README.txt`（语音包里也带着这份说明和许可全文）；「AliMeeting (Alibaba Group; Yu et al., M2MeT, ICASSP 2022)」是 CC-BY-SA-4.0，链接到 openslr.org/119；Chinese ELECTRA 是 Apache-2.0。没导入语音包时也列着（许可跟着应用，不看有没有包）。
-- **JVM**：`SettingsPagesUatTest.theVoiceModelsDataIsCredited`（四行的许可和点开的链接）；设备上不跑。
+- **操作**：点"第三方库许可证"，找 LibriSpeech、语音整理、MagicData-RAMC、RealTalk-CN、CS2W、Chinese ELECTRA。
+- **预期**：列着 LibriSpeech，许可是 CC BY 4.0（CC-BY-4.0），链接到 openslr.org/12；「语音整理（口头禅、标点、数字）：本项目训练的模型……语音包单独授权，仅供非商业使用（CC BY-NC-SA 4.0）；应用的代码仍按它自己的许可（LGPL-2.1-or-later）」许可是 CC-BY-NC-SA-4.0，链接到 creativecommons.org 的 by-nc-sa/4.0；「MagicData-RAMC (Magic Data Technology)」CC-BY-NC-ND-4.0，链接到 openslr.org/123；「RealTalk-CN (BAAI)」CC-BY-NC-SA-4.0，链接到 huggingface.co 的数据集页；「CS2W (…; sentences from MagicData-RAMC)」CC-BY-SA-4.0，链接到 github.com/guozishan/CS2W；Chinese ELECTRA 是 Apache-2.0。没导入语音包时也列着（许可跟着应用，不看有没有包）。
+- **JVM**：`SettingsPagesUatTest.theVoiceModelsDataIsCredited`（六行的许可和点开的链接）；设备上不跑。
 
 ### VO-17 [P1] 加了自己的词，平常的话照样听对
 - **前提**：B0-设置（导入了语音包），按 VO-14 加了「澜境花园」。
@@ -233,7 +233,7 @@
 ### VO-34 [P0] 没有语音包时麦克风提示导入
 - **前提**：B0，导入了文字包、没导入语音包。
 - **操作**：点工具栏上的麦克风；再长按空格。
-- **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时（如 0.6.1 起装着 0.6.0 的语音包 v2）提示「语音输入需要把语音包更新到 v3：设置 → 资源包」并打开资源包页，资源包页写「需要更新到 v3（现在是 v2）」，长按空格同样什么都不做，导入 v3 后恢复；语音包比应用新（格式更新）时提示「语音包 vN 是给更新版应用的：请更新幽默输入法」；语音包已损坏时提示重新导入。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
+- **预期**：键盘照常能打字。点麦克风时提示「语音输入需要导入语音包：设置 → 资源包」并打开资源包页，不问录音权限；语音包版本太旧时（如装着 0.6.0 测试版 1 的语音包 v1，这一版要 v2）提示「语音输入需要把语音包更新到 v2：设置 → 资源包」并打开资源包页，资源包页写「需要更新到 v2（现在是 v1）」，长按空格同样什么都不做，导入 v2 后恢复；语音包比应用新（格式更新）时提示「语音包 vN 是给更新版应用的：请更新幽默输入法」；语音包已损坏时提示重新导入。长按空格什么都不做（和 0.5.x 文字版一样）：没有提示、不打开页面，空格上没有麦克风角标，按住后照样能左右慢拖移动光标。导入语音包后空格上出现麦克风角标，长按就能说话。
 - **JVM**：`PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing`、`aVoicePackForANewerAppAsksForTheAppsUpdate`、`aVoicePackOlderThanTheAppTakesAsksForTheNewOneAndVoiceStaysOff`、`KeyboardUatTest.withoutTheVoicePackTheDefaultHoldLeavesTheSlowDragItsCursor`（`:app:testDebugUnitTest`）。
 
 ### VO-35 [P1] 句末句号按输入框，语音整理去掉口头禅
@@ -357,7 +357,7 @@
 
 ### VO-55 [P1] 松开后很快出字
 <!-- 061-voice-960-impl-report.md：松开到出字的时间（1920 ms 分块、补零 2.42 s；960 ms 分块量过没采用） -->
-- **前提**：B0-语音（语音包 v3）。
+- **前提**：B0-语音（语音包 v2）。
 - **操作**：长按空格说"今天天气很好"，说完就松开；再用"我们走吧"做一遍。
 - **预期**：松开后很快（真机约 1.4 秒）框里是「今天天气很好」「我们走吧」。
 - **JVM**：无（时间只在设备上量）。

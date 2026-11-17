@@ -574,7 +574,7 @@
 ### ST-62 [P0] 资源包页列出每个包的状态
 - **前提**：B0-设置，导入了文字包、没导入语音包。
 - **操作**：首页点 **资源包**；再导入语音包。（用过语音后再导入语音包是 ST-69，手工跑。）
-- **预期**：页上依次是「文字包」「语音包」两行，各写状态（已导入 vN／未导入／需要更新到 vN（现在是 vM））和用途（文字包：拼音、英文、形码、笔画、手写，没有它键盘不能打字；语音包：语音输入，可选）；下面是「导入资源包」和一段说明（资源包随每个版本发布、升级应用会保留）。导入语音包后，语音包那一行变成「已导入 vN」（N 是导入的语音包的版本，现在是 v3）。
+- **预期**：页上依次是「文字包」「语音包」两行，各写状态（已导入 vN／未导入／需要更新到 vN（现在是 vM））和用途（文字包：拼音、英文、形码、笔画、手写，没有它键盘不能打字；语音包：语音输入，可选）；下面是「导入资源包」和一段说明（资源包随每个版本发布、升级应用会保留）。导入语音包后，语音包那一行变成「已导入 vN」（N 是导入的语音包的版本，现在是 v2）。
 - **JVM**：`PacksUatTest.thePageListsEachPacksStateAndWhatItIsFor`（两行的状态和用途、导入后跟着变；图）、`theStatusAPackRowSaysForEachState`。
 
 ### ST-69 [P1] 用过语音后重新导入语音包
@@ -597,10 +597,10 @@
 - 真机或模拟器上手工跑（要自己打包），不在自动跑里。
 
 ### ST-82 [P1] 导入比手机上旧的资源包：用得上的先问，用不上的直接说
-- **前提**：B0-设置，导入了这一版的语音包 v3；"下载"里有 0.6.0 的语音包 v2（这一版要 v3 或更新的，用不上）。B（做得出时）：导入了文字包 v2，"下载"里有文字包 v1（这一版用得上。`:app:packs` 没有改版本号的参数：照 `TestShelves` 的做法，把正式 v1 的文件放进一个 version 为 2 的包，用仓库里的测试密钥 `app/pack-keys/test-ed25519.pem` 签名；只有 debug 包认测试密钥，所以 B 在 debug 包上跑；做不出就记阻塞）。
-- **操作**：A：**资源包 → 导入资源包** 选语音包 v2。B：选文字包 v1；在问的框里点 **保留**；再导入一次 v1，这次点 **替换**；再导一次 v1，问框出来时转屏。
-- **预期**：A：不弹问框，直接是结果框「<文件名> 是语音包 v2，这个版本的应用需要 v3 或更新的。」，下面写「原来的资源包没有变化。」，页上语音包仍是 v3（以前先问「手机上是更新的 v3，要换成 v2 吗？」，点 **替换** 后才说用不了）。B：复制开始前先弹框：第一行是选的文件名（如 `youmo-text-v1.youmopack`），空一行后是「手机上是更新的 v2，要换成 v1 吗？」，按钮 **替换**、**保留**；点 **保留** 后结果框是「文字包：保留了更新的 v2，没有导入 v1」，下面写「原来的资源包没有变化。」，没有「导入完成…可以删掉」，页上文字包仍是 v2；点 **替换** 后照常导入，结果「文字包：已用 v1 替换了更新的 v2」，下面是「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；转屏后问框还在（只一个），按返回算保留。导入更新的或手机上没有的包不问。
-- **JVM**：`PackStoreChangedTest.anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes`（问、保留、替换、新的不问）、`PackStoreChangedTest.anOlderPackThisBuildCannotUseIsRefusedWithoutAsking`（用不上的旧包不问、直接说要哪一版、什么都不复制；用得上的照问）；`PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles`（都保留时结果框说原来的没有变化、不说可以删掉）；`PackImportsTest.theReplaceQuestionWaitsForThePagesAnswerOneFileAtATime`（页上一次只问一个文件，等回答）、`aCancelledImportTakesItsQuestionDown`（取消导入时问框收起）；ime-core `PackShelfTest`（只读包头的清单、包头看得出这一版用不用得上）；问框是界面，设备上跑。
+- **前提**：A、B 在 debug 包上跑（只有 debug 包认仓库里的测试密钥，发布包按签名不对拒绝），C 在发布包上跑。A：B0-设置，导入了这一版的语音包 v2；"下载"里有用 `TestShelves` 的做法以测试密钥签的语音包 v1（这一版要 v2 或更新的，用不上；做不出就记阻塞）。B（做得出时）：导入了文字包 v2，"下载"里有文字包 v1（这一版用得上。`:app:packs` 没有改版本号的参数：照 `TestShelves` 的做法，把正式 v1 的文件放进一个 version 为 2 的包，用仓库里的测试密钥 `app/pack-keys/test-ed25519.pem` 签名；只有 debug 包认测试密钥，所以 B 在 debug 包上跑；做不出就记阻塞）。C（发版时，在发布包上）：装着 0.6.1 测试版导入的语音包 v3（0.6.1 退回了 0.6.0 的 v2）；"下载"里有发布的 `youmo-voice-v2.youmopack`。
+- **操作**：A：**资源包 → 导入资源包** 选语音包 v1。B：选文字包 v1；在问的框里点 **保留**；再导入一次 v1，这次点 **替换**；再导一次 v1，问框出来时转屏。C：先看资源包页和语音输入；再导入 `youmo-voice-v2.youmopack`，在问的框里点 **替换**。
+- **预期**：A：不弹问框，直接是结果框「<文件名> 是语音包 v1，这个版本的应用需要 v2 或更新的。」，下面写「原来的资源包没有变化。」，页上语音包仍是 v2（以前先问「手机上是更新的 v2，要换成 v1 吗？」，点 **替换** 后才说用不了）。B：复制开始前先弹框：第一行是选的文件名（如 `youmo-text-v1.youmopack`），空一行后是「手机上是更新的 v2，要换成 v1 吗？」，按钮 **替换**、**保留**；点 **保留** 后结果框是「文字包：保留了更新的 v2，没有导入 v1」，下面写「原来的资源包没有变化。」，没有「导入完成…可以删掉」，页上文字包仍是 v2；点 **替换** 后照常导入，结果「文字包：已用 v1 替换了更新的 v2」，下面是「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；转屏后问框还在（只一个），按返回算保留。导入更新的或手机上没有的包不问。C：导入前页上语音包写「已导入 v3」，语音输入照常能用（不崩、不提示更新）；导入时先问「手机上是更新的 v3，要换成 v2 吗？」，点 **替换** 后结果「语音包：已用 v2 替换了更新的 v3」，页上变成「已导入 v2」，语音输入照常。
+- **JVM**：`PackStoreChangedTest.anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes`（问、保留、替换、新的不问）、`PackStoreChangedTest.anOlderPackThisBuildCannotUseIsRefusedWithoutAsking`（用不上的旧包不问、直接说要哪一版、什么都不复制；用得上的照问）；`PackStoreChangedTest.aTestBuildsVoicePackV3StaysInUseTillTheReleasedV2ReplacesIt`（C：测试版的 v3 照用、页上写 v3，导入 v2 先问、替换后用 v2）；`PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles`（都保留时结果框说原来的没有变化、不说可以删掉）；`PackImportsTest.theReplaceQuestionWaitsForThePagesAnswerOneFileAtATime`（页上一次只问一个文件，等回答）、`aCancelledImportTakesItsQuestionDown`（取消导入时问框收起）；ime-core `PackShelfTest`（只读包头的清单、包头看得出这一版用不用得上）；问框是界面，设备上跑。
 
 ### ST-64 [P0] 升级后资源包和设置、学过的词都还在
 - **前提**：装 0.5.2，改几项设置、学几个词，在 **备份与恢复** 里导出一份备份（放在"下载"）；"下载"里有要测的版本（0.6.0 或更新）的 APK 和文字包。新装的 0.5.x 学到的词只在内存里（0.6.0 的更新说明「修复全新安装后学到的词不保存」），覆盖安装后就没了，所以学过的词靠这份备份带过去（同 ST-67 的 A）。
