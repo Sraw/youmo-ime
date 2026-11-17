@@ -489,8 +489,11 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   stroke drawn on the keyboard comes as `Keyboard.strokeKey` (0xF0110 up, `Keyboard.STROKES`, one
   per `h s p n z`; `KeyRouter` swallows it in any other input method and a temporary mode, so it
   is never typed), `Action.Stroke` to the session. While something is typed it keeps, in the
-  inner session's order, the candidates whose first character starts so in any of its orders
-  (`Strokes.startsWith`, a sorted char → entries index made on first use); an emoji or mark goes
+  inner session's order, the candidates whose first character starts so: in the mainland's order
+  where `CharInfo.orderKeys` has one (lexicon/stroke-order.tsv, the card's; rime-stroke's other orders
+  are mostly Taiwan's and start otherwise for 473 of those 6940, 艳 丿一一丨: ST-120; compared in place,
+  `CharInfo.orderStartsWith`), else, for the ones it lacks (some, most of them traditional or rare), in any of
+  rime-stroke's (`Strokes.startsWith`, a sorted char → entries index made on first use); an emoji or mark goes
   as the one before it, a Latin word goes. The next stroke is that character's next. Then `singles`
   (首页至少几个单字, `EngineSettings.strokeSingles`, 0–5, 2 by default) of the kept characters alone (one
   ideographic code point, an emoji after one going with it) are put right after the kept first, the
@@ -505,8 +508,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   of the pinyin, the rest stays typed and the key is swallowed (`Keyboard` keeps a key not read
   handled while something is still composing, so the app never types it before the rest). Nothing kept leaves the bar
   empty and Backspace takes the stroke back. The preedit is the inner one, a space, the strokes
-  (`Strokes.shown`). `ime-eval strokes <pinyin.data> <stroke.data> <set> [--first-char] [--scheme t9]
-  [--rerank <sentence-model> --refine <sentence-model-large>]` times it (the first character typed by
+  (`Strokes.shown`). `ime-eval strokes <pinyin.data> <stroke.data> <set> [--charinfo <charinfo.data>] [--first-char] [--scheme t9]
+  [--rerank <sentence-model> --refine <sentence-model-large>]` times it (`--charinfo`: drawn and filtered by the mainland's orders, as the app; the first character typed by
   the sample's exact reading, samples without one left out, an untimed warm-up first): on
   pinyin-chat.tsv's first characters alone (a syllable's homophones, 1941 samples) a stroke's snapshot
   is 0.05 ms p50 / 0.27 ms p95, the look through to 2000 0.31 / 1.54 ms, first right after 0–4 strokes

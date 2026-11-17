@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.BitPacked
 import org.fcitx.fcitx5.android.engine.data.DataFile
 import org.fcitx.fcitx5.android.engine.data.ensureFormat
 import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
+import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import java.nio.ByteBuffer
 
 /**
@@ -62,6 +63,29 @@ class CharInfo private constructor(
         val o = find(orderChars, codePoint)
         val order = if (o < 0) null else (orderStart[o] until orderStart[o + 1]).map { StrokeShape.entries[orders[it]] }
         return Entry(String(Character.toChars(radicals[radical[i]])), strokes[i], partList, order)
+    }
+
+    /**
+     * [codePoint]'s stroke order as the mainland writes it, a kind a stroke in [StrokeShape.keys]' letters (行 ppshhs);
+     * null where not known: the order ime-eval's stroke run draws.
+     */
+    fun orderKeys(codePoint: Int): String? {
+        val o = find(orderChars, codePoint)
+        if (o < 0) return null
+        return StrokeShape.keys((orderStart[o] until orderStart[o + 1]).map { StrokeShape.entries[orders[it]] })
+    }
+
+    /**
+     * Whether [codePoint]'s stroke order as the mainland writes it starts with [keys] ([StrokeShape.keys]' letters), null
+     * where not known: what 笔画筛选 goes by (StrokeFilter), compared in place, as it asks up to 2000 candidates a stroke.
+     */
+    fun orderStartsWith(codePoint: Int, keys: CharSequence): Boolean? {
+        val o = find(orderChars, codePoint)
+        if (o < 0) return null
+        val from = orderStart[o]
+        if (orderStart[o + 1] - from < keys.length) return false
+        for (i in keys.indices) if (Strokes.KEYS[StrokeShape.entries[orders[from + i]].kind - 1] != keys[i]) return false
+        return true
     }
 
     /** How many characters it knows. */

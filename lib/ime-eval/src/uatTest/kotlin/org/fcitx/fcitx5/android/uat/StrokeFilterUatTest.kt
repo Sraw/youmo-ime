@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +33,24 @@ class StrokeFilterUatTest {
         type(EngineReplay.nineKeys("0"))
         expectText("养0")
         expectPreedit("")
+    }
+
+    @Test
+    @Uat("ST-120")
+    fun nineKeysWangThenAPieKeepsWhatTheMainlandStartsSo() = with(EngineReplay(im = InputMethodCatalog.PINYIN)) {
+        type(EngineReplay.nineKeys("9264"))
+        stroke("p")
+        expectPreedit("wang 丿")
+        expectFirst("往")
+        // 艳 is 一一一丨丿… as the mainland writes it (its card's order); rime-stroke's first, Taiwan's, starts 丿一一丨
+        expectNotAmong("艳", "王", "养")
+        assertTrue("腰 (丿㇆…) not kept: $candidates", "腰" in candidates)
+        // the first characters of all kept start with 丿 as the mainland writes them
+        val mainland = CharInfo.load(UatEngines.data(InputMethodCatalog.CHAR_INFO_DATA).duplicate(), verify = false)
+        for (c in candidates.take(60)) {
+            val order = mainland.of(c.codePointAt(0))?.order ?: continue
+            assertEquals("$c ${StrokeShape.shown(order)}", 3, order.first().kind)
+        }
     }
 
     @Test

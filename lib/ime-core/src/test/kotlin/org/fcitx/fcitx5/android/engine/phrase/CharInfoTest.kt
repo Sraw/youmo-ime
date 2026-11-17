@@ -131,8 +131,18 @@ class CharInfoTest {
         assertEquals(shapes("P P S H H SG"), of("行")!!.order)
         assertEquals("丿丿丨一一亅", StrokeShape.shown(of("行")!!.order!!))
         assertEquals("ppshhs", StrokeShape.keys(of("行")!!.order!!))
+        assertEquals("ppshhs", info.orderKeys("行".codePointAt(0)))
+        // compared by kind: 亅 is a 竖; longer than the order, false; one not known, null
+        assertEquals(true, info.orderStartsWith("行".codePointAt(0), "pp"))
+        assertEquals(true, info.orderStartsWith("行".codePointAt(0), "ppshhs"))
+        assertEquals(false, info.orderStartsWith("行".codePointAt(0), "ppshhz"))
+        assertEquals(false, info.orderStartsWith("行".codePointAt(0), "ppshhsh"))
+        assertEquals(false, info.orderStartsWith("行".codePointAt(0), "h"))
+        assertEquals(null, info.orderStartsWith("打".codePointAt(0), "h"))
         assertEquals(shapes("D D T H S H"), of("江")!!.order)
         assertNull(of("打")!!.order)
+        assertNull(info.orderKeys("打".codePointAt(0)))
+        assertNull(info.orderKeys("a".codePointAt(0)))
         // what it reads back is what was written, through the file
         assertEquals("P H S P D S HZ H", of("和")!!.order!!.joinToString(" ") { it.code })
         val e = assertThrows(SourceException::class.java) {

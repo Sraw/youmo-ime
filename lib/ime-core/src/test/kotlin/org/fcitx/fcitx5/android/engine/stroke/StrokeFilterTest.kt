@@ -166,6 +166,23 @@ class StrokeFilterTest {
     }
 
     @Test
+    fun aCharacterTheMainlandWritesGoesByThatOrderAloneOneItDoesNotByAny() {
+        // 望 as the mainland writes it is nzphhsh: its other order (rime-stroke's Taiwan one) keeps it no longer (ST-120's 艳);
+        // 样 and 杨, which it does not know, by the table's
+        val mainland = mapOf('望'.code to "nzphhsh")
+        val f = StrokeFilter(FakePinyin(mapOf("yang" to yang)), { strokes }, pageSize = 3, mainland = { cp, drawn -> mainland[cp]?.startsWith(drawn) })
+        "yang".forEach { f.apply(Action.Key(it)) }
+        f.apply(Action.Stroke('h'))
+        assertEquals(listOf("样", "杨"), f.apply(Action.Stroke('s')).candidates)
+        assertEquals(listOf("样", "杨"), f.candidates(0, 100).map { it.text })
+        f.apply(Action.Backspace)
+        f.apply(Action.Backspace)
+        f.apply(Action.Stroke('n'))
+        assertEquals(listOf("养", "羊", "🐑", "望"), f.candidates(0, 100).map { it.text })
+        assertEquals(listOf("望"), f.apply(Action.Stroke('z')).candidates)
+    }
+
+    @Test
     fun aPickIsTheSessionsCandidateAtItsOwnIndexTheStrokesGone() {
         type("yang")
         filter.apply(Action.Stroke('n'))

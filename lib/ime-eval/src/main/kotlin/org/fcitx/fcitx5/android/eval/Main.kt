@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
@@ -311,8 +312,8 @@ internal val COMMANDS = listOf(
         learnUx(dataPath, File(scriptPath), args.options, out)
     },
     Command(
-        "strokes", "<pinyin.data> <stroke.data> <set.tsv> [--scheme <scheme>] [--look-ahead <n>] [--first-char] [--rerank <model.safetensors>] [--refine <model.safetensors>]",
-        3..3, "scheme", "look-ahead", "first-char", "rerank", "refine",
+        "strokes", "<pinyin.data> <stroke.data> <set.tsv> [--charinfo <charinfo.data>] [--scheme <scheme>] [--look-ahead <n>] [--first-char] [--rerank <model.safetensors>] [--refine <model.safetensors>]",
+        3..3, "charinfo", "scheme", "look-ahead", "first-char", "rerank", "refine",
     ) { args, out, _ ->
         val (dataPath, strokePath, setPath) = args.operands
         val lookAhead = args.options["look-ahead"]?.let { it.toIntOrNull()?.takeIf { n -> n > 0 } ?: return@Command null } ?: StrokeFilter.LOOK_AHEAD
@@ -775,7 +776,9 @@ private fun strokes(dataPath: String, strokePath: String, setPath: String, lookA
     val session = PinyinSession(data, RunOptions(o).segmenter(data), prediction = false, reranker = models.reranker?.invoke(), refiner = models.refiner?.invoke())
     val set = readSet(setPath)
     val samples = if ("first-char" in o) firstChars(set, o["scheme"]) else set
-    StrokeRun(session, strokes, lookAhead).run(samples).rows().forEach(out::appendLine)
+    // the mainland's orders as the app has them (StrokeFilter goes by them): without, rime-stroke's alone
+    val charInfo = o["charinfo"]?.let { CharInfo.load(mapFile(it), verify = false) } ?: CharInfo.EMPTY
+    StrokeRun(session, strokes, lookAhead, charInfo).run(samples).rows().forEach(out::appendLine)
     return 0
 }
 

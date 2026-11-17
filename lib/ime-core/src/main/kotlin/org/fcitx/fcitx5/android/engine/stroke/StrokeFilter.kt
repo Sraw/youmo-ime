@@ -17,7 +17,8 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 /**
  * 笔画筛选, as 触宝 has it: while [session] shows something typed, a stroke drawn on the keyboard
  * ([Action.Stroke]) keeps those of its candidates whose first character is written starting so
- * ([Strokes.startsWith]: either order of one written two ways), in the order [session] gives them;
+ * (as the mainland writes it where [mainland] knows it, else [Strokes.startsWith]: any of rime-stroke's
+ * orders of one written two ways), in the order [session] gives them;
  * the next stroke is that character's next. A candidate whose first character is no letter (an
  * emoji, a mark) goes as the one before it went: 🐑 stays after 羊. A Latin word, a character the
  * strokes do not know, goes. The first [lookAhead] of [session]'s candidates are looked through,
@@ -49,6 +50,8 @@ class StrokeFilter(
     private val lookAhead: Int = LOOK_AHEAD,
     // how many characters alone come right after the first kept (EngineSettings.strokeSingles)
     private val singles: Int = SINGLES,
+    // whether a character's stroke order as the mainland writes it starts with these strokes (CharInfo.orderStartsWith); null where not known
+    private val mainland: (Int, CharSequence) -> Boolean? = { _, _ -> null },
 ) : Session by session {
 
     // the strokes drawn, 横竖撇捺折 as Strokes.KEYS
@@ -278,6 +281,9 @@ class StrokeFilter(
         // an emoji, a mark: no strokes of its own, it follows the word it is offered after
         // (〇 is no letter to Java, but written as one)
         if (mark(text)) return lastKept
+        // one the mainland's table has goes by that order alone, as its card shows it: rime-stroke's others are
+        // mostly Taiwan's, which start otherwise for 473 of its 6940 (艳 丿一一丨, 小 乛丿丶: ST-120)
+        mainland(first, drawn)?.let { return it }
         return first <= Char.MAX_VALUE.code && table.startsWith(first.toChar(), drawn)
     }
 

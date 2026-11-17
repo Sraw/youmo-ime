@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.phrase.CharInfo
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
@@ -12,14 +13,20 @@ import java.util.Locale
 
 /**
  * What 笔画筛选 costs and finds (design i2-stroke-filter §5.5): each sample typed into [session],
- * then up to [MAX_STROKES] strokes of its first character drawn (its first order), timed as each
+ * then up to [MAX_STROKES] strokes of its first character drawn (the mainland's order, else the table's first), timed as each
  * stroke's snapshot is made (the page the bar shows), and after the first stroke the rest looked
  * through to [lookAhead] (what a candidate list scrolled to the end asks). Whether that character starts the first
  * candidate, by strokes drawn, is what they find.
  */
-class StrokeRun(session: Session, private val strokes: Strokes, private val lookAhead: Int = StrokeFilter.LOOK_AHEAD) {
+class StrokeRun(
+    session: Session,
+    private val strokes: Strokes,
+    private val lookAhead: Int = StrokeFilter.LOOK_AHEAD,
+    // the mainland's stroke orders, as the app filters by them and draws them (SessionFactory.make): none, the table's alone
+    private val charInfo: CharInfo = CharInfo.EMPTY,
+) {
 
-    private val filter = StrokeFilter(session, { strokes }, lookAhead = lookAhead)
+    private val filter = StrokeFilter(session, { strokes }, lookAhead = lookAhead) { cp, drawn -> charInfo.orderStartsWith(cp, drawn) }
 
     /**
      * A sample's: microseconds of each stroke drawn, of the pause's [Action.Refine] after the first
@@ -54,7 +61,7 @@ class StrokeRun(session: Session, private val strokes: Strokes, private val look
 
     fun type(sample: Sample): Outcome? {
         val c = sample.expected.firstOrNull() ?: return null
-        val order = strokes.ordersOf(c).firstOrNull() ?: return null
+        val order = charInfo.orderKeys(c.code) ?: strokes.ordersOf(c).firstOrNull() ?: return null
         filter.apply(Action.Reset)
         sample.input.forEach { filter.apply(Action.Key(it)) }
         var firstAfter = if (filter.candidates(0, 1).firstOrNull()?.text?.firstOrNull() == c) 0 else -1
