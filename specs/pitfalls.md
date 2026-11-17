@@ -304,6 +304,8 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - Data releases are pinned by SHA-256; a re-uploaded asset with the same name fails the build. Make
   a new release instead.
 
+- A list page (`BaseDynamicListUi`) shows what it read from its file with `DynamicListAdapter.showAll`, never `addItems`: an add offers 「已添加 N 个项目 / 撤销」, and its undo deletes everything read (0.6.1 UAT, custom phrases and common words lost that way).
+
 ## Tests
 
 - A class that reads `AppPrefs` in its initialiser fails in a JVM test until

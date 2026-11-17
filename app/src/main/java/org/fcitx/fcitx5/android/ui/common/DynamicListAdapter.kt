@@ -206,7 +206,10 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
     }
 
-    /** Adds [items] at the end, drawn as one insertion: thousands of them one by one hold the main thread. */
+    /**
+     * Adds [items] at the end, drawn as one insertion: thousands of them one by one hold the main thread. The user's add:
+     * the list page offers an undo of the whole batch, so a page showing what it read from its file uses [showAll].
+     */
     fun addItems(items: List<T>) {
         if (items.isEmpty()) return
         val start = _entries.size

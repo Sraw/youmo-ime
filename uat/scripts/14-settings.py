@@ -851,7 +851,7 @@ case("ST-63", needs="release:多选文字包、语音包和一个非包文件导
 case("ST-67", needs="release:覆盖安装 0.5.x→0.6.0 和恢复 0.5.x 的备份，发版时的升级检查里手工跑；JVM 见 ThemePrefsMigrationTest、ThemePrefsTest、KeyboardAreaTest")(lambda d: None)
 
 
-case("ST-64", needs="release:要上一版（0.5.x）的包覆盖安装；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
+case("ST-64", needs="release:要上一版（0.5.2）的包覆盖安装、它导出的备份带学过的词；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
 
 
 case("ST-65", needs="jvm:PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended")(lambda d: None)
@@ -1178,7 +1178,7 @@ def st90(d):
     return f"空格上星的红点 {n}，换回内置后 {m}"
 
 
-case("ST-82", needs="release:要一个比手机上旧的签名文字包（v1）；发版时在发布包上手工跑（问框、保留、替换、转屏）")(lambda d: None)
+case("ST-82", needs="release:要 0.6.0 的语音包 v2（用不上，直接说）和一个比手机上旧、用得上的签名文字包（v1）；发版时在发布包上手工跑（问框、保留、替换、转屏）")(lambda d: None)
 case("ST-83", needs="manual:要切系统深色模式并点主题卡；规则由 ThemePackListingTest 查，在模拟器或真机上手工跑")(lambda d: None)
 case("ST-84", needs="manual:要从 from-app.theme 改出 monokai.theme；规则由 ThemePackImportTest 查，提示在设备上手工看")(lambda d: None)
 case("ST-85", needs="release:要打 v0.6.0-beta1 标签构建的包；发测试版时跑，规则由 ThemePackMinAppTest 查")(lambda d: None)

@@ -796,6 +796,7 @@ case("WD-38", needs="jvm:DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyin
 
 
 case("WD-37a", needs="jvm:SettingsPagesUatTest.anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest")(lambda d: None)
+case("WD-65", needs="jvm:ListPagesReadUatTest.openingTheCustomPhrasesOffersNoUndoOfThePhrasesRead、ListPagesReadUatTest.openingOrImportingTheCommonWordsOffersNoUndoThatDeletesThem")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 常用词 (060-common-words)

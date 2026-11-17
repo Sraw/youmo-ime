@@ -268,7 +268,8 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 return@launch
             }
             loaded = words
-            ui.addItems(words.words)
+            // shown, not added: an add offered its undo, which deleted the words read (UAT 0.6.1)
+            ui.showAll(words.words)
             dirty = false
             readable = true
             ui.updateFAB()
@@ -368,8 +369,9 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 // replacement the keyboard removed) is not put back by the merge made before
                 val now = CommonWords.of(ui.entries.toList()).importing(parsed.words)
                 if (now.added + now.updated == 0) return@setPositiveButton
-                ui.removeItems(0, ui.entries.size)
-                ui.addItems(now.words.words)
+                // the whole list shown anew, as the dialog said: an add of all of it offered an undo that
+                // deleted the words there before the import too (UAT 0.6.1)
+                ui.showAll(now.words.words)
                 dirty = true
             }
             .setNegativeButton(android.R.string.cancel, null)

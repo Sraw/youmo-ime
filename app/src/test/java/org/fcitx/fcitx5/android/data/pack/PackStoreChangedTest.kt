@@ -10,7 +10,9 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.pack.ImportResult
 import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.pack.PackRequirement
 import org.fcitx.fcitx5.android.pack.PackShelf
+import org.fcitx.fcitx5.android.pack.Refusal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -139,6 +141,42 @@ class PackStoreChangedTest {
             assertTrue("$once", once is ImportResult.Imported)
             // what the bug was: a second open of a file whose provider gives it once
             assertEquals(1, opened)
+        } finally {
+            PackStore.restartHost = restart
+            TestShelves.use()
+            root.deleteRecursively()
+        }
+    }
+
+    // UAT 0.6.1 (ST-82): an older pack this build cannot use was offered first as the newer one's replacement,
+    // and only after 替换 refused as needing a newer one; refused at once now, nothing asked, nothing copied.
+    // An older one it can use is still asked about
+    @Test
+    fun anOlderPackThisBuildCannotUseIsRefusedWithoutAsking() {
+        val root = Files.createTempDirectory("packs").toFile()
+        val restart = PackStore.restartHost
+        PackStore.restartHost = { true }
+        try {
+            val needed = PackRequirement(format = 1, minVersion = 2)
+            val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements + (PackKind.TEXT to needed)).apply { load() }
+            assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 3).inputStream()) is ImportResult.Imported)
+            PackStore.useShelf(shelf)
+            val resolver = RuntimeEnvironment.getApplication().contentResolver
+            val asked = mutableListOf<Pair<Int, Int>>()
+            var copied = 0
+            fun import(version: Int) = runBlocking {
+                val file = File(root, "v$version.youmopack").apply { writeBytes(TestShelves.pack(PackKind.TEXT, version = version)) }
+                PackStore.import(resolver, Uri.fromFile(file), { _, _ -> copied++ }) { new, there -> asked += new.version to there.version; false }
+            }
+            val refused = import(1)
+            assertTrue("$refused", refused is ImportResult.Refused)
+            val why = (refused as ImportResult.Refused).why as Refusal.Incompatible
+            assertEquals(1 to needed, why.manifest.version to why.needed)
+            assertEquals("not asked", emptyList<Pair<Int, Int>>(), asked)
+            assertEquals(0, copied)
+            assertEquals(3, shelf.installed(PackKind.TEXT)!!.version)
+            assertTrue(import(2) is ImportResult.KeptNewer)
+            assertEquals(listOf(2 to 3), asked)
         } finally {
             PackStore.restartHost = restart
             TestShelves.use()

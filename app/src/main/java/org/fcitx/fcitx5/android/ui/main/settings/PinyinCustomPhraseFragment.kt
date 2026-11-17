@@ -253,7 +253,8 @@ class PinyinCustomPhraseFragment : Fragment(), OnItemChangedListener<PinyinCusto
                 return@launch
             }
             loaded = items
-            ui.addItems(items)
+            // shown, not added: an add offered its undo, which deleted the phrases read (UAT 0.6.1)
+            ui.showAll(items)
             // what was read is not a change to save
             dustman.reset(items.associateBy { it.serialize() })
             readable = true

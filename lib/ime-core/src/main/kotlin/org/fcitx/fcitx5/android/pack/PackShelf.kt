@@ -338,6 +338,9 @@ class PackShelf(
         }
     }
 
+    /** Whether this build can use the pack [manifest] tells of: else [import] refuses it ([Refusal.Incompatible]). */
+    fun usable(manifest: PackManifest): Boolean = judge(manifest) is PackStatus.Ready
+
     private fun signed(manifest: ByteArray, signature: ByteArray) = trusted.any { Ed25519.verify(it, manifest, signature) }
 
     /**

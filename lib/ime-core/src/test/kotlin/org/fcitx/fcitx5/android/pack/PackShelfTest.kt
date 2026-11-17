@@ -537,6 +537,9 @@ class PackShelfTest {
         shelf.take(text(format = 3)).refused<Refusal.Incompatible>()
         assertEquals(2, shelf.take(text(version = 2)).refused<Refusal.Incompatible>().manifest.version)
         assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
+        // told before an import, as the store asks whether to replace a newer one (UAT 0.6.1)
+        fun usable(bytes: ByteArray) = shelf.usable(shelf.manifestOf(ByteArrayInputStream(bytes))!!)
+        assertEquals(listOf(false, false, false, true), listOf(text(format = 1), text(format = 3), text(version = 2), text()).map(::usable))
     }
 
     @Test

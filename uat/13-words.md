@@ -347,6 +347,12 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 - **预期**：导入只加 1 条，列表到 5000 条，提示后面另写「另有 2 条没导入：导入最多加到 5000 条」；手动加的照常加上（这个上限只管导入）。以前就超过 5000 条的列表不删，再导入什么都不加。
 - **JVM**：`SettingsPagesUatTest.anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest`（已有 4999 条再导入 3 条：加 1 条，提示另 2 条没导入；满 5000 条后用 **+** 对话框再加一条，列表是 5001 条）；设备上不跑。
 
+### WD-65 [P0] 打开自定义短语、常用词页不提示「已添加」，已有的不会被撤销删掉
+- **前提**：B0-设置；已有自定义短语 `bj` →「北京」，常用词「米字旁 → 米、糸」「木字旁 → 木」。
+- **操作**：进 **词库与短语 → 自定义短语**，等列表出来；点 **+** 加 `sh` →「上海」；返回。进 **常用词**，等列表出来；⋮ → **导入** 一个只有「你好 → 您好」的文件，确认框点确定；返回再进这两页。
+- **预期**：打开两页时底部都不弹「已添加 N 个项目 / 撤销」（0.6.0 和 0.6.1 测试版会弹，点撤销就把已有的短语、常用词全删了，离开页面时存成空的）；手动加短语照常提示「已添加 sh,1=上海」；导入常用词后列表是三条，底部不弹「已添加 3 个项目 / 撤销」（那个撤销连导入前就有的两条也删）；回来两页的条目都在。
+- **JVM**：`ListPagesReadUatTest.openingTheCustomPhrasesOffersNoUndoOfThePhrasesRead`（打开不弹，手动加照常提示，存下两条）、`ListPagesReadUatTest.openingOrImportingTheCommonWordsOffersNoUndoThatDeletesThem`（打开、导入都不弹撤销，存下三条）；设备上不跑。
+
 ### WD-38 [P1] 带拼音的 GBK 词库里夹着几行只写词的，照样能导入
 - **前提**：无（JVM）。
 - **操作**：导入 GB18030 编码、约 100 行带拼音外加 1 行推不出拼音的只写词的文件。
