@@ -368,6 +368,26 @@
 - **预期**：关掉时 rq 没有日期、xq 没有星期（这两条才说明开关起作用），riqi 有「日期」但后面没有今天的日期（按词触发的也关了；双拼、九键、码表走同一个开关）；打开后 rq 又有今天的日期（见 docs/words.md）。
 - **JVM**：`PinyinUatTest.theBuiltInDatesTurnedOff`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+## 导入的分组键盘
+
+### PY-153 [P1] 导入的 17 键（H 和 JK 并成一键）用在拼音上，按自己的分组打字
+- **前提**：B0；没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-k17-1.0.layout`（App 的 18 键把第 2 行的 H 和 JK 并成一个 HJK 键）。
+- **操作**：**设置 → 外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；问「现在就用在 拼音 上吗？」时点 **用**；回测试页点「普通文本」框，依次点 BN、IO、HJK、A、IO，每个键点在要打的那个字母那边（BN 点右半 N、IO 先点左半 I、HJK 点最左的 H、A 点中间、IO 再点右半 O），看候选，点「你好」。
+- **预期**：只有拼音能用自己分组的键盘，所以只问拼音。键盘是导入的 17 键：第 2 行是 A、SD、FG、HJK、L 五个键，没有单独的 H、JK 键。首选是「你好」（两个以上字母的键按点在哪边加权，和 App 的 18 键一样），点了框里是「你好」。
+- **JVM**：ime-eval `CustomGroupsUatTest.theSeventeenKeysTypeNihaoByTheirOwnCodes`（真数据）、ime-core `LayoutImportGroupedTest.theUatsGroupedLayoutsAreTheSeventeenKeysAndTheEighteenRearranged`、`KeyboardCustomTest.theSeventeenKeysSegmentAndOfferWhatIsTyped`；设备上留作冒烟（导入、画出来、码送到引擎）。
+
+### PY-154 [P1] 重排的 18 键用在拼音上：按它自己的位置画，打字和学的词跟 App 的 18 键一样
+- **前提**：B0；导入了只换了键的位置、分组还是 18 键那些组的布局（比如 Q 和 WE 换位的 `uat-k18-swapped-1.0.layout`），用在拼音上。
+- **操作**：用拼音打几个词，选不是第一个的候选；把拼音的 **键盘** 换回「18 键」，再打同样的键。
+- **预期**：键按导入的布局画（WE 在 Q 左边）；每个键打的是它那组字母，跟 App 的 18 键上同一组的键一样；换回 App 的 18 键后，刚才选过的词照样排在前面（学的词记在同一处）。
+- **JVM**：ime-core `NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord`（同样的码、同样的记录）、`KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod`、`ImKeyboardsTest.aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs`；app `GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys`；设备上不跑（换位的样子由 SP-51 在设备上看）。
+
+### PY-155 [P1] 打字时换成另一种分组的键盘：退格还改刚才打的，点新键盘的字母键时先上屏
+- **前提**：B0；导入了两个自己分组的布局（比如 17 键和另一种 17 键），拼音用其中一个。
+- **操作**：在第一个键盘上打 nih（不选候选）；打字时从工具栏 **⋯ → 键盘** 换成另一个；先点一下退格，再点新键盘上的一个字母键。
+- **预期**：退格删的是刚才打的最后一个键（还在编码里，没有上屏）；点新键盘的字母键时，刚才打的先照回车的样子上屏，再从新键盘的这个键开始打。不会丢掉打了一半的拼音，也不会退格删掉已经上屏的字。
+- **JVM**：ime-core `OwnKeysTurnTest`（什么键等、什么键换）；app `OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey`（两个自己分组的键盘各自显示、点键，经真的 KotlinHost 到真引擎：退格、上屏、新键盘接着打）、`KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode`、`aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped`、`otherGroupsLeaveTheFieldsComposingTextAlone`、`EngineBridgeTest.theConfigReadAgainKeepsTheGroupsTypedOnTillTheOthersFirstCode`（换了还没打时改设置也不丢）；设备上暂不跑（要导入两个自己分组的布局再在 ⋯ → 键盘 里换，L8 补）。
+
 ## 学习的规则
 
 这一节每条对应 docs/pinyin.md「输入法怎样学你的词」的一条规则，用到的词在 `lib/ime-eval/data/learn-ux/` 的场景里按真实数据核过。写法：

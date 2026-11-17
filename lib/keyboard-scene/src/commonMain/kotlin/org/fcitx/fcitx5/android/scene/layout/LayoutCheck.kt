@@ -587,7 +587,7 @@ object LayoutCheck {
         return when (layout.family) {
             "letters" -> listOfNotNull(lacks("space").takeIf { "space" !in roles }, lacks("shift").takeIf { "shift" !in roles })
             "grouped" -> listOfNotNull(
-                Groups.problem(groups(layout))?.let { Finding(0, "groups", listOf(it)) },
+                Groups.problem(groups(layout, fragments))?.let { Finding(0, "groups", listOf(it)) },
                 lacks("space").takeIf { "space" !in roles },
             )
             "nine" -> listOfNotNull(
@@ -604,17 +604,20 @@ object LayoutCheck {
         }
     }
 
-    // a grouped board's groups, its keys' letters in order
-    private fun groups(layout: Layout): List<String> =
-        ownCells(layout).filterIsInstance<Key>().mapNotNull { k -> k.letters?.rows?.joinToString(" ") }
+    // a grouped board's groups, its keys' letters in order, an included fragment's where it is included (as the app's
+    // SceneGroups.of collects them: review L4 N7)
+    private fun groups(layout: Layout, fragments: Map<String, Fragment>): List<String> =
+        cells(layout, fragments).filterIsInstance<Key>().mapNotNull { k -> k.letters?.rows?.joinToString(" ") }
 
-    // §5.1: which input methods may use it (a grouped board: 双拼 only on 14 or 18 keys' groups, in any order)
+    // §5.1: which input methods may use it (a grouped board: 双拼 only on 14 or 18 keys' groups, in any order, each
+    // once, as the app's NineKeyLetters.custom takes them: a group on two keys is a keyboard of its own groups)
     private fun ims(layout: Layout, sources: Sources): List<String> = when (layout.family) {
         "letters" -> listOf("pinyin", "shuangpin", "english", "table")
         "nine" -> listOf("pinyin", "shuangpin", "english")
         "grouped" -> {
-            val mine = groups(layout).map { it.replace(" ", "") }.toSet()
-            val app = listOf("k14", "k18").mapNotNull { id -> sources.layout(id)?.let { l -> groups(l).map { it.replace(" ", "") }.toSet() } }
+            fun of(l: Layout) = groups(l, baseFragments(l, sources)).map { it.replace(" ", "") }.sorted()
+            val mine = of(layout)
+            val app = listOf("k14", "k18").mapNotNull { id -> sources.layout(id)?.let(::of) }
             if (mine in app) listOf("pinyin", "shuangpin") else listOf("pinyin")
         }
         else -> emptyList()

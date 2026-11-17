@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
@@ -87,6 +88,29 @@ class KeyboardCustomTest {
         val noZ = LayoutReader.layout(SceneData.read("k17.xml").replace("letters=\"zx\"", "letters=\"x\"").replace("letters=\"xyz\"", "letters=\"xy\"")) as Parsed.Ok
         val bad = SceneGroups.taken(noZ.value, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Refused
         assertTrue(bad.why, "make no keyboard" in bad.why)
+    }
+
+    // 061-custom-layout §6 (L4): the 18 or 14 keys' groups on other keys are those keyboards, on 双拼's too; the codes go by
+    // the group, whichever key it is on, and the lean= written stays the layout's
+    @Test
+    @Uat("PY-154", "SP-51")
+    fun theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod() {
+        val text = SceneData.read("k18.xml")
+        // the two keys' letters= swapped, whatever else the keys write (lean= among it)
+        check("letters=\"q\"" in text && "letters=\"we\"" in text)
+        val swapped = (LayoutReader.layout(text.replace("letters=\"q\"", "letters=\"@@\"")
+            .replace("letters=\"we\"", "letters=\"q\"").replace("letters=\"@@\"", "letters=\"we\"")) as Parsed.Ok).value
+        val groups = SceneGroups.of(swapped, frags())
+        assertEquals(listOf("we", "q"), groups.take(2))
+        assertEquals(NineKeyLetters.G18, SceneGroups.letters(groups))
+        assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(swapped, NineKeyLetters.G18, own = false, frags()))
+        assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(swapped, NineKeyLetters.G18, own = true, frags()))
+        assertEquals(null, SceneGroups.mismatch(groups, NineKeyLetters.G18))
+        assertEquals(SceneGroups.leaning(swapped, frags()), SceneGroups.leaningOf(NineKeyLetters.G18, swapped, frags()))
+        // the 14 keys' groups backwards: the 14 keys
+        val g14 = NineKeyLetters.G14.tag().split(',')
+        assertEquals(null, SceneGroups.mismatch(g14.reversed(), NineKeyLetters.G14))
+        assertTrue(SceneGroups.mismatch(g14.reversed(), NineKeyLetters.G18) != null)
     }
 
     // review L3: each group's key by its id, in the groups' order, two keys of the same letters each its own

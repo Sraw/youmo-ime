@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.OwnKeysTurn
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.host.ChineseConverter
@@ -337,13 +338,16 @@ class KotlinHost(
     // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it; a
     // tap's [touch] goes with it as the key's payload, the engine's Keyboard reads it there
     private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int, touch: Touch? = null) {
-        // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine
-        // other groups while a code is typed on the ones before (060-render-p3 T10): the code committed as
-        // Return commits it, not lost with the session made anew; the field's composing text is left alone
+        // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine.
+        // Other groups than the ones typed on (060-render-p3 T10, 061-custom-layout L4): their first code commits the
+        // code as Return commits it, not lost with the session made anew, the field's composing text left alone; a key
+        // before it (Backspace, space, a syllable) is still the groups' before, as KeyboardPair turns between keyboards
         val own = EngineState.ownKeys
-        if (bridge.replaces(own)) commitCode()
-        bridge.syncOwnKeys(own)
-        val payload = touch?.takeUnless { up }?.let { Action.Key(KeySyms.toUnicode(sym).toChar(), touch = it) }
+        val unicode = KeySyms.toUnicode(sym)
+        val turn = bridge.turnAt(own, unicode)
+        if (turn == OwnKeysTurn.Step.COMMIT_AND_TURN) commitCode()
+        if (turn != OwnKeysTurn.Step.WAIT) bridge.syncOwnKeys(own)
+        val payload = touch?.takeUnless { up }?.let { Action.Key(unicode.toChar(), touch = it) }
         sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp, payload = payload)
     }
 

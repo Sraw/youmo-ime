@@ -892,6 +892,50 @@ class EngineBridgeTest {
             }
         }
 
+        // review L4 S3: other groups shown while the ones before are typed on (turnAt waiting) do not reach the engine
+        // by a config read again (a setting changed, the module files reread): the session typing would be made anew
+        // and what it typed dropped. They reach it as its first code syncs them
+        @Test
+        fun theConfigReadAgainKeepsTheGroupsTypedOnTillTheOthersFirstCode() {
+            val own = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
+            val other = own.reversed()
+            try {
+                bridge.configure(EngineSettings())
+                EngineState.ownKeys = own
+                bridge.syncOwnKeys()
+                EngineState.ownKeys = other
+                bridge.configure(EngineSettings(prediction = false))
+                assertEquals(own, bridge.engines.settings.ownKeys)
+                assertEquals(false, bridge.engines.settings.prediction)
+                bridge.syncOwnKeys()
+                assertEquals(other, bridge.engines.settings.ownKeys)
+                bridge.configure(EngineSettings())
+                assertEquals(other, bridge.engines.settings.ownKeys)
+            } finally {
+                EngineState.ownKeys = null
+                NineKeyLetters.clearInUse()
+                bridge.close()
+            }
+        }
+
+        // review L4 N2: the 14 or 18 keys' groups told (no keyboard tells them: guarded all the same) are no keyboard of
+        // their own: the one in use for codes is cleared, the engine names none
+        @Test
+        fun theBuiltInGroupsToldAreNoKeyboardOfTheirOwn() {
+            val g18 = NineKeyLetters.G18.tag().split(',').reversed()
+            try {
+                bridge.configure(EngineSettings())
+                EngineState.ownKeys = g18
+                bridge.syncOwnKeys()
+                assertNull(bridge.engines.settings.ownKeyboard)
+                assertNull(NineKeyLetters.ofCode(NineKeyLetters.CUSTOM_BLOCK.first))
+            } finally {
+                EngineState.ownKeys = null
+                NineKeyLetters.clearInUse()
+                bridge.close()
+            }
+        }
+
         // the keyboard reads it to tell 微软双拼's ; from text (CommonKeyActionListener.typedAsIs)
         @Test
         fun theShuangpinSchemeIsTheOneConfigured() {

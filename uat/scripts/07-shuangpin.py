@@ -1,7 +1,7 @@
 """uat/07-shuangpin.md (B0-双拼). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
-from uat import case, check, choose, gear, keys_at
+from uat import case, check, choose, gear, grouped_keys, keys_at, script
 
 
 case("SP-01", needs="jvm:OtherInputMethodsUatTest.shuangpinZiranma")(lambda d: None)
@@ -181,3 +181,30 @@ def sp47(d):
     check(edge.replace(" ", "") == "ta", f"q 靠 a 点的 t q，编码行是「{edge}」，候选 {c[:6]}")
     check(mid.replace(" ", "") != "ta", f"两个键都点在正中的 t q，编码行是「{mid}」")
     return f"靠边「{edge}」{c[:3]}；正中「{mid}」"
+
+
+@case("SP-51", base="B0-18键", mutates=True, visual=True)
+def sp51(d):
+    # 061-custom-layout L4: the 18 keys with Q and WE swapped are the 18 keys, 双拼's too, drawn as the layout has them
+    script("06-pinyin").import_grouped(d, "uat-k18-swapped-1.0", "UAT 换位 18 键")
+    check(d.wait_text("现在就用在", timeout=6, where="all", contains=True), f"没问用在哪：{d.screen().texts('all')[:10]}")
+    for im in ("拼音", "双拼"):
+        check(d.screen().find(text=im, where="all"), f"「现在就用在」里没有{im}")
+    d.tap_text("双拼", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    d.open_page("text")
+    d.switch_im("双拼")
+    k = d.keys(refresh=True)
+    check("we" in k and "q" in k and k["we"][0] < k["q"][0], f"WE 不在 Q 左边：we {k.get('we')} q {k.get('q')}")
+    d.shot("ime", "双拼用换位的 18 键：第 1 行 WE 在 Q 左边")
+    # 自然码 ni hk
+    grouped_keys(d, "bn io h jk")
+    c = d.cands()
+    check("你好" in c[:5], f"BN IO H JK 的候选 {c[:8]}")
+    d.pick("你好")
+    text = d.field_text()
+    d.clear()
+    check(text == "你好", f"框里是 {text!r}")
+    gear(d, "双拼")
+    check(d.wait_text("UAT 换位 18 键（自定义）", timeout=5, contains=True), f"双拼的「键盘」没写 UAT 换位 18 键（自定义）：{d.screen().texts()[:16]}")
+    return f"拼音、双拼都能用；WE 在 Q 左边；候选 {c[:3]}；点「你好」上屏；键盘写 UAT 换位 18 键（自定义）"

@@ -483,12 +483,15 @@ class T9Segmenter(
         /**
          * Where [touch] lies on the key [near] around the one it hit, as [NineKeyLetters.place] has a
          * tap ([own], the hit key's place, says in which dimensions): clamped onto it, so on its edge
-         * nearest the key hit (061-neighbour-correction §4.4).
+         * nearest the key hit (061-neighbour-correction §4.4). A place of one dimension is along the
+         * key's letters: across, or down a key whose letters a layout stacks ([Near.stacked]), as a tap
+         * on that key itself is sent (review L4).
          */
         internal fun placeOn(touch: Touch, near: Near, own: Float): Float {
             val x = ((touch.dx - near.nx) / near.nw + HALF).coerceIn(0f, 1f)
-            if (NineKeyLetters.placeY(own).isNaN()) return x
-            return NineKeyLetters.place(x, ((touch.dy - near.ny) / near.nh + HALF).coerceIn(0f, 1f))
+            val y = ((touch.dy - near.ny) / near.nh + HALF).coerceIn(0f, 1f)
+            if (NineKeyLetters.placeY(own).isNaN()) return if (near.stacked) y else x
+            return NineKeyLetters.place(x, y)
         }
 
         private const val HALF = 0.5f

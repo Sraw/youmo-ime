@@ -695,12 +695,20 @@ setting either: it reads the codes.
 - **A layout's own groups** (060-render-p3 T9a, the engine part; T9b, the app's: app.md, grouped keys).
   `NineKeyLetters.custom(groups)` (each a key's `letters=`, rows apart by a space): `problem` refuses
   groups that leave a letter of a–z on no key (ü as v), a key of 0 or more than 5 letters (a–z, `;`), a
-  letter twice on one key, or more than 30 keys. Groups whose letters are G14's or G18's are those
-  keyboards (their codes, their `qk:`/`spk:` record: the built-in keys move no data); any other gets
+  letter twice on one key, or more than 30 keys. Groups whose letters are G14's or G18's, in any order
+  (as many, the same set: 061-custom-layout §6, L4), are those keyboards (their codes, a group's code its first
+  letter's wherever its key is; their `qk:`/`spk:` record and 双拼: the built-in keys moved about move no data;
+  written in rows, the rows put in the built-in order, `rowsOf` the app's GroupedKeyboard hands its taps,
+  its `Grouping.letters`, for where a tap falls on a key stacked: review L4 S1; the engine's G14/G18 have one row a key and
+  read a place along it: a stacked key's tap is sent with where down it fell, a slip onto one placed down it,
+  `Near.stacked`, `T9Segmenter.placeOn`).
+  A group is its letters in their order: `wq` is not the 14 keys' `qw` (a tap's place goes against the first letter on
+  the left), a grouping with it one of its own, pinyin's alone (docs/settings.md); any other gets
   codes `NineKeyLetters.CUSTOM_BLOCK` (U+F840 + its key's index, freed by `Action.Syllable.IDS` 98 → 97,
   so `Keyboard.SYLLABLES` ends at U+F83F): a stable encoding, kept in its `qk:<tag>` record (and backups),
   never to move; the record filed under its `tag()` (the keys' letters, commas between;
-  `NineKeyLetters.filedAs` reads one back, G14, G18 or a layout's own, never NINE_SP). Making,
+  `NineKeyLetters.filedAs` reads one back, G14, G18 or a layout's own, never NINE_SP; a tag of G14's or G18's
+  groups in another order is still read as one of its own, as 0.6.0 filed such a layout, its learning no longer typed on). Making,
   comparing (`SceneGroups.letters`, `mismatch`, `leaningOf`) and filing are pure; `ofCode` reads a
   custom code as the keyboard `NineKeyLetters.inUse` last named (the session typing on it, T9b), none
   past its keys. Rows are where a tap falls, not the keyboard: with or without them it is equal. Pinyin reads them (`readsCode`), never text (`isCode`).

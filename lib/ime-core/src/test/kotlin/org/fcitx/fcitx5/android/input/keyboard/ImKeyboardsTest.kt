@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
@@ -128,6 +129,18 @@ class ImKeyboardsTest {
     private val k14 = CustomChoice("my-k14", "14", "grouped", "k14", g14)
     private val k17 = CustomChoice("k17", "17", "grouped", "k18", listOf("qw", "er", "t", "y", "u", "io", "p", "as", "df", "g", "h", "jk", "l", "zx", "cv", "bn", "m"))
 
+    // review L4 N4: two layouts of the 18 keys' groups in other orders type the same codes, so what was typed on one is
+    // typed again on the other; two groupings of their own in other orders type other codes
+    @Test
+    fun theEighteenKeysRearrangedEitherWayAreTypedWithAlike() {
+        val zr = ShuangpinScheme.ZIRANMA
+        val asBuiltIn = CustomChoice("my-k18b", "18b", "grouped", "k18", g18)
+        assertEquals(ImKeyboards.typedWith(PINYIN, chosen(PINYIN, k18), zr), ImKeyboards.typedWith(PINYIN, chosen(PINYIN, asBuiltIn), zr))
+        assertEquals(null, ImKeyboards.typedWith(PINYIN, chosen(PINYIN, k18), zr).groups)
+        val k17back = CustomChoice("k17b", "17b", "grouped", "k18", k17.groups.reversed())
+        assertTrue(ImKeyboards.typedWith(PINYIN, chosen(PINYIN, k17), zr) != ImKeyboards.typedWith(PINYIN, chosen(PINYIN, k17back), zr))
+    }
+
     private fun chosen(im: String, layout: CustomChoice, table: Boolean = false) = Chosen(
         pinyin = if (im == PINYIN) CUSTOM else FULL,
         shuangpin = if (im == SHUANGPIN) CUSTOM else FULL,
@@ -158,6 +171,7 @@ class ImKeyboardsTest {
     }
 
     @Test
+    @Uat("PY-154")
     fun aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs() {
         assertEquals(ImKeyboards.Shown(Layout.TEXT, letters), ImKeyboards.shown(PINYIN, chosen(PINYIN, letters), ziranma))
         assertEquals(ImKeyboards.Shown(Layout.TEXT, letters), ImKeyboards.shown(WUBI, chosen(WUBI, letters, table = true), ziranma))

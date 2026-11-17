@@ -112,6 +112,36 @@ class GroupedKeyboard18Test {
         assertTrue("l;" in leaning)
     }
 
+    // review L4: a layout of the built-in groups stacking a key's two letters (W over E) has a tap's place along them go
+    // by where down it fell: the top letter the first, as the engine and Keyboard.typedLetter read a built-in code's
+    // place; in one row, across as before. The 14 keys' codes alike (Keyboard.tapKey)
+    @Test
+    fun aStackedKeysTapGoesByWhereDownItFell() {
+        val g18 = NineKeyLetters.G18.tag().split(',')
+        val stacked = NineKeyLetters.custom(g18.map { if (it == "we") "w e" else it })
+        assertEquals(NineKeyLetters.G18, stacked)
+        val pinyinWe = GroupedKeyboard.layout(NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false).flatten()
+            .single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "WE" }
+            .behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action
+        val we = NineKeyLetters.G18.key('w')
+        fun typed(at: Float, down: Float, letters: NineKeyLetters) =
+            GroupedKeyboard.tapped(pinyinWe, at, letters, setOf("we"), down).let { Keyboard.typedLetter((it as KeyAction.SymAction).sym.sym - UNICODE) }
+        // the top's right, the bottom's left
+        assertEquals('w', typed(0.9f, 0.1f, stacked))
+        assertEquals('e', typed(0.1f, 0.9f, stacked))
+        assertEquals(KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyin18Tap(we, 0.9f)), KeyStates.Virtual), GroupedKeyboard.tapped(pinyinWe, 0.1f, stacked, setOf("we"), 0.9f))
+        // in one row: across
+        assertEquals('e', typed(0.9f, 0.1f, NineKeyLetters.G18))
+        // stacked with no place down (a click no touch made): the code alone
+        assertEquals(pinyinWe, GroupedKeyboard.tapped(pinyinWe, 0.1f, stacked, setOf("we"), Float.NaN))
+        // the 14 keys' QW stacked
+        val g14 = NineKeyLetters.custom(NineKeyLetters.G14.tag().split(',').map { if (it == "qw") "q w" else it })
+        val qw = NineKeyLetters.G14.key('q')
+        val sent = GroupedKeyboard.tapped(GroupedKeyboard.code(qw), 0.1f, g14, setOf("qw"), 0.9f) as KeyAction.SymAction
+        assertEquals(Keyboard.tapKey(qw, 0.9f), sent.sym.sym - UNICODE)
+        assertEquals('w', Keyboard.typedLetter(sent.sym.sym - UNICODE))
+    }
+
     // pinyin's 18 keys have no ;: L alone on the key (its long press the resolver's, g18/l: KeyDefaults)
     @Test
     @Uat("SP-28")

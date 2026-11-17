@@ -48,8 +48,12 @@ data class Touch(val dx: Float, val dy: Float, val widthDp: Float, val heightDp:
 /**
  * A key around a tapped one: what it types ([char], a grouped keyboard's code), its centre [nx],
  * [ny] from the tapped key's, and its size [nw] by [nh], all in the tapped key's width and height.
+ * [stacked]: a built-in group's letters a layout of the user's puts one over the other (W over E),
+ * so a place along them is down the key, not across (T9Segmenter.placeOn; GroupedKeyboard.tapped
+ * sends a tap on such a key so, review L4). Not in [Touch.text]: the evaluation sets type the
+ * app's keyboards, whose keys have their letters across.
  */
-data class Near(val char: Char, val nx: Float, val ny: Float, val nw: Float = 1f, val nh: Float = 1f)
+data class Near(val char: Char, val nx: Float, val ny: Float, val nw: Float = 1f, val nh: Float = 1f, val stacked: Boolean = false)
 
 /**
  * What reading a tapped key as a key around it costs (log10, as the model's scores; §3): the log

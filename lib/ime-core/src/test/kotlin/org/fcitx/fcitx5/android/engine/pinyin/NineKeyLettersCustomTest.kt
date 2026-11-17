@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.Uat
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -85,6 +86,70 @@ class NineKeyLettersCustomTest {
         assertEquals(NineKeyLetters.G14, stacked)
         assertEquals(NineKeyLetters.G14.tag(), stacked.tag())
         assertEquals(listOf("q", "w"), stacked.rowsOf(stacked.codes[0]))
+    }
+
+    @Test
+    @Uat("PY-154")
+    fun theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord() {
+        // 061-custom-layout §6: the 18 keys with the first two keys swapped, the 14 keys backwards
+        val g18 = NineKeyLetters.G18.tag().split(',')
+        val swapped = listOf(g18[1], g18[0]) + g18.drop(2)
+        assertSame(NineKeyLetters.G18, NineKeyLetters.custom(swapped))
+        assertSame(NineKeyLetters.G14, NineKeyLetters.custom(NineKeyLetters.G14.tag().split(',').reversed()))
+        // its codes are its groups' (a group's first letter's), whichever key they are on
+        val made = NineKeyLetters.custom(swapped)
+        assertEquals(NineKeyLetters.G18.codes, made.codes)
+        assertEquals(NineKeyLetters.G18.tag(), made.tag())
+        assertEquals(NineKeyLetters.G18.key('w'), made.key('w'))
+        // in rows: each group's rows go with it to the built-in keyboard's order
+        val rows = NineKeyLetters.G14.tag().split(',').map { it.toList().joinToString(" ") }.reversed()
+        val stacked = NineKeyLetters.custom(rows)
+        assertEquals(NineKeyLetters.G14, stacked)
+        assertEquals(listOf("q", "w"), stacked.rowsOf(NineKeyLetters.G14.key('q')))
+        assertEquals(listOf("b", "n"), stacked.rowsOf(NineKeyLetters.G14.key('n')))
+        // a group twice (another left out by a key of its own letters): not the built-in keyboard
+        val twice = g18.dropLast(1) + g18[0]
+        assertNotNull(NineKeyLetters.problem(twice))
+        // as many keys, other groups: a keyboard of their own
+        val moved = listOf(g18[0] + g18[1].first(), g18[1].drop(1)) + g18.drop(2)
+        assertTrue(NineKeyLetters.custom(moved).codes[0].code in NineKeyLetters.CUSTOM_BLOCK)
+    }
+
+    // review L4 S4: a group is its letters in order. The 14 keys with QW written WQ are no 14 keys: a tap's place there
+    // goes against the first letter on the left (against), so W drawn left read as the 14 keys' would lean to Q
+    @Test
+    fun aGroupsLettersInAnotherOrderAreNoBuiltInGroup() {
+        val g14 = NineKeyLetters.G14.tag().split(',')
+        val wq = listOf("wq") + g14.drop(1)
+        val made = NineKeyLetters.custom(wq)
+        assertTrue(made != NineKeyLetters.G14)
+        assertTrue(made.codes.all { it.code in NineKeyLetters.CUSTOM_BLOCK })
+        assertEquals("wq", made.letters(made.codes[0]))
+        // the left half of its first key leans to W, its first letter
+        assertEquals(0f, made.against(made.codes[0], 0, 0.2f))
+        assertTrue(made.against(made.codes[0], 1, 0.2f) > 0f)
+    }
+
+    // review L4 N2: the groups told the engine make a keyboard of their own only where they are no built-in keyboard's
+    @Test
+    fun aKeyboardOfItsOwnIsNoneForTheBuiltInGroups() {
+        val g18 = NineKeyLetters.G18.tag().split(',')
+        assertNull(NineKeyLetters.ownOf(g18))
+        assertNull(NineKeyLetters.ownOf(g18.reversed()))
+        assertNull(NineKeyLetters.ownOf(NineKeyLetters.G14.tag().split(',')))
+        assertNull(NineKeyLetters.ownOf(k17.filter { it != "m" }))
+        assertEquals(NineKeyLetters.custom(k17), NineKeyLetters.ownOf(k17))
+    }
+
+    @Test
+    fun aRecordUnderTheBuiltInGroupsInAnotherOrderIsStillOneOfItsOwn() {
+        // before 0.6.1 such a layout was typed on a keyboard of its own: its learning was filed with those codes
+        val tag = NineKeyLetters.G18.tag().split(',').reversed().joinToString(",")
+        val filed = NineKeyLetters.filedAs(tag)
+        assertNotNull(filed)
+        assertEquals(tag, filed!!.tag())
+        assertTrue(filed.codes.all { it.code in NineKeyLetters.CUSTOM_BLOCK })
+        assertEquals("m", filed.letters(filed.codes[0]))
     }
 
     @Test

@@ -13,6 +13,9 @@ import kotlin.math.roundToInt
 internal interface TypingKeys {
     /** Its keys that do: what each types as the engine reads it (a letter, 九键's digit, a group's code) and which key of the scene it is. */
     fun typingKeys(): List<Pair<Char, KeyRef>>
+
+    /** Of [typingKeys]' characters, those whose key's letters the layout stacks, a place along them down it (Near.stacked). */
+    fun stackedKeys(): Set<Char> = emptySet()
 }
 
 /**
@@ -43,7 +46,10 @@ internal fun withTouch(action: KeyAction, k: KeyHandle, typing: TypingKeys?, den
         boxes += ch to KeyBoxes.Box(r.left.roundToInt() / density, r.top.roundToInt() / density, r.right.roundToInt() / density, r.bottom.roundToInt() / density)
     }
     val box = boxes.getOrNull(hitBox)?.second
-    val touch = box?.let { KeyBoxes.touch(boxes, hitBox, it.left + at * it.w, it.top + down * it.h) } ?: return action
+    val placed = box?.let { KeyBoxes.touch(boxes, hitBox, it.left + at * it.w, it.top + down * it.h) } ?: return action
+    // a slip onto a key whose letters are stacked is placed down it, as a tap on it is sent (GroupedKeyboard.tapped)
+    val stacked = typing.stackedKeys()
+    val touch = if (stacked.isEmpty()) placed else placed.copy(near = placed.near.map { n -> if (n.char in stacked) n.copy(stacked = true) else n })
     return when (action) {
         is KeyAction.HostKeyAction -> action.copy(touch = touch)
         is KeyAction.SymAction -> action.copy(touch = touch)

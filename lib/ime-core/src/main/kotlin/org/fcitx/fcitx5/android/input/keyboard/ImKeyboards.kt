@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.input.scene.SceneGroups
 
 /**
  * An on-screen keyboard an input method is typed on (I1): pinyin's, 双拼's and English's own
@@ -150,13 +151,15 @@ object ImKeyboards {
     fun offers(im: String, scheme: ShuangpinScheme, all: List<CustomChoice>): Boolean =
         choices(im, scheme).isNotEmpty() || customs(im, scheme, all).isNotEmpty()
 
-    /** The built-in keyboard a grouped layout of the user's is ([CustomChoice.groups] those of the 14 or 18 keys, in any order), null for one of its own groups. */
+    /**
+     * The built-in keyboard a grouped layout of the user's is ([CustomChoice.groups] those of the 14 or 18 keys, in any order:
+     * the keyboard the engine reads them as, SceneGroups.letters), null for one of its own groups.
+     */
     fun groupedAs(layout: CustomChoice): ImKeyboard? {
         if (layout.family != GROUPED) return null
-        val mine = layout.groups.toSet()
-        return when {
-            layout.groups.size == G14.size && mine == G14 -> ImKeyboard.KEYS14
-            layout.groups.size == G18.size && mine == G18 -> ImKeyboard.KEYS18
+        return when (SceneGroups.letters(layout.groups)) {
+            NineKeyLetters.G14 -> ImKeyboard.KEYS14
+            NineKeyLetters.G18 -> ImKeyboard.KEYS18
             else -> null
         }
     }
@@ -231,7 +234,8 @@ object ImKeyboards {
 
     /**
      * What [im]'s keys were typed on: the layout shown, for 双拼 its [scheme], which reads the same letters otherwise, and
-     * a grouped layout of the user's [groups] (another grouping's keys other codes).
+     * a grouped layout of the user's of its own [groups] (another grouping's keys other codes); null for the 14 or 18
+     * keys' groups wherever its keys are, which type the built-in keyboard's codes ([layout] its; review L4 N4).
      */
     data class TypedWith(val layout: Layout, val scheme: ShuangpinScheme?, val groups: List<String>? = null)
 
@@ -241,7 +245,7 @@ object ImKeyboards {
      */
     fun typedWith(im: String, chosen: Chosen, scheme: ShuangpinScheme): TypedWith {
         val shown = shown(im, chosen, scheme)
-        return TypedWith(shown.layout, scheme.takeIf { im == InputMethodCatalog.SHUANGPIN }, shown.custom?.takeIf { it.family == GROUPED }?.groups)
+        return TypedWith(shown.layout, scheme.takeIf { im == InputMethodCatalog.SHUANGPIN }, shown.custom?.takeIf { it.family == GROUPED && groupedAs(it) == null }?.groups)
     }
 
     /** What the screen shows for an input method: [layout] (the built-in one's it is typed as), and the layout of the user's drawn in its place ([custom]), if any. */
@@ -320,8 +324,4 @@ object ImKeyboards {
 
     // the input methods typed on a letters or a nine-key layout of the user's (a table aside: usable)
     private val TYPED = setOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.ENGLISH)
-
-    // the 14 and 18 keys' groups, as a grouped layout of the user's writes them (SceneGroups.of)
-    private val G14 = NineKeyLetters.G14.tag().split(',').toSet()
-    private val G18 = NineKeyLetters.G18.tag().split(',').toSet()
 }

@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.SceneShownKey
@@ -56,6 +58,9 @@ class GroupedKeyboardOwnGroupsTest {
 
     private val context = RuntimeEnvironment.getApplication()
     private val sent = ArrayList<KeyAction>()
+
+    // the touches sent with them, for the keys around a tap (Near)
+    private val touches = ArrayList<Touch?>()
     private val popups = ArrayList<PopupAction>()
     private val sourceWas = SceneLayouts.source
 
@@ -112,7 +117,10 @@ class GroupedKeyboardOwnGroupsTest {
     private fun GroupedKeyboard.wired() = apply {
         setViewTreeLifecycleOwner(Owner())
         // the codes alone: where each fell (061-neighbour-correction) is GroupedKeyboardTapTest's
-        keyActionListener = KeyActionListener { action, _ -> sent += (action as? KeyAction.SymAction)?.copy(touch = null) ?: action }
+        keyActionListener = KeyActionListener { action, _ ->
+            touches += (action as? KeyAction.SymAction)?.touch
+            sent += (action as? KeyAction.SymAction)?.copy(touch = null) ?: action
+        }
         popupActionListener = PopupActionListener { popups += it }
         laidOut(1080, 800)
     }
@@ -301,6 +309,67 @@ class GroupedKeyboardOwnGroupsTest {
             assertTrue(logged.toString(), logged.single().contains("pinyin's alone"))
         } finally {
             timber.log.Timber.uproot(tree)
+        }
+    }
+
+    // review L4 S1: the built-in groups on other keys, a key's letters stacked, reach the keyboard as the layout writes
+    // them: each key's letters where they are on it (NineKeyLetters.rowsOf), its taps' place read by them
+    @Test
+    fun theBuiltInGroupsRearrangedAndStackedReachTheKeyboardAsWritten() {
+        val app = BuiltInLayouts(context).text("k14")!!
+        val qw = Regex("<key [^>]*letters=\"qw\"[^>]*/>").find(app)!!.value
+        val er = Regex("<key [^>]*letters=\"er\"[^>]*/>").find(app)!!.value
+        k14Text = app.replace(qw, "@@").replace(er, qw.replace("letters=\"qw\"", "letters=\"q w\"")).replace("@@", er)
+        val stacked = GroupedKeyboard.grouping(context, NineKeyLetters.G14, own = true, log = false)
+        assertEquals(NineKeyLetters.G14, stacked.letters)
+        assertNull(stacked.own)
+        assertEquals(listOf("q", "w"), stacked.letters.rowsOf(NineKeyLetters.G14.key('q')))
+        assertEquals(listOf("er"), stacked.letters.rowsOf(NineKeyLetters.G14.key('e')))
+        // touched through: QW's bottom left is W, its top right Q (review L4 verifier NIT-2); a tap on ER has QW
+        // around it stacked, a slip onto it placed down it (T9Segmenter.placeOn)
+        val qwCode = NineKeyLetters.G14.key('q')
+        val keyboard = grouped()
+        keyboard.onAttach()
+        keyboard.touch(keyboard.shownKey("QW"), 0.1f, 0.9f)
+        keyboard.touch(keyboard.shownKey("QW"), 0.9f, 0.1f)
+        assertEquals(listOf(Keyboard.tapKey(qwCode, 0.9f), Keyboard.tapKey(qwCode, 0.1f)), sent.map(::symOf))
+        assertEquals(listOf('w', 'q'), sent.map { Keyboard.typedLetter(symOf(it)) })
+        keyboard.touch(keyboard.shownKey("ER"), 0.5f, 0.5f)
+        val around = touches.last()!!.near(qwCode)
+        assertTrue(touches.last()!!.near.toString(), around != null && around.stacked)
+        assertTrue(touches.last()!!.near.toString(), touches.last()!!.near.filter { it.char != qwCode }.none { it.stacked })
+        // the 18 keys rearranged, each key a row: as written, on 双拼's keyboard too
+        val k18 = BuiltInLayouts(context).text("k18")!!
+        val q = Regex("<key [^>]*letters=\"q\"[^>]*/>").find(k18)!!.value
+        val we = Regex("<key [^>]*letters=\"we\"[^>]*/>").find(k18)!!.value
+        k18Text = k18.replace(q, "@@").replace(we, q).replace("@@", we)
+        val swapped = GroupedKeyboard.grouping(context, NineKeyLetters.G18, own = false, log = false)
+        assertEquals(NineKeyLetters.G18, swapped.letters)
+        assertEquals(listOf("we"), swapped.letters.rowsOf(NineKeyLetters.G18.key('w')))
+    }
+
+    // 061-custom-layout §6 (L4): the 18 keys' groups on other keys are the 18 keys, on 双拼's and pinyin's: drawn as the
+    // layout has them, each key its group's code (wherever it is), as the built-in 18 keys send it; no groups of its own told
+    @Test
+    @Uat("PY-154", "SP-51")
+    fun theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys() {
+        val app = BuiltInLayouts(context).text("k18")!!
+        // the keys of Q and WE swapped, each element whole as the app's layout writes it (lean= or not)
+        val q = Regex("<key [^>]*letters=\"q\"[^>]*/>").find(app)!!.value
+        val we = Regex("<key [^>]*letters=\"we\"[^>]*/>").find(app)!!.value
+        k18Text = app.replace(q, "@@").replace(we, q).replace("@@", we)
+        // each key its group's G18 code, however its keyboard wires it: 双拼's the code, pinyin's its own code
+        // (Keyboard.pinyin18Key) or, where the layout has the group lean, a tap with its place (061-neighbour-18key)
+        val wq = listOf(NineKeyLetters.G18.key('w'), NineKeyLetters.G18.key('q'))
+        for (keyboard in listOf(GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18).wired(), pinyin18())) {
+            sent.clear()
+            val labels = keyboard.shownKeys().map { it.label }
+            assertTrue(labels.toString(), labels.indexOf("WE") in 0 until labels.indexOf("Q"))
+            keyboard.onAttach()
+            assertNull(EngineState.ownKeys)
+            keyboard.touch(keyboard.shownKey("WE"), 0.5f, 0.5f)
+            keyboard.touch(keyboard.shownKey("Q"), 0.5f, 0.5f)
+            assertEquals(wq, sent.map { symOf(it).let { c -> Keyboard.tappedCode(c) ?: Keyboard.keyedChar(c) ?: c.toChar() } })
         }
     }
 }

@@ -459,7 +459,7 @@ class Engines(
     private var ownKeys = false
 
     // a layout's own keyboard's code or tap: none but that keyboard reads it
-    private fun isOwnKeysCode(c: Int) = c in NineKeyLetters.CUSTOM_BLOCK || c in Keyboard.PLACES
+    private fun isOwnKeysCode(c: Int) = OwnKeysTurn.isCode(c)
 
     private val latin = LatinSync { w -> assets.englishData?.let { it.id(w) != NO_WORD } == true }
 

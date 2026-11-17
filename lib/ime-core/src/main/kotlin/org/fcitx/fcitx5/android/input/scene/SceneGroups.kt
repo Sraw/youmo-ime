@@ -16,9 +16,10 @@ import org.fcitx.fcitx5.android.scene.layout.Row
  * keyboard: [NineKeyLetters], whose codes, learning record and wiring a keyboard's taps go by.
  *
  * The groups are collected the one way whatever the layout ([of]); the keyboard they make is the
- * built-in one with exactly those groups ([letters]: the 14 keys' G14, the 18 keys' G18), so neither
- * codes nor what was learnt change; any other grouping that covers a to z (a layout's own 17 keys)
- * one of its own ([NineKeyLetters.custom]), its letters' rows as written ([written]).
+ * built-in one with exactly those groups, in any order ([letters]: the 14 keys' G14, the 18 keys' G18;
+ * the keys moved about, 061-custom-layout §6), so neither codes nor what was learnt change; any other
+ * grouping that covers a to z (a layout's own 17 keys) one of its own ([NineKeyLetters.custom]), its
+ * letters' rows as written ([written]).
  */
 object SceneGroups {
     /** [layout]'s groups, row by row as written, an included fragment's where it is included; a key's own letters, whatever its condition. */
@@ -67,7 +68,7 @@ object SceneGroups {
 
     /**
      * The grouped keyboard [groups] make ([NineKeyLetters.custom]): the built-in one with exactly these
-     * letters, else one of their own; null where they make none ([NineKeyLetters.problem]). Pure: it is
+     * groups, in any order, else one of their own; null where they make none ([NineKeyLetters.problem]). Pure: it is
      * not the keyboard in use till the session typing on it says so ([NineKeyLetters.inUse]). Rows or
      * not ([of], [written]), the same keyboard (its keys and codes).
      */
@@ -105,7 +106,7 @@ object SceneGroups {
 
     /**
      * What is wrong with [groups] for a keyboard the engine reads as [expected]: null where they are its
-     * groups, in order; otherwise why (the keyboard then goes by [expected], its codes and record as they were).
+     * groups, in any order (each key's code its group's, wherever the key is); otherwise why (the keyboard then goes by [expected], its codes and record as they were).
      */
     fun mismatch(groups: List<String>, expected: NineKeyLetters): String? {
         val made = letters(groups)

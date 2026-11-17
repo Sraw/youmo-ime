@@ -110,8 +110,10 @@ class GroupedKeyboard private constructor(
     // the keys drawn are the layout's own groups'
     private val ownDrawn: Boolean get() = ownOn(drawnLayout)
 
-    // what the engine reads this keyboard's codes and record by: the built-in groups', or the layout's own
-    private val letters: NineKeyLetters get() = if (ownDrawn) grouping.letters else builtInLetters
+    // what the engine reads this keyboard's codes and record by: the built-in groups', or the layout's own; the
+    // built-in ones as the layout drawn writes them, equal to them (their codes) with each key's letters where
+    // they are on it (NineKeyLetters.rowsOf, for where a tap falls: review L4 S1)
+    private val letters: NineKeyLetters get() = if (ownDrawn || drawnLayout === grouping.layout) grouping.letters else builtInLetters
 
     // a layout's own groups' codes go as they are (NineKeyLetters.CUSTOM_BLOCK); the built-in ones' as [wire] has them
     private val wire: (Char) -> Int get() = if (ownDrawn) Char::code else builtInWire
@@ -142,7 +144,9 @@ class GroupedKeyboard private constructor(
 
         /**
          * How a grouped keyboard types and draws its layout ([grouping]): [letters] what the engine reads its
-         * codes by, [own] a layout's own groups as written (null for the built-in ones), [layout] what is drawn.
+         * codes by, each key's letters as [layout] writes them ([NineKeyLetters.rowsOf]: across, or stacked
+         * down, the built-in groups' too), [own] a layout's own groups as written (null for the built-in
+         * ones), [layout] what is drawn.
          */
         internal class Grouping(val letters: NineKeyLetters, val own: List<String>?, val layout: SceneLayout?)
 
@@ -156,7 +160,8 @@ class GroupedKeyboard private constructor(
             // a layout of the user's that does not read or is refused: the app's drawn (logged as it was read)
             val shown = custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
             return when (val taken = SceneGroups.taken(shown.layout, builtIn, own, shown.fragments)) {
-                SceneGroups.Taken.BuiltIn -> Grouping(builtIn, null, shown)
+                // equal to [builtIn], its letters' rows the layout's (NineKeyLetters.custom)
+                SceneGroups.Taken.BuiltIn -> Grouping(NineKeyLetters.custom(SceneGroups.written(shown.layout, shown.fragments)), null, shown)
                 is SceneGroups.Taken.Own -> Grouping(taken.letters, taken.written, shown)
                 is SceneGroups.Taken.Refused -> {
                     // a settings page asks on each refresh ([KeyboardLabels]): the keyboard made logs it
@@ -194,7 +199,10 @@ class GroupedKeyboard private constructor(
          * [Keyboard.pinyin18Tap]: 双拼's 18 keys, the same codes, send the code, 061-neighbour-18key); a key
          * of one letter too where any group leans, for a slip from it onto one that does.
          * A layout's own group's code goes with where [down] the key it fell too (060-render-p3 T9b), its
-         * cell the scene's; a click no touch made (NaN), its code alone.
+         * cell the scene's; a click no touch made (NaN), its code alone. A built-in group's two letters a
+         * layout stacks ([letters]' [NineKeyLetters.rowsOf]: Q over W) go by [down] instead of [at]: the
+         * engine and [Keyboard.typedLetter] read a built-in code's place as along its letters, the first
+         * at 0, so the top one is the first (review L4 S1).
          */
         internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters, leaning: Set<String>, down: Float = Float.NaN): KeyAction {
             val sym = (action as? KeyAction.SymAction)?.sym?.sym ?: return action
@@ -206,11 +214,12 @@ class GroupedKeyboard private constructor(
             // weighs the letters of a key it slipped from onto (T9Segmenter): placed where any group leans
             val placed = pinyin18 != null || Keyboard.placesTaps(c)
             val leans = letters.isCode(c) && placed && (letters.letters(c) in leaning || leaning.isNotEmpty() && !letters.weighs(c))
-            if (at.isNaN() || !leans) return action
-            if (pinyin18 != null) return action.copy(sym = KeySym(UNICODE + Keyboard.pinyin18Tap(c, at)), states = KeyStates.Virtual)
             val own = c.code in NineKeyLetters.CUSTOM_BLOCK
+            val along = if (!own && letters.rowsOf(c).size > 1) down else at
+            if (along.isNaN() || !leans) return action
+            if (pinyin18 != null) return action.copy(sym = KeySym(UNICODE + Keyboard.pinyin18Tap(c, along)), states = KeyStates.Virtual)
             if (own && down.isNaN()) return action
-            val sent = if (own) Keyboard.tapKey(c, at, down) else Keyboard.tapKey(c, at)
+            val sent = if (own) Keyboard.tapKey(c, at, down) else Keyboard.tapKey(c, along)
             return action.copy(sym = KeySym(UNICODE + sent), states = KeyStates.Virtual)
         }
 
@@ -344,6 +353,10 @@ class GroupedKeyboard private constructor(
     override fun typingKeys(): List<Pair<Char, KeyRef>> = canvas?.shownKeys.orEmpty().mapNotNull { k ->
         k.letters?.let { l -> codeOf(l.group, k.id)?.let { it to KeyRef(k.id, k.copy == 1) } }
     }
+
+    // a built-in group's codes whose letters the layout stacks: their taps go by where down they fell ([tapped]), a
+    // slip onto them alike (review L4); a layout's own groups' codes carry both dimensions, their rows the engine's
+    override fun stackedKeys(): Set<Char> = if (ownDrawn) emptySet() else letters.codes.filter { letters.rowsOf(it).size > 1 }.toSet()
 
     // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
     // layout's own its key's place among the engine's groups (a letter may be on more than one key of its own,

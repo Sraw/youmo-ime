@@ -374,6 +374,26 @@ class NeighbourSlipTest {
         assertNull(Touch(0f, 0f, 1f, 1f).near('x'))
     }
 
+    // review L4: a layout of the 18 keys' groups with WE stacked, W over E. A tap at RT's top left read as a slip
+    // from WE is on WE's top right: along its letters that is down, near its top, so W, as a tap on WE there is
+    // sent (GroupedKeyboard.tapped); across, its right edge, it would be E
+    @Test
+    fun aSlipOntoAKeyWhoseLettersAreStackedIsPlacedDownIt() {
+        val we = NineKeyLetters.G18.key('w')
+        val touch = Touch(-0.45f, -0.4f, 36f, 50f)
+        val stacked = T9Segmenter.placeOn(touch, Near(we, -1f, 0f, stacked = true), 0.1f)
+        assertEquals(0.1f, stacked, 0.01f)
+        assertEquals(0f, NineKeyLetters.G18.against(we, 0, stacked), 0f)
+        assertTrue(NineKeyLetters.G18.against(we, 1, stacked) > 0f)
+        // the same keys with WE across: the right half, E
+        val across = T9Segmenter.placeOn(touch, Near(we, -1f, 0f), 0.1f)
+        assertEquals(1f, across, 0.06f)
+        assertTrue(NineKeyLetters.G18.against(we, 0, across) > 0f)
+        // a place of two dimensions (a layout's own groups, whose rows the engine has) stays both
+        val both = T9Segmenter.placeOn(touch, Near(we, -1f, 0f, stacked = true), NineKeyLetters.place(0.1f, 0.1f))
+        assertEquals(NineKeyLetters.place(1f, 0.1f), both, 0.06f)
+    }
+
     // a split keyboard's G on both halves: the left half's G tapped has F beside it and H across the
     // gap, too far to be read; the right's, H beside it
     @Test

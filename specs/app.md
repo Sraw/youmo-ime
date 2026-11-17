@@ -996,18 +996,27 @@ keyboard's `sceneTable.group`, as `wire` sends it, its place added by `pressed`)
 (`g14/…`, `g18/…`: `KeyDefaults.grouped`, Q W 1 q w, the letters' built-in symbols above); a theme's group of no name gets the same built-in list, none the user can change (`SceneKeyDef.grouped`). The
 app collects a layout's groups (`SceneGroups.of`, row by row, a fragment's where included) into a
 `NineKeyLetters` and takes it as the keyboard is made (`GroupedKeyboard.grouping`, `SceneGroups.taken`,
-060-render-p3 T9b): the keyboard's own groups (G14, G18) as always, their codes, `wire` and learning
-unchanged; on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
+060-render-p3 T9b): the keyboard's own groups (G14, G18), in any order (061-custom-layout L4: drawn as the layout
+has them, each key its group's code, on 双拼's keyboards too), as always, their codes, `wire` and learning
+unchanged, the `Grouping`'s letters equal to them with each key's letters as the layout writes them (`NineKeyLetters.rowsOf`:
+across, or stacked down; `pressed` hands them `tapped` for where a tap falls, review L4 S1; the engine's G14/G18 read a
+place along a key's letters: across, or down a key the layout stacks, `tapped` sending that as the place and
+`stackedKeys` marking the keys around a tap (`Near.stacked`) so a slip onto one is placed down it too, T9Segmenter.placeOn); on pinyin's 14 and 18 keys (`ownGroups`, KeyboardWindow) a grouping of its own that makes a
 keyboard (`NineKeyLetters.custom` over `SceneGroups.written`, engine.md) is typed as such: each key's code
 its key's place among the keyboard's groups (`SceneGroups.ids`, by the node's id; `CUSTOM_BLOCK`, sent as
 it is, no `wire`; a letter, or the same letters, on two keys each key its own), a leaning tap `Keyboard.tapKey(code, x, y)` with where across and down its scene cell the
 finger came down (`KeyGesture.clickAt`, `clickDown`; a click no touch made, the code alone), and the groups
 told the engine as the keyboard is shown, not as it is made (`onAttach`, `EngineState.ownKeys`; the bridge's `syncOwnKeys` before
-each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them). Other groups told while
-a code is typed on the ones before (`EngineBridge.replaces`: groups told before, now others): the code is committed first
-as Return commits it (`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew; no reset, so
-the next word keeps its 前文. The field's composing text (English's word) is no such code and is left alone
-(`KotlinHostOwnKeysTest`).
+each key sets `NineKeyLetters.inUse` and `EngineSettings.ownKeys`, `configure` and `reload` keep them: `configure` the ones
+synced, not others shown and not yet typed on, review L4 S3; `NineKeyLetters.ownOf`, none for the 14 or 18 keys' groups). Other groups told while
+a code is typed on the ones before take over as `KeyboardPair` turns keyboards (ime-core `OwnKeysTurn`, `EngineBridge.turnAt`,
+061-custom-layout L4): a key that is no own code (`CUSTOM_BLOCK`, `PLACES`: a Backspace, space, the separator, a syllable)
+stays with the groups before, unsynced, so it edits what they typed; their first code commits the code as Return commits it
+(`HostCore.commitCode`, pinyin's letters as typed), not lost with the session made anew, then syncs; no reset, so
+the next word keeps its 前文. None told after some (a fallback took them back) waits the same (review L4 N1): its keys
+send the built-in groups' codes, which `KeyboardPair` turns at, the groups told before staying as a built-in grouping
+leaves them (sticky). The field's composing text (English's word) is no such code and is left alone
+(`KotlinHostOwnKeysTest`, `OwnKeysTurnTest`; the whole way, two keyboards to the real engine: `OwnKeysTurnChainTest`).
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
@@ -1248,7 +1257,8 @@ given the `id@stamp`; `TextKeyboard`, `T9Keyboard` and `GroupedKeyboard` draw `S
 `custom:<id>@<stamp>`, `CustomLayoutSource`, whose `refuses` is `CustomKeyboards.refusal`: the read refused where its
 id, stamp, family or based-on is not the `CustomChoice`'s) in place of their own, the base where it is refused (the
 layout's own `based-on`, `CustomKeyboards.baseOf`: a board of its family, whatever the input method's built-in one); `SceneLayout.base` (based-on) is what `KeyboardVariants`, `ownLayout` and the marks go by.
-双拼 on a reordered G18/G14 set is offered but drawn as the base until L4 (`SceneGroups.taken` refuses it). The
+双拼 on a reordered G18/G14 set is drawn as the layout has it and typed as the built-in keyboard (L4: `SceneGroups.taken`
+takes the set; `groupedAs` asks `SceneGroups.letters`, the one rule). The
 picker's `offered()` and the settings' lists add the usable ones as `Custom:<id>` 「17 键（自定义）」, the chosen one
 that is not usable 「17 键（读不出，暂用 18 键）」. 外观 → 布局: a card of the user's says `ImKeyboards.usedBy`
 (用在：…), tapped offers 用在… (`usableBy`, `ticked`: unticked back on its base), an import asks 现在就用在…,

@@ -204,6 +204,45 @@ case("PY-09d", needs="jvm:PinyinUatTest.whyItIsHereTellsTheLiftAndTheFloor")(lam
 case("PY-77b", needs="jvm:PinyinUatTest.aWordGlidedTwiceGoesThirdUnderItsInitials")(lambda d: None)
 
 
+# ---------------------------------------------------------------- 导入的分组键盘 (061-custom-layout L4)
+
+
+def import_grouped(d, name, title):
+    """uat/fixtures/layouts/<name>.layout imported through 外观 → 布局 (14-settings' helpers); its 导入 tapped,
+    the 现在就用在 question that follows left open"""
+    st = script("14-settings")
+    st.push_layout(d, name)
+    st.import_layout(d, name)
+    check(d.wait_text(f"导入布局 {title}？", timeout=8, where="all"), f"没出导入确认框：{d.screen().texts('all')[:10]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+
+
+@case("PY-153", mutates=True, visual=True)
+def py153(d):
+    import_grouped(d, "uat-k17-1.0", "UAT 17 键")
+    check(d.wait_text("现在就用在 拼音 上吗？", timeout=6, where="all"), f"没只问拼音：{d.screen().texts('all')[:10]}")
+    d.tap_text("用", where="all", scroll=False, after=2.0)
+    d.open_page("text")
+    k = d.keys(refresh=True)
+    check("hjk" in k and "jk" not in k and "h" not in k, f"键盘上不是 17 键（有 HJK，没有 H、JK）：{sorted(k)}")
+    d.shot("ime", "拼音用导入的 17 键：第 2 行 A SD FG HJK L")
+    # each letter where it sits on its key, as a user aims (按落点加权: 061-pending-decisions L4): n i h a o
+    grouped_keys(d, "bn io hjk a io", at=[0.75, 0.25, 1 / 6, 0.5, 0.75])
+    c = d.cands()
+    check(c[:1] == ["你好"], f"BN IO HJK A IO（点在 n i h a o 那边）的候选 {c[:8]}")
+    d.pick("你好")
+    text = d.field_text()
+    d.clear()
+    check(text == "你好", f"框里是 {text!r}")
+    return f"只问拼音；17 键画出来；候选 {c[:3]}；点「你好」上屏"
+
+
+case("PY-154", needs="jvm:NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord、KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod、ImKeyboardsTest.aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs、GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys")(lambda d: None)
+
+
+case("PY-155", needs="jvm:OwnKeysTurnTest.otherGroupsWaitForTheirFirstCodeAndCommitThen、OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey、KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode、KotlinHostOwnKeysTest.aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped")(lambda d: None)
+
+
 # ---------------------------------------------------------------- 14 键 (B0-14键)
 
 

@@ -68,6 +68,36 @@ class LayoutCheckTest {
         assertTrue(check(qwerty).warnings.none { it.key == "commits" })
     }
 
+    // 061-custom-layout L4: the 18 keys' groups on other keys are 双拼's too; a group on a second key is a grouping of its own
+    @Test
+    fun theEighteenKeysRearrangedAreShuangpinsAndAGroupTwiceIsNot() {
+        val k18 = own("k18")
+        // the keys of Q and WE, each element whole as the app's layout writes it (lean= or not)
+        val q = Regex("<key [^>]*letters=\"q\"[^>]*/>").find(k18)!!.value
+        val we = Regex("<key [^>]*letters=\"we\"[^>]*/>").find(k18)!!.value
+        val swapped = k18.replace(q, "@@").replace(we, q).replace("@@", we)
+        assertEquals(emptyList(), check(swapped).errors)
+        assertEquals(listOf("pinyin", "shuangpin"), check(swapped).ims)
+        val twice = k18.replace(q, q + "<key id=\"r1c0\" label=\"{group:q}\" letters=\"q\"/>")
+        assertEquals(listOf("pinyin"), check(twice).ims)
+    }
+
+    // review L4 N7: a grouped board's groups an included fragment has are its groups too, as the app collects them
+    // (SceneGroups.of): the 18 keys' top row in a fragment still makes the 18 keys, 双拼's too
+    @Test
+    fun theGroupsOfAnIncludedFragmentAreTheBoardsToo() {
+        val k18 = own("k18")
+        val top = Regex("<row>[\\s\\S]*?</row>").find(k18)!!.value
+        assertTrue("letters=\"we\"" in top)
+        val withTop = LayoutCheck.Sources(
+            sources.layouts,
+            sources.fragments + ("k18-top" to "<fragment xmlns=\"https://youmo-ime/layout/1\" id=\"k18-top\">\n$top\n</fragment>"),
+        )
+        val r = LayoutCheck.check(k18.replace(top, "<include src=\"k18-top\"/>"), withTop, "0.6.1")
+        assertTrue(r.errors.none { it.key == "groups" }, r.errors.toString())
+        assertEquals(listOf("pinyin", "shuangpin"), r.ims)
+    }
+
     // a file saved with a byte-order mark (Windows' Notepad) reads as the app reads it
     @Test
     fun aByteOrderMarkIsTakenAsTheAppTakesIt() {

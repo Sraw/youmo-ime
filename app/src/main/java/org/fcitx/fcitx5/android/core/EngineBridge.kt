@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.FieldFlags
+import org.fcitx.fcitx5.android.engine.runtime.OwnKeysTurn
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -531,10 +532,13 @@ class EngineBridge {
 
     /**
      * The host's config ([org.fcitx.fcitx5.android.host.EngineOptions.toSettings]), with the nine keys'
-     * letters the keyboard draws (the app's preference, read again by [reload]); on the fcitx thread too.
+     * letters the keyboard draws (the app's preference, read again by [reload]) and the groups of its own the
+     * codes are read by: the ones [syncOwnKeys] told, else (none told yet) the keyboard's. Not the keyboard's
+     * where others are told while the ones before are typed on ([turnAt] waiting): their session, made anew,
+     * would drop what was typed (review L4 S3). On the fcitx thread too.
      */
     fun configure(settings: EngineSettings) {
-        engines.settings = settings.copy(nineKeys = nineKeys(), ownKeys = EngineState.ownKeys)
+        engines.settings = settings.copy(nineKeys = nineKeys(), ownKeys = inUseOf ?: EngineState.ownKeys)
         EngineState.shuangpinScheme = engines.settings.scheme
         EngineState.englishSuggests = engines.settings.englishSuggest
         EngineState.candidateReadingState.value = engines.settings.candidateReading
@@ -589,10 +593,12 @@ class EngineBridge {
     private var inUseOf: List<String>? = null
 
     /**
-     * Whether [own] replaces other own groups [syncOwnKeys] told, whose session may be typing: none told before
-     * (the first own keyboard, a glide or ink before any key) is no change of what anything was typed on.
+     * What a key of [codePoint] does with [own], the groups the keyboard shown told ([OwnKeysTurn]): other own groups
+     * than the ones [syncOwnKeys] told, whose session may be typing, take over at their first code, what was typed
+     * committed then; none told before (the first own keyboard, a glide or ink before any key) is no change of what
+     * anything was typed on.
      */
-    fun replaces(own: List<String>?): Boolean = inUseOf != null && own != inUseOf
+    fun turnAt(own: List<String>?, codePoint: Int): OwnKeysTurn.Step = OwnKeysTurn.at(inUseOf, own, codePoint)
 
     /**
      * The groups of the layout of its own a keyboard shows ([EngineState.ownKeys], 060-render-p3 T9b) told
@@ -600,12 +606,12 @@ class EngineBridge {
      * letters too, no engine needed), and the engine's settings, its sessions made anew with them (an engine
      * made again after [close] too). Before each key, on the fcitx thread: the keyboard wrote them before any
      * of its keys could be tapped. The same ones (the same list, as a rule): nothing to do. [own] read once
-     * by the caller, [replaces] asked of the same.
+     * by the caller, [turnAt] asked of the same.
      */
     fun syncOwnKeys(own: List<String>? = EngineState.ownKeys) {
         if (own != inUseOf) {
             inUseOf = own
-            own?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)?.let(NineKeyLetters::inUse) ?: NineKeyLetters.clearInUse()
+            own?.let(NineKeyLetters::ownOf)?.let(NineKeyLetters::inUse) ?: NineKeyLetters.clearInUse()
         }
         made?.let { if (it.settings.ownKeys != own) it.settings = it.settings.copy(ownKeys = own) }
     }

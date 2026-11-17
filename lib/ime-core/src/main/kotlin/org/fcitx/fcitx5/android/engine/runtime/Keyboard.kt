@@ -650,7 +650,9 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             val (code, at) = untapped(codePoint)
             val letters = if (internal in TAPS_18) NineKeyLetters.G18 else NineKeyLetters.G14
             val group = letters.letters(code).ifEmpty { return null }
-            // past the middle goes against the first letter
+            // the place is along the group's letters as the keyboard sent it, wherever the layout put them: a
+            // key stacking them sends where down it fell (GroupedKeyboard.tapped, review L4), so these halves
+            // are its letters' own. Past the middle goes against the first letter
             return if (letters.weighs(code) && letters.against(0, at) > 0f) group[1] else group[0]
         }
 

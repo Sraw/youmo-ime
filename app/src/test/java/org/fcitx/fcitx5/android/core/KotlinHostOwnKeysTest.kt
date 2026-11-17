@@ -11,12 +11,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.KeyStates
+import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,27 +70,45 @@ class KotlinHostOwnKeysTest {
         assertNull(NineKeyLetters.ofCode(letters.codes[0].code))
         fcitx.sendKey('a', 0u, 0, false, 0)
         assertEquals(letters, NineKeyLetters.ofCode(letters.codes[0].code))
-        // other groups told: the next key reads by them
+        // other groups told: a key of none of theirs still reads by the ones before (061-custom-layout L4), their first code by them
         val other = NineKeyLetters.custom(OWN.reversed())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('b', 0u, 0, false, 0)
+        assertEquals(letters, NineKeyLetters.ofCode(other.codes[0].code))
+        fcitx.sendKey(other.codes[0], 0u, 0, false, 0)
         assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
     }
 
-    // T9b's leftover (T10): other groups told while a code is typed on the ones before commit the code as Return
-    // does (EngineBridge.replaces, HostCore.commitCode), not lost with the session made anew; no reset, so the
-    // context stays as after any commit
+    // T9b's leftover (T10), as KeyboardPair turns (061-custom-layout L4): other groups told while a code is typed on
+    // the ones before commit the code at their first code as Return does (EngineBridge.turnAt, HostCore.commitCode),
+    // not lost with the session made anew; no reset, so the context stays as after any commit
     @Test
-    fun otherGroupsWhileTypingCommitTheCodeFirst() = runBlocking {
+    @Uat("PY-155")
+    fun otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode() = runBlocking {
         focused()
         EngineState.ownKeys = OWN
         "nih".forEach { fcitx.sendKey(it, 0u, 0, false, 0) }
         assertEquals("the same groups: typed on", "nih", fcitx.inputPanelCached.preedit.toString())
         EngineState.ownKeys = OWN.reversed()
-        fcitx.sendKey('a', 0u, 0, false, 0)
+        fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], 0u, 0, false, 0)
         assertEquals(listOf("nih"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
-        assertEquals("a", fcitx.inputPanelCached.preedit.toString())
         assertFalse("not reset", EngineEvent.RESET in engine.events.takeLast(3))
+    }
+
+    // 061-custom-layout L4: a key before the other groups' first code (a Backspace) is still the code typed's,
+    // nothing committed under it; their first code then commits what is left
+    @Test
+    @Uat("PY-155")
+    fun aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped() = runBlocking {
+        focused()
+        EngineState.ownKeys = OWN
+        "nih".forEach { fcitx.sendKey(it, 0u, 0, false, 0) }
+        EngineState.ownKeys = OWN.reversed()
+        fcitx.sendKey(KeySyms.BACKSPACE, 0u, 0, false, 0)
+        assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
+        assertEquals("ni", fcitx.inputPanelCached.preedit.toString())
+        fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], 0u, 0, false, 0)
+        assertEquals(listOf("ni"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
     }
 
     // review H1: the field's composing text (English's word) is no code of the groups: other groups

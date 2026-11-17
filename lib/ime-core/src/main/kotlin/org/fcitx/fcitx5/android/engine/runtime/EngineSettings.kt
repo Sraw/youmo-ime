@@ -55,8 +55,11 @@ data class EngineSettings(
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
-    /** The keyboard [ownKeys] make (NineKeyLetters.custom), null for none or groups that make none (NineKeyLetters.problem). */
-    val ownKeyboard: NineKeyLetters? get() = ownKeys?.takeIf { NineKeyLetters.problem(it) == null }?.let(NineKeyLetters::custom)
+    /**
+     * The keyboard of its own [ownKeys] make ([NineKeyLetters.ownOf]), null for none, groups that make none, or the 14
+     * or 18 keys' groups (a built-in keyboard, typed by its own session).
+     */
+    val ownKeyboard: NineKeyLetters? get() = ownKeys?.let(NineKeyLetters::ownOf)
 
     companion object {
         const val SHUANGPIN_PROFILE = "ShuangpinProfile"

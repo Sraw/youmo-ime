@@ -288,3 +288,9 @@
 - **操作**：点 9，再点 9 靠上边缘（键高 5% 处，靠 6），看候选；删光，两个 9 都点在正中再打一遍。
 - **预期**：第一次候选里有 wo（9 6）的字，例如「我」；点在正中时没有。九键双拼的数字键要点得很靠边才读成旁边的键：九键上两个键能读的音节很多，按偏的读法放宽了会让按准打的句子首选变错。1、0 不算邻键。
 - **JVM**：`NeighbourSlipTest.shuangpinsNineKeysReadADigitAsTheOneItWasTappedTowards`、`T9ShuangpinKeyboardTest.aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes`、`NeighbourTouchTest.shuangpinsNineKeysDigitsGoWithTheirCodesAround`；设备上不跑。
+
+### SP-51 [P1] 双拼用重排的 18 键：按它自己的位置画，按 18 键打
+- **前提**：B0-18键（自然码）；没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-k18-swapped-1.0.layout`（App 的 18 键，第 1 行头两个键 Q 和 WE 换了位置）。
+- **操作**：**设置 → 外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；在「现在就用在」里勾 **双拼**，点 **确定**；回测试页，双拼下依次点 BN、IO、H、JK（自然码 ni hk），看候选，点「你好」；看 **输入法 → 双拼 → 键盘**。
+- **预期**：「现在就用在」里有拼音和双拼（分组正好是 18 键那些组，位置随意，双拼也能用）。键盘按导入的布局画：第 1 行最左是 WE，Q 在它右边。候选前 5 个里有「你好」，点了框里是「你好」。双拼的 **键盘** 写「UAT 换位 18 键（自定义）」。
+- **JVM**：ime-eval `CustomGroupsUatTest.theEighteenKeysRearrangedTypeZiranmaAsTheEighteenKeys`（真数据）、ime-core `LayoutImportGroupedTest.theUatsGroupedLayoutsAreTheSeventeenKeysAndTheEighteenRearranged`、`KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod`；app `GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys`；设备上留作冒烟。
