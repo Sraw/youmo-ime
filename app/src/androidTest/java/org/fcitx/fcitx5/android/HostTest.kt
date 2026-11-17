@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.PunctuationTable
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
@@ -629,6 +630,22 @@ class HostTest {
     }
 
     /**
+     * [entries] as zh_CN's table where a user's own is read, and read again as a reload reads it; null, none there
+     * (the built-in table). No app path saves one since 0.6.1: an edited table is what a test puts in so.
+     */
+    private suspend fun putTable(entries: List<PunctuationMapEntry>?) {
+        val file = File(fcitxData(), "punctuation/punc.mb.zh_CN")
+        if (entries == null) {
+            file.delete()
+        } else {
+            file.parentFile!!.mkdirs()
+            file.writeBytes(PunctuationTable.write(entries.map { PunctuationTable.Entry(it.key, it.mapping, it.altMapping) }))
+        }
+        fcitx.reloadConfig()
+        PunctuationManager.forget()
+    }
+
+    /**
      * A pair as a key's first card is one choice, the half the key types: its other half is not
      * offered beside it. The halves come in turn, fcitx's default (TypePairedPunctuationsTogether=False).
      */
@@ -639,10 +656,7 @@ class HostTest {
         val hadSaved = saved.exists()
         try {
             // " with a card after its pair, as the editor page lets one add
-            PunctuationManager.save(
-                fcitx, "zh_CN",
-                shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", "")
-            )
+            putTable(shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", ""))
             fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
             sendString("\"")
             Assert.assertEquals("“", awaitPanelPreedit("“"))
@@ -659,9 +673,8 @@ class HostTest {
             Assert.assertEquals("＂", receiveFirstCommitString()?.text)
         } finally {
             fcitx.reset()
-            PunctuationManager.save(fcitx, "zh_CN", shipped)
-            // the save above wrote a map of the user's where there was none
-            if (!hadSaved) saved.delete()
+            // the table above put where there was none, or the user's put back
+            if (hadSaved) putTable(shipped) else putTable(null)
         }
     }
 
@@ -675,10 +688,7 @@ class HostTest {
         val saved = File(fcitxData(), "punctuation/punc.mb.zh_CN")
         val hadSaved = saved.exists()
         try {
-            PunctuationManager.save(
-                fcitx, "zh_CN",
-                shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", "")
-            )
+            putTable(shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", ""))
             fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
             sendString("\"")
             Assert.assertEquals("“", awaitPanelPreedit("“"))
@@ -703,8 +713,7 @@ class HostTest {
             Assert.assertEquals("”", awaitPanelPreedit("”"))
         } finally {
             fcitx.reset()
-            PunctuationManager.save(fcitx, "zh_CN", shipped)
-            if (!hadSaved) saved.delete()
+            if (hadSaved) putTable(shipped) else putTable(null)
         }
     }
 
@@ -718,10 +727,7 @@ class HostTest {
         val saved = File(fcitxData(), "punctuation/punc.mb.zh_CN")
         val hadSaved = saved.exists()
         try {
-            PunctuationManager.save(
-                fcitx, "zh_CN",
-                shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", "")
-            )
+            putTable(shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", ""))
             fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
             sendString("\"")
             Assert.assertEquals("“", awaitPanelPreedit("“"))
@@ -752,8 +758,7 @@ class HostTest {
             Assert.assertEquals("“", awaitPanelPreedit("“"))
         } finally {
             fcitx.reset()
-            PunctuationManager.save(fcitx, "zh_CN", shipped)
-            if (!hadSaved) saved.delete()
+            if (hadSaved) putTable(shipped) else putTable(null)
         }
     }
 

@@ -44,9 +44,9 @@ internal class LetterArea(
     /** Whether [k] of [canvas]'s scene is in the area. */
     fun has(canvas: KeyboardCanvasView?, k: KeyNode): Boolean = also(k) || KeyRef(k.id, k.copy == 1) in letterKeys(canvas)
 
-    // the letters' keys of the scene drawn last
+    // the letters' keys of the scene drawn last (not the testing accessor's, which makes one anew where it is dirty)
     private fun letterKeys(c: KeyboardCanvasView?): Set<KeyRef> {
-        val s = c?.scene ?: return emptySet()
+        val s = c?.shownScene ?: return emptySet()
         if (s === keysOf) return keys
         keys = letters().mapTo(HashSet()) { (_, p) -> p.ref }
         keysOf = s

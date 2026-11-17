@@ -137,15 +137,12 @@ class ChoiceCardTest {
         }
     }
 
-    @Test
-    fun `names of two lines make every card two lines high`() {
-        val c = card()
-        c.nameLines = 2
-        assertEquals(2, c.nameText.minLines)
-    }
+    // names of two lines making every card two lines high: the rule is the page's, tested there
+    // (PopupOverridesLayoutTabTest.aLongNameMakesEveryCardTwoLinesHigh, R26 F8159)
 
+    // R26 F8320: named for what it checks; what the squares look like is the screenshot tests'
     @Test
-    fun `the picture is no node and draws a square a key`() {
+    fun `the picture is no node and draws without a crash, bars and no rows too`() {
         val glyph = KeyboardGlyphView(ctx, listOf(10, 9, 7))
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, glyph.importantForAccessibility)
         glyph.measure(MeasureSpec.makeMeasureSpec(ctx.dp(80), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(ctx.dp(KeyboardGlyphView.HEIGHT_DP), MeasureSpec.EXACTLY))

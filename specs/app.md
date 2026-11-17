@@ -47,8 +47,8 @@ show (`Layout.moreOnly`: none ticked or none of use; a greyed 手写 counts) the
 read 「更多」), a tap opening the panel, the toolbar never opened (`evalIdleUiState` passes no expansion).
 A bar arranged before 手写 was on the list (0.6.0's, `ToolbarConfig.handwritingNeverOffered`) gets it after 表情 at the start (`AppPrefs.offerHandwriting`, in `dropRetired`). The ⋯ panel's own actions live in `PanelActions`, called by
 `StatusAreaWindow` and the bar's buttons alike. A new panel entry that should be a button too is a
-`ToolbarButton`, its `ToolbarButtonLooks`, its icon in `BarIcons.of` (a name a theme may replace; `Icons.TOOLBAR` if new), its action in `PanelActions`, and an `on(…)` line in
-`KawaiiBarComponent`.
+`ToolbarButton`, its `ToolbarButtonLooks`, its icon in `BarIcons.of` (a name a theme may replace; `Icons.TOOLBAR` if new), its action in `PanelActions`, and a branch in
+`KawaiiBarComponent.tap` (the bar's button and its row in ⋯'s panel press the same).
 The toolbar's 手写 (061-handwriting-toolbar) is such a button, pinned by default (`ToolbarConfig.DEFAULT`: 表情, 手写,
 语音, 收起; `withHandwritingPinned` for a bar arranged before, `AppPrefs.pinHandwriting`), offered where
 `HandwritingMode.offered` (not English, not a password). Its state is `Internal.handwritingOpen`, kept across
@@ -273,7 +273,7 @@ for `PopupKeyboardUi` and `KeySwipes`. `KeyListsCache` (app) reads `key_lists`; 
 `migrateKeyLists` (`KeyListsMigration`, pure) makes it once from 0.5/beta's `popup_overrides`, `key_popups` and
 `t9_symbols` when it is missing or has no `@n` head, then upgrades it, and beta3's `@1`, to `@2` (`KeyListsMigration.upgrade`:
 a row key's symbols put under its row as the editor shows it, by the user's 按键字母, the first 16 items kept in list order; its first as `@1` resolved it;
-`KeyLists.needsMigration`: a later version's `@3` is kept as it is, read as no lists, never migrated over), leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
+`KeyLists.needsMigration`: a later version's `@4` is kept as it is, read as no lists, never migrated over), leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
 plain `string` (not `hidden`, or a backup's import would reset it and the old keys come back) and is copied to device
 encrypted storage, where before the first unlock the cache migrates the old keys (or upgrades `@1`) in memory. The settings' editor
 (按键字符和快捷键, eight keyboards' cards over one card of the picked board's keys, the 九键 one replacing 0.5's 按键长按) draws the current theme's layouts,
@@ -368,8 +368,8 @@ two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 �
 拼音键字母大小写 (`AppPrefs.keyboard.letterCase`, key `letter_case`, `LetterCaseChoice`: 总是小写 / 跟随 Shift / 总是大写, default 跟随 Shift) cases a Chinese input method's letter faces and press bubbles only; what is typed and Shift are untouched. The decision is keyboard-scene's pure `LetterCaseRule` (`forIme`: English always follows Shift, its case being what it types; `upper`: the setting, Shift's state, `shiftless` for 九键 and 14/18 键, which show capitals following Shift, and the hidden keep-uppercase). The keyboards pass it as `Texts.letterCase`; `Expand` reads it in `{case:x}`, `{nine-letters:N}` and `{group:qw}` (k14/k18's group faces); a key's screen reader text is the label as 跟随 Shift shows it, so it reads the same whichever is chosen. `TextKeyboard`/`GroupedKeyboard`/`T9Keyboard` case their bubbles by the same rule; `KeyCaps.board` (`SceneKeyCell.Board.letterCase`) and the 九键 letters page show it too. The hidden 键盘字母保持大写 (`keepLettersUppercase`, `keep_keyboard_letters_uppercase`) still holds under 跟随 Shift, 总是小写 over it; with it on, English's press bubble shows the capital its face shows while the letter typed still follows Shift. A table's letter with no root (`{root:x}` empty in `Texts.other`) falls back to `{case:x}`. In `remakeKeyboardsPrefs`. Held by `LetterCaseRuleTest`, `ExpandTest`, `LetterCaseScreenshotTest`.
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`TextKeyboard.charShortcutMarks`: its roots start in the top left corner), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
 are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's, times a resized floating keyboard's `resize`; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
-makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`, as
-`floatingBuilt`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size (one at an edge's middle stepped down too until it fits between the corner marks on its edge, `Content.MIDDLE_GAP_DP`, 1 dp, from each, the corner marks not moved for it: review 061-small S6), its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a mark wider than its key's face counts as not fitting: a long first the user set, a 0.5 backup's 「5%葡萄糖注射液100ml」, drawn over the next keys till R24; `KeyMarkYield.cornersIn`, `LongMarksStayOnTheirKeyTest`; a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out no corner symbol (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
+makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`; a keyboard style's change
+only where it changes the style built, `screenBuilt`/`styleBuilt`, `keyboardStyleListener`, `ViewRebuild.STYLE`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size (one at an edge's middle stepped down too until it fits between the corner marks on its edge, `Content.MIDDLE_GAP_DP`, 1 dp, from each, the corner marks not moved for it: review 061-small S6), its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a mark wider than its key's face counts as not fitting: a long first the user set, a 0.5 backup's 「5%葡萄糖注射液100ml」, drawn over the next keys till R24; `KeyMarkYield.cornersIn`, `LongMarksStayOnTheirKeyTest`; a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out no corner symbol (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). What each punctuation key types (。 or . by the punctuation mode) is the host's (`HostCore.startPunctuationKeys`), kept from the last run in `filesDir/punctuation-start-keys` (`PunctuationStartKeys`, written by the host as it changes, read on a thread of its own at the service's `onCreate`) so the keys show it before the host is up (060-render-p2 S7a); `PunctuationComponent.known` says whether it is known. None kept (a first install, the host not up yet): `KeyboardWindow` holds a punctuation key's tap back (not typed, its bubble not shown) and buzzes once. A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
 key (`lib/keyboard-scene` `engine/Popups`: `KEY_MIN_WIDTH_DP`, `KEY_HEIGHT_DP`, `LIFT_DP`; as wide as the key pressed, 九键's 7 filled the screen; over a key across rows' top row, `KeyNode.head`, not its whole height: `KeyHandle.previewBounds`),
 floating above it, the bubble gone; the finger picks by how far it moved since they opened, not
@@ -657,15 +657,15 @@ start (`AppPrefs.migrateKeyDrawing`, a backup's at the start after its import): 
 else strokes if they were, else off (both on, which only a backup or a hand edit holds, is glide),
 the two old keys dropped. The page's row is an `AppChoice` whose summary is the choice alone.
 `GlideInput` decides at the finger's down (`strokes`): the switch, a word field, pinyin typed (`BaseKeyboard.imTyping`, which
-`KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`filters`:
-`InputMethodCatalog.filtersByStrokes` of the one shown, on `TextKeyboard`, `T9Keyboard` and
+`KeyboardWindow` sets from the preedit, not in a temporary mode: its panel alone has an aux line above) and a keyboard whose input method filters (`BaseKeyboard.drawsStrokes`:
+`PageStrokeTouch.Draws.keys` with `InputMethodCatalog.filtersByStrokes` of `keysIm`, the one shown, and `strokesDrawn`, on `TextKeyboard`, `T9Keyboard` and
 `GroupedKeyboard`, the 14 and 18 keys, which have no glide). `GlideGesture` starts it far sooner than
 a glide (`strokeDistance`, 12dp in any direction, `GlideInput.STROKE_START_DP`, before the long press): a
 竖 from the bottom row or a short 点 must be one before the key's swipe (36dp) is, so while pinyin
 is typed a key's swipe is a stroke. At the lift `GlideTouch` (`liftDistance`) looks at the farthest the finger went from its down:
 short of 笔画筛选灵敏度 (`AppPrefs.keyboard.strokeLift`, `StrokeLift` 高 20 / 中 24 / 低 28dp, read at each down;
 design 061-swipe-eval) it is `Route.TAP_KEY` and `GlideInput.tapKey` taps the key under the down point
-(`BaseKeyboard.tapKeyAt`, `KeyGesture.tap`), off its edge or not; the trail is drawn only past it (`GlideTouch.shown`).
+(the `tapKey` lambda `BaseKeyboard` hands `GlideInput`: `SceneTouch.find`, then `SceneKey.tap`), off its edge or not; the trail is drawn only past it (`GlideTouch.shown`).
 Past it, on the lift the path, in key widths both ways, is read by `StrokeShape` (ime-core) and
 sent as the engine's stroke key, `KeyAction.SymAction.stroke` (`Keyboard.strokeKey`); a shape it reads
 as none (up, up to the left) is dropped. `StrokeShape` reads a 折 only where the turn's two arms are
@@ -941,9 +941,11 @@ the prefs written; then its end: the install's marker, the restore's names it to
 recorded since kept, `theme-layouts-trying` deleted). Till then the keyboards draw the app's boards; the layout prefs
 being in `remakeKeyboardsPrefs`, they are drawn anew as it switches. `theme-layouts-trying` holds the count of starts
 that tried: one that ended in the middle (killed, as is common; its switch thrown) is tried again, `MAX_TRIES` 3 starts,
-then given up (logged). `awaitStart` waits for the first
-stage: a theme import (`ThemeListFragment`, before it opens a pack) and a restore (`UserDataManager.import`, which also
-drops a switch not yet made, `restoring = true`: the settings it copies in are the backup's). A restore's record written
+then given up (logged). `awaitStart` waits for the start to
+end, both stages (`ended`): a theme import (`ThemeListFragment`, before it opens a pack) and 外观 → 布局's list
+(`LayoutListFragment.items`). A restore (`UserDataManager.import`, `restoring = true`) waits for the listing alone and
+drops a switch not yet made (`dropStart`) only once it is past its checks, just before it copies the backup's settings in;
+a refused restore leaves the switch to be made (R26 F8134). A restore's record written
 after the first stage is the next start's. `ThemeListFragment`'s 「一起导入」 runs `run` on IO and copies the renamed
 keys' settings on the main thread too. The packs installed before 0.6.1 had
 their `qwerty.xml` given the app's 分词 once (FB12, dev/design/061-theme-separator-migration.md):
@@ -1238,7 +1240,7 @@ four) and `englishKeyboard` (`EnglishKeyboard`: `Full`, `NineKeys`, key `english
 following pinyin's); each is in `recreateInputViewPrefs`. The router's IM stays `engine-pinyin` on
 every pinyin keyboard. The ⋯ panel's 「键盘」 entry is `KeyboardPicker` (`show(anchor)`): the current
 input method's `choices`, the one in use ticked; a pick sets that input method's pref, so the view is
-rebuilt at once. No entry where there is no choice (the tables). The settings pages
+rebuilt at once. No entry where there is no choice (a table with no usable layout of the user's). The settings pages
 show a section 「九键」 (`InputMethodSettings.NINE_KEYS`: 连按, 按键字母, one pref each, shared by
 pinyin's and English's nine keys; English's 九键英文打法 first in it; 双拼 has no such section, its
 letters the scheme's and no multi-tap; every nine key's symbols are on 按键字符和快捷键's 九键 tab) while 九键 is chosen, hidden and shown at once as 键盘 changes
@@ -1263,7 +1265,8 @@ layout's own `based-on`, `CustomKeyboards.baseOf`: a board of its family, whatev
 双拼 on a reordered G18/G14 set is drawn as the layout has it and typed as the built-in keyboard (L4: `SceneGroups.taken`
 takes the set; `groupedAs` asks `SceneGroups.letters`, the one rule). The
 picker's `offered()` and the settings' lists add the usable ones as `Custom:<id>` 「17 键（自定义）」, the chosen one
-that is not usable 「17 键（读不出，暂用 18 键）」. 外观 → 布局: a card of the user's says `ImKeyboards.usedBy`
+that is not usable 「17 键（读不出，暂用 18 键）」 where its file is gone, does not read or is refused, 「17 键（这里用不了，暂用
+18 键）」 where it reads (`drawn`) but this input method cannot use it (`keyboard_custom_unusable`). 外观 → 布局: a card of the user's says `ImKeyboards.usedBy`
 (用在：…), tapped offers 用在… (`usableBy`, `ticked`: unticked back on its base), an import asks 现在就用在…,
 a delete puts each user on `afterDelete` (its base where it has it, else the full keyboard) and `forget`s the id.
 `CustomKeyboards.all()` lists the folder and reads each file new or changed since (parsed, checked, its thumbnail made;

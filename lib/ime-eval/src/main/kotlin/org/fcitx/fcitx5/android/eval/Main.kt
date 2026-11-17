@@ -67,6 +67,8 @@ internal val COMMANDS = listOf(
         "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
         3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
     ) { args, _, _ ->
+        // pinyin's --touched is the set its --touch tapped (table-slips' its own taps, preset or not: review F8111)
+        if ("touched" in args.options && "touch" !in args.options) return@Command null
         val (dataPath, setPath, resultPath) = args.operands
         runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
     },
@@ -478,13 +480,13 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         // the taps type the 14 keys or the 18 keys: such a scheme
         valid("taps") { runCatching { Taps.parse(it) }.isSuccess && scheme != null && scheme in T9Set.SCHEMES && T9Set.lettersOf(scheme) in TAPPED },
         valid("seed") { (it.toIntOrNull() ?: -1) >= 0 },
+        // table-slips' floors, log10 costs: one not read would run at the app's and be reported as asked (review F8254)
+        listOf("floor", "topping-floor").all { name -> valid(name) { it.toFloatOrNull()?.isFinite() == true } },
         // a merged dictionary's file is what is stale
         valid("stale") { "merged" in options },
         listOf("threads", "beam", "sentences").all { name -> valid(name) { (it.toIntOrNull() ?: 0) > 0 } },
         // a key read as the one beside it (061-neighbour-correction): full pinyin, 双拼's full keyboard, pinyin's nine, 14 and 18 keys
         valid("neighbours") { it in ON_OFF && readsNeighbours(scheme) },
-        // pinyin's with its touches; table-slips' are its own, by the preset
-        valid("touched") { "touch" in options || "preset" in options },
         valid("touch") { "taps" !in options && touchValid(it) },
         valid("hand") { runCatching { TouchSim.hand(it) }.isSuccess },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
@@ -500,9 +502,10 @@ private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.
 private fun readsNeighbours(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES ||
     scheme in ShuangpinSet.GROUPED || scheme in ZhuyinSet.SCHEMES
 
-/** Whether `--touch` [spec] names a keyboard, a hand and clean or slip ([TouchSim.convert]). */
+/** Whether `--touch` [spec] names a keyboard, a hand, clean or slip and maybe a seed ([TouchSim.convert]). */
 private fun touchValid(spec: String) = spec.split(':').let { p ->
-    p.size in 3..4 && p[2] in setOf("clean", "slip") && runCatching { TouchSim.board(p[0]); TouchSim.hand(p[1]) }.isSuccess
+    p.size in 3..4 && p[2] in setOf("clean", "slip") && (p.size == 3 || p[3].toLongOrNull() != null) &&
+        runCatching { TouchSim.board(p[0]); TouchSim.hand(p[1]) }.isSuccess
 }
 
 /** Whether [scheme]'s segmenter reads common slips: full pinyin's and 双拼's; the grouped keyboards and zhuyin read none. */
@@ -816,14 +819,16 @@ private fun writeSlipSet(setPath: String, outPath: String, scheme: String?, out:
 
 private fun tune(dataPath: String, setPath: String, slipsPath: String, threads: Int, out: Appendable): Int {
     val tuning = Tuning({ loadData(dataPath) }, readSet(setPath), readSet(slipsPath), threads)
+    // the labels' column as wide as the longest a slip's makes (`default -1.5 (-3.5 a slip)`, with room): the rates under the
+    // header's names (R26 F8474)
     fun row(label: String, point: Tuning.Point) = out.appendLine(
-        String.format(Locale.ROOT, "%-24s", label) +
+        String.format(Locale.ROOT, "%-30s", label) +
             (point.rates + point.mean).joinToString("") { rate ->
                 if (rate == null) String.format(Locale.ROOT, "%17s", "-") else String.format(Locale.ROOT, "%16.1f%%", rate * 100)
             },
     )
     fun header(label: String, point: Tuning.Point, columns: List<String> = Tuning.COLUMNS) = out.appendLine(
-        String.format(Locale.ROOT, "%-24s", label) +
+        String.format(Locale.ROOT, "%-30s", label) +
             (columns.zip(point.sizes) { c, n -> "$c/$n" } + "mean").joinToString("") { String.format(Locale.ROOT, "%17s", it) },
     )
     val default = tuning.measure(Penalties(), Halves.TUNE)
@@ -839,17 +844,22 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, threads: 
     val off = tuning.measureKeys(Penalties(), Halves.TUNE, read = false)
     header("neighbour (tune)", off, Tuning.KEY_COLUMNS)
     row("off", off)
+    // the neighbour penalty is on top of what a slip costs by its place, the segmenter's own for the slip set's, which
+    // have none: each row says both, the whole the engine uses (review F8142; R26 F8473: read off the segmenter Tuning
+    // measures with, not a SlipCost of its defaults; F8509: that very segmenter, not one built like it)
+    val fixed = tuning.slipFixed
+    fun slip(p: Penalties) = "${p.neighbour} (${fixed + p.neighbour} a slip)"
     val keyPoints = tuning.searchKeys()
-    keyPoints.forEach { row("${it.penalties.neighbour}", it) }
+    keyPoints.forEach { row(slip(it.penalties), it) }
     val keyChoice = tuning.chooseKeys(keyPoints, off)
     val offHeldOut = tuning.measureKeys(Penalties(), Halves.HELD_OUT, read = false)
     header("held-out", offHeldOut, Tuning.KEY_COLUMNS)
     row("off", offHeldOut)
-    row("default ${Penalties().neighbour}", tuning.measureKeys(Penalties(), Halves.HELD_OUT, read = true))
+    row("default ${slip(Penalties())}", tuning.measureKeys(Penalties(), Halves.HELD_OUT, read = true))
     if (keyChoice == null) {
         out.appendLine("chosen: none keeps clean input")
     } else {
-        row("chosen ${keyChoice.penalties.neighbour}", tuning.measureKeys(keyChoice.penalties, Halves.HELD_OUT, read = true))
+        row("chosen ${slip(keyChoice.penalties)}", tuning.measureKeys(keyChoice.penalties, Halves.HELD_OUT, read = true))
     }
     return 0
 }
@@ -1055,7 +1065,7 @@ private fun tableSlips(dataPath: String, setPath: String, preset: String, o: Map
     return 0
 }
 
-// a line of a set the device runner times, about as many keys as pinyin's (61–60 keys a sample)
+// a line of a set the device runner times, about as many keys as pinyin's: 60 keys a sample or a word's few more, the last line fewer
 private const val TOUCHED_KEYS = 60
 
 private val ON_OFF = setOf("on", "off")

@@ -316,16 +316,18 @@ object LayoutReader {
 
     private fun menu(el: XmlElement, p: Problems): List<MenuItem> {
         Attributes(el, p).done()
+        var gone = false
         val items = el.children.mapNotNull { item ->
             if (item.name != "item") return@mapNotNull null.also { p.add(item.line, "<${item.name}> is not allowed in <menu>") }
             val a = Attributes(item, p)
             val label = a.required("label")
             val icon = a.matching("icon", IDENT, "an icon name")
-            val action = if (retired(a, "do")) null else a.value("do", "an action", ::action) ?: a.required("do")
+            val action = if (retired(a, "do")) null.also { gone = true } else a.value("do", "an action", ::action) ?: a.required("do")
             a.done()
             if (label != null && action != null) MenuItem(label, icon, action) else null
         }
-        if (items.isEmpty()) p.add(el.line, "<menu> has no items")
+        // a menu of 0.6.0's 注 items alone (its handwriting.xml's) is none, each item warned of: still read (R26 F8209)
+        if (items.isEmpty() && !gone) p.add(el.line, "<menu> has no items")
         return items
     }
 

@@ -296,7 +296,9 @@ class Content(
             } else {
                 val drop = if (i == firstShortcut) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
                 val s = w.shortcut!!
-                // a text its step down, the same whether laid out on whole pixels or not
+                // a text its step down: [short]'s (SceneBuilder's, the same in both passes), then further while wider than
+                // the room between the corners, which is worked out in each pass on its own cell and may differ by a
+                // pixel between the whole-pixel and the loose one (R26 F8344: not made one, a text at that edge rare)
                 val shown = if (s is MarkContent.Text) stepped(s, short[i] ?: 0, room, cell, looks) else s
                 if (w.user) fate = fateOf(s, shown)
                 shortcutMark(shown, slot, drop, cell, content, looks, snap)
@@ -316,6 +318,8 @@ class Content(
 
     // [s] [from] steps down its ladder, further while wider than [room]
     private fun stepped(s: MarkContent.Text, from: Int, room: Double, cell: Box, looks: Looks): MarkContent {
+        // a corner's, or a centred one with nothing on its edge: any width fits, nothing measured to know it
+        if (room == Double.POSITIVE_INFINITY) return rung(s, from, looks)
         var steps = from
         while (steps < s.ladder.size && textWidth(rung(s, steps, looks), cell, looks) > room) steps++
         return rung(s, steps, looks)

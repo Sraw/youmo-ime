@@ -555,11 +555,12 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             }
         }
         val (name, slotKey, label) = pageKey(page, key)
-        val longPress = longPressOf(page, key, name)
+        // a layout's key of a name another tab has too (Q4): marked, its editor saying which. Asked once a key (R26 F8324)
+        val sharedTab = page.layout?.let { KeyShortcutPages.sharedWith(page, key.name, pages) }
+        val longPress = longPressOf(page, key, name, sharedTab)
         // the engine's cap: a character key by its name, a function key by its own (its up and down); a layout's tab's on it
         val shortcut = KeyCaps.Shortcut(name, stored, layout = page.layout)
-        // a layout's key of a name another tab has too (Q4): marked, its editor saying which
-        val shared = page.layout?.let { KeyShortcutPages.sharedWith(page, key.name, pages) }?.let(::titleOf)
+        val shared = sharedTab?.let(::titleOf)
         // the key's first as a screen reader says it beside the label (the cap draws it where the keyboard does)
         val first = longPress?.let { resolverOf(ctx, it)?.edit(it.id)?.first }
         val hint = first?.takeIf { it != label }.orEmpty()
@@ -582,10 +583,13 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     private data class LongPress(val id: KeyId, val board: String)
 
     // a character key's long press, and the function keys' with a list of characters (， 。); a layout's tab's key of a name
-    // another tab has (共用) the app's key: its list started and defaulted on the app's board, the one its tab edits (L6 review S2)
-    private fun longPressOf(page: KeyShortcutPages.Page, key: KeyShortcutPages.Key, name: String): LongPress? = when {
+    // an app's tab has ([sharedTab], the first: the app's tabs come first) the app's key: its list started and defaulted on
+    // the app's board, the one its tab edits (L6 review S2). One of a name of its own another layout's tab has too (two
+    // layouts in use, one saved under a new id) its layout's, where its default is: the app's board has no such key
+    // (R26 F8160: the editor opened as one with none, its OK saving the list without the layout's own)
+    private fun longPressOf(page: KeyShortcutPages.Page, key: KeyShortcutPages.Key, name: String, sharedTab: KeyShortcutPages.Page?): LongPress? = when {
         page.form != KeyShortcuts.FUNCTION ->
-            LongPress(KeyId.of(name), page.layout?.takeIf { KeyShortcutPages.sharedWith(page, key.name, pages) == null } ?: KeyCaps.defaultBoard(name))
+            LongPress(KeyId.of(name), page.layout?.takeIf { sharedTab == null || sharedTab.layout != null } ?: KeyCaps.defaultBoard(name))
         KeyDefaults.function(key.label) != null -> LongPress(KeyId.function(key.label), KeyCaps.defaultBoard(key.label))
         else -> null
     }
@@ -744,7 +748,10 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     private fun longPressSummary(editor: PopupEditor?): String = when {
         listsNewer || editor == null -> getString(R.string.long_press_card_read_only)
         editor.items.isEmpty() -> getString(R.string.long_press_card_summary_none)
-        else -> getString(R.string.long_press_card_summary, editor.first ?: editor.items.first(), editor.items.size)
+        // a key with no first (a 注音 group's): none said, not the list's first, which neither a long press nor 长按首选 types
+        // (R26 F8323)
+        else -> editor.first?.let { getString(R.string.long_press_card_summary, it, editor.items.size) }
+            ?: getString(R.string.long_press_card_summary_no_first, editor.items.size)
     }
 
     /**
@@ -776,7 +783,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             hint = getString(R.string.long_press_editor_hint).takeIf { editor != null },
             ways = listOf(wayTitle(up = true), wayTitle(up = false)),
             sections = sections,
-            first = { editor?.let { it.first ?: it.items.firstOrNull() } },
+            first = { editor?.first },
             pressSummary = { longPressSummary(editor) },
         )
         if (longPress != null) cards.fill(longPressViews(ctx, start, editor, field, cards::changed) { addTyped = it })

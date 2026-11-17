@@ -544,7 +544,8 @@ class PinyinSession(
 
     // the keys [c] reads, as its pin is filed: a level-2 word's are those up to its end; one read through a slipped
     // key under the key meant, as a pick of it is learned (N1-A), so a pin of 呀 read off `ta` is not ta's
-    private fun spanCode(c: Candidate) = recorder.code(readFrom(), readFrom() + c.end, entries(c)?.let(CommitRecorder::words).orEmpty(), shows.slips(c))
+    // [read]: [entriesAndSlips] of [c], passed by a caller that wants its entries too, so walked once (review F8453)
+    private fun spanCode(c: Candidate, read: Pair<List<Entry>?, Map<Int, Char>> = entriesAndSlips(c)) = read.let { (entries, slips) -> recorder.code(readFrom(), readFrom() + c.end, entries?.let(CommitRecorder::words).orEmpty(), slips) }
 
     // what is pinned under [c]'s keys, if [c] is it; a fault of working that out is learning's
     private fun pinnedHere(c: Candidate) = recorder.safely(null) { recorder.habits.pinned(spanCode(c))?.takeIf { it.text == c.text } }
@@ -554,7 +555,11 @@ class PinyinSession(
         val c = candidates.getOrNull(index)
         if (c == null || predicting || !pinnable(c)) return snapshot()
         // pins are the user's say, recorded wherever they are made, as their unpins (review-1a-app S2)
-        recorder.pin(c.text, on = true) { spanCode(c) to entries(c) }
+        recorder.pin(c.text, on = true) { entriesAndSlips(c).let { read -> spanCode(c, read) to read.first } }
+        // a word pinned is one typed (UserModel.setPinned): the words collected key to key read again, as unpin's and
+        // forget's (review F8340). Kept for that alone: the word pinned is a candidate already, collected, so no list
+        // shown differs for it today (R26 F8458), unlike unpin's, which PinyinSessionAbbrevTest holds
+        decoder.reset()
         return again()
     }
 
@@ -568,6 +573,7 @@ class PinyinSession(
         owned.remove(c, pinned != null)?.let { return it }
         if (pinned == null || predicting) return snapshot()
         recorder.pin(pinned.text, on = false) { spanCode(c) to null }
+        decoder.reset()
         return again()
     }
 
@@ -631,6 +637,13 @@ class PinyinSession(
         return shows.readings(c, graph ?: return null)?.mapIndexed { i, reading -> Entry(text(c.words[i]), reading.syllables) }
     }
 
+    // [entries] and [Shows.slips] of [c] off one walk of its readings: each walked them, a trie walk a word, at every pin
+    // asked and pick (review F8247)
+    private fun entriesAndSlips(c: Candidate): Pair<List<Entry>?, Map<Int, Char>> {
+        val graph = lastRead.decoded?.graph?.takeUnless { predicting } ?: return entries(c) to emptyMap()
+        return shows.readings(c, graph).let { r -> r?.mapIndexed { i, reading -> Entry(text(c.words[i]), reading.syllables) } to shows.slips(graph, r) }
+    }
+
     private fun text(word: Int) = wordText(data, user, word)
 
     /**
@@ -667,10 +680,9 @@ class PinyinSession(
 
     // [c], picked, as the learning record takes it: see CommitRecorder.pick. A phrase, an
     // emoji or a character by its parts is no word picked (PLAN §2.7 U-66, U-67): its commit learns nothing
-    private fun toLearn(c: Candidate) = if (!learning || !recorder.learns || shownAside(c)) null else recorder.pick(
-        c, readFrom(), input.length - readFrom(), entries(c), candidates, shownAside, ::text, nineKeys?.anyTaken == true, pieces.isEmpty(), lastRead.ranks[c]?.original == true,
-        shows.slips(c),
-    )
+    private fun toLearn(c: Candidate) = if (!learning || !recorder.learns || shownAside(c)) null else entriesAndSlips(c).let { (entries, slips) ->
+        recorder.pick(c, readFrom(), input.length - readFrom(), entries, candidates, shownAside, ::text, nineKeys?.anyTaken == true, pieces.isEmpty(), lastRead.ranks[c]?.original == true, slips)
+    }
 
     /** Whether the keys kept for the learning record cover the input a place each, as they must: for tests. */
     internal val pressedInStep get() = recorder.pressed.length == input.length
@@ -1035,11 +1047,11 @@ class PinyinSession(
         }
 
         // the keys of [c] read as the keys next to them, each place of the input to the key meant: learned so (061-neighbour-correction §8.2)
-        fun slips(c: Candidate): Map<Int, Char> {
-            val graph = lastRead.decoded?.graph
-            if (predicting || graph == null || !graph.hasOtherReadings) return emptyMap()
+        // ([readings] of a candidate along [graph], the input read last)
+        fun slips(graph: SyllableGraph, readings: List<Reading>?): Map<Int, Char> {
+            if (!graph.hasOtherReadings) return emptyMap()
             val out = HashMap<Int, Char>()
-            readings(c, graph)?.forEach { r -> r.slips.forEach { (at, key) -> out[readFrom() + at] = key } }
+            readings?.forEach { r -> r.slips.forEach { (at, key) -> out[readFrom() + at] = key } }
             return out
         }
 

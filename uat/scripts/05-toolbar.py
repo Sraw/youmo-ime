@@ -316,7 +316,7 @@ def tb23(d):
     return f"左上 {b1}，再出 {b2}，横屏 {b3} → 右上 {b3r}，竖屏 {b4}"
 
 
-case("TB-24", needs="jvm:FloatingUatTest.theDockButtonPutsItBack")(lambda d: None)
+case("TB-24", needs="jvm:FloatingUatTest.theDockButtonPutsItBack、FloatingHandleTest.rightToLeftTheDockButtonStaysAtTheRightEnd")(lambda d: None)
 
 
 case("TB-65", needs="jvm:KeyboardStyleUatTest.theBarsOneHandedWhereSplitNotWhereFloating、KeyboardStyleUatTest.fromTheBarTheFocusIsOnTheNewViewsOneHandedButton")(lambda d: None)
@@ -514,30 +514,43 @@ case("TB-59", needs="jvm:FloatingUatTest.resizedNoSmallerThan260NorPastTheScreen
 
 @case("TB-60", mutates=True, visual=True)
 def tb60(d):
+    def shown():
+        s = d.screen()
+        if not s.find(rid="keyboard_view", where="ime"):
+            f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
+            if f:
+                d.tap(f.c, 1.2)
+
     floating_up(d)
     r = resizer(d)
     drag(d, r.c, (r.c[0] + 120, r.c[1] - 120))
     upright = kwidth(d)
     d.rotate(1)
-    s = d.screen()
-    if not s.find(rid="keyboard_view", where="ime"):
-        f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
-        if f:
-            d.tap(f.c, 1.2)
+    shown()
     if not d.screen().find(desc="键盘放回底部", where="ime"):
         floating(d)
     turned = kwidth(d)
     d.shot("ime", "横屏")
+    # landscape resized bigger too, half way up the screen so there is room under it to grow: rotate(1) makes every
+    # device's display 2340x1080 (wm size), so 540 px is half its height on all of them (review R26 F8493)
+    h, _ = handle(d)
+    drag(d, h, (h[0], 540))
+    r = resizer(d)
+    drag(d, r.c, (r.c[0] - 120, r.c[1] + 120))
+    bigger = kwidth(d)
     d.rotate(0)
-    s = d.screen()
-    if not s.find(rid="keyboard_view", where="ime"):
-        f = next((n for n in s.app() if n.cls == "EditText" and n.rid != "url_field"), None)
-        if f:
-            d.tap(f.c, 1.2)
+    shown()
     again = kwidth(d)
+    d.rotate(1)
+    shown()
+    turned_again = kwidth(d)
+    d.shot("ime", "横屏调大、转回竖屏再转过来")
+    d.rotate(0)
     check(upright and turned and turned != upright, f"横屏 {turned}，竖屏调过的 {upright}（横屏是自己那份）")
-    check(abs(again - upright) < 6, f"转回竖屏 {again}，应是 {upright}")
-    return f"竖屏 {upright}，横屏 {turned}，转回 {again}"
+    check(bigger > turned + 40, f"横屏调大 {turned} → {bigger}")
+    check(abs(again - upright) < 6, f"横屏调大后转回竖屏 {again}，应是 {upright}")
+    check(abs(turned_again - bigger) < 6, f"再转成横屏 {turned_again}，应是横屏调大的 {bigger}")
+    return f"竖屏 {upright}，横屏 {turned} → 调大 {bigger}，转回竖屏 {again}，再横屏 {turned_again}"
 
 
 case("TB-61", needs="jvm:FloatingUatTest.itsSizeIsKeptShownAgainAndDockedAndFloatingAgain、FloatingStoreTest.neverKeptEitherWayItIsWhere060LeftIt、"

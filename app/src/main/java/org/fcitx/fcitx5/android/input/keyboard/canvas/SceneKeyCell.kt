@@ -229,8 +229,8 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
         val layout = SceneLayouts.board(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
-            // the keyboard upright, the page turned or not (KeyCaps.board's size)
-            .copy(board = layout.id, keyStyle = overPack(), landscape = b.landscape)
+            // the keyboard upright, the page turned or not (KeyCaps.board's size); a user's layout's styles its base's too, as there
+            .copy(board = layout.id, base = layout.stylesOf, keyStyle = overPack(), landscape = b.landscape)
             .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split, density = it.density * b.resize) else it }
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
             is Parsed.Ok -> s.value.also { v -> if (v.keys.none { it.shortcut == b.shortcut }) Timber.e("key cell: no key of %s on %s", b.shortcut, b.layout) }

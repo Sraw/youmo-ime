@@ -210,6 +210,16 @@ class KeyDataTest {
         assertEquals(listOf("H", "J", "K", "(", "h", "j", "k"), list.row.map { it.text })
     }
 
+    // R26 F8437: a grouped layout based on qwerty (the layout maker's merge) has the 18 keys' shape, its own family's: the
+    // corners 0.6.0's k18 wrote are the app's there, no notice; read by its based-on's shape (the 14 keys') they were told
+    @Test
+    fun aGroupKeysCornerIsJudgedByItsOwnFamilysShapeNotItsBasedOns() {
+        val l = read(k17.replace("id=\"k18\"", "id=\"my-k17\" based-on=\"qwerty\""))
+        val frags = Forms.fragments.filterKeys { it == "grouped-bottom" }
+        assertEquals(emptyList(), KeyData.of("my-k17", l, frags, KeyData.Mode.Own, shape = "k18").ignored)
+        assertTrue(KeyData.of("my-k17", l, frags, KeyData.Mode.Own).ignored.any { it.what == "alt" }, "by qwerty's shape: the 14 keys' corners")
+    }
+
     @Test
     fun aGroupKeyOfANameOfItsOwnHasNoCornerOfTheApps() {
         val text = k17.replace("shortcut=\"g18/h\"", "shortcut=\"k17/hjk\"")

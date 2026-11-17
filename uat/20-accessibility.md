@@ -73,9 +73,9 @@
 ### AX-17 [P1] 生僻字屏蔽的网格
 <!-- 061-rare-char-block.md §6.4 -->
 - **前提**：B0-设置；**词库与短语 → 生僻字屏蔽** 打开开关；打开 TalkBack。
-- **操作**：点一张卡片进去，摸顶上那条勾选条和几个格子；在一个格子上双击；摸右边的字母条。
-- **预期**：共同的预期；勾选条读组名、字数和「全部屏蔽 / 部分屏蔽 / 全部放行」；格子读成复选框：字和它的读音（多音字读出全部读音，如「荅，dā、dá」），屏蔽的读「已选中」；双击切换后读出的状态跟着变。
-- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（格子的 `AccessibilityNodeInfo` 是可勾选的 CheckBox、屏蔽时已勾选，读的是字和全部读音；勾选条的描述）；TalkBack 本身在设备上手工看。
+- **操作**：点一张卡片进去，摸顶上那条勾选条和几个格子；在一个格子上双击；摸右边的字母条；在一个格子上双击并按住，再双击隔一格的另一个格子；返回，点第二张卡片进去，摸右边的字母条。
+- **预期**：共同的预期；勾选条读组名、字数和「全部屏蔽 / 部分屏蔽 / 全部放行」；格子读成复选框：字和它的读音（多音字读出全部读音，如「荅，dā、dá」），屏蔽的读「已选中」；双击切换后读出的状态跟着变。双击并按住（读屏的长按，没有手指的位置）只切换这一格，之后点别的格子只切换那一格，不当成从按住的那格拖过去、把中间的格子也连着切换，不崩。换到第二组后字母条从这一组的第一个字母读起（不停在上一组翻到的地方；搜索后也一样）。
+- **JVM**：`RareCharsPageUatTest.thePageHoldsBackAndLetsThrough`（格子的 `AccessibilityNodeInfo` 是可勾选的 CheckBox、屏蔽时已勾选，读的是字和全部读音；勾选条的描述）、`RareCharsTouchTest.aLongPressWithNoFingerIsNoDrag`（没有手指位置的长按只切换一格，不拖）、`RareCharsTouchTest.newLettersAreAtTheirTop`（换组、搜索后字母条从头开始）；TalkBack 本身在设备上手工看。
 
 ## 长按候选
 
@@ -104,9 +104,9 @@
 
 ### AX-18 [P1] 手写、单手、悬浮按钮读出是开关和开、关
 - **前提**：B0-手写，打开 TalkBack。
-- **操作**：摸工具栏的手写按钮；写一个字后摸候选栏上的手写按钮；打开单手、悬浮再摸它们的按钮。
-- **预期**：读成开关（「手写，开关，已开」这类，各机型读法略有不同），关掉后读「未开」。手写开着时摸字母区照旧读键、不写字（用户定：TalkBack 触摸浏览时不写，见 AX-13）。
-- **JVM**：`HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff`（候选栏的手写按钮可勾选、已勾选；不是开关的按钮不读成开关）；真机上再听一遍读法。
+- **操作**：摸工具栏的手写按钮；写一个字后摸候选栏上的手写按钮；打开单手、悬浮再摸它们的按钮；切到拼音，展开工具栏，摸输入习惯、简繁按钮（默认不固定在工具栏上，要展开才有；简繁只在拼音下出现）。
+- **预期**：读成开关（「手写，开关，已开」这类，各机型读法略有不同），关掉后读「未开」。工具栏的输入习惯、简繁按钮读名字，不读成开关。手写开着时摸字母区照旧读键、不写字（用户定：TalkBack 触摸浏览时不写，见 AX-13）。
+- **JVM**：`HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff`（候选栏的手写按钮可勾选、已勾选；不是开关的按钮不读成开关）、`ToolButtonNodeTest.aButtonNamedForItsStateIsNoCheckableNode`（工具栏的输入习惯、简繁按钮不读成开关）；真机上再听一遍读法。
 
 ### AX-19 [P1] 读屏：键盘样式两项、单手和悬浮按当时的方向读开关
 - **前提**：真机，打开 TalkBack；横屏样式没设过（横拿分体）。

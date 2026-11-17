@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
+import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
@@ -92,7 +93,7 @@ class HabitCountsTest {
         learner.habits.forget("了")
         assertTrue(!below("le") && !below("liao") && below("ni") && !typed("了", "le"))
         // and after 30 typing days of something else
-        repeat(org.fcitx.fcitx5.android.engine.learn.LearnState.WINDOW) {
+        repeat(LearnState.WINDOW) {
             learner.clock.days(1)
             commit(row("jie", "解", "jie"))
         }

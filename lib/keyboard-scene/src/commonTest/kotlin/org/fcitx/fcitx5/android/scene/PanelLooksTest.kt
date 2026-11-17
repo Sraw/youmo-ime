@@ -279,4 +279,24 @@ class PanelLooksTest {
         // printed as the scene's text
         assertTrue("  ink #ffff0000 ${SceneText.n(6.0 * d)}" in SceneText.of(scene))
     }
+
+    // the pad's ink is the pad's alone (R26 F8356): a slot of another kind beside it, and the letters' board, which
+    // handwriting is written over now, draw none whatever `handwriting/pad` sets
+    @Test
+    fun noSlotButThePadHasInk() {
+        val t = theme(withStyle("<style select=\"handwriting/pad\" ink-color=\"#ff0000\" ink-width=\"6dp\" grid=\"true\"/>"))
+        val side = SceneBuilder(t, Forms.block, FakeMeasurer).build(
+            LayoutReader.layout(
+                "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"handwriting\" name=\"t\" family=\"handwriting\" columns=\"100\">" +
+                    "<row><slot id=\"pad\" kind=\"handwriting-pad\" width=\"70\" look=\"letter\"/>" +
+                    "<slot id=\"side\" kind=\"nine-side\" width=\"15\"/>" +
+                    "<key id=\"backspace\" role=\"backspace\" kind=\"function\" width=\"15\" icon=\"backspace\" a11y=\"a11y_key_backspace\" send=\"sym:BackSpace\"/></row></keyboard>",
+            ).ok(),
+            Forms.fragments,
+        ).ok()
+        assertEquals(mapOf(Pads.KIND to true, "nine-side" to false), side.slots.associate { it.kind to (it.ink != null) })
+        val letters = SceneBuilder(t, Forms.block, FakeMeasurer).build(Fixtures.qwerty).ok()
+        assertTrue(letters.slots.all { it.ink == null }, "${letters.slots}")
+        assertTrue("  ink " !in SceneText.of(letters))
+    }
 }

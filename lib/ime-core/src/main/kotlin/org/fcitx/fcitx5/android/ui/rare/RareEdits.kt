@@ -86,8 +86,24 @@ class RareEdits(private val grid: RareGrid, private val levels: CharLevels, read
     /** A group's box: all its cells held, some, or none. */
     enum class Box { ALL, SOME, NONE }
 
+    // the cells held by level (its ordinal), counted in one pass once a choice: the page asks a dozen times a step,
+    // each a pass over some 35,000 cells (R26 F8251)
+    private var countedFor: RareChoice? = null
+    private var counts = IntArray(0)
+
+    private fun counts(): IntArray {
+        val c = choice
+        if (countedFor !== c) {
+            val n = IntArray(Level.entries.size)
+            for (i in 0 until grid.size) if (held(i)) n[grid.level(i).ordinal]++
+            counts = n
+            countedFor = c
+        }
+        return counts
+    }
+
     /** How many of [level]'s cells are held. */
-    fun heldIn(level: Level): Int = (0 until grid.size).count { grid.level(it) == level && held(it) }
+    fun heldIn(level: Level): Int = counts()[level.ordinal]
 
     fun box(level: Level): Box {
         val held = heldIn(level)
@@ -99,7 +115,7 @@ class RareEdits(private val grid: RareGrid, private val levels: CharLevels, read
     }
 
     /** 「已屏蔽 N 个字」: the cells held, off counting none, whatever the phone can draw (§6.1). */
-    fun heldCount(): Int = if (!choice.on || choice.newer) 0 else (0 until grid.size).count(::held)
+    fun heldCount(): Int = if (!choice.on || choice.newer) 0 else counts().sum()
 
     companion object {
         private const val ASCII = 0x7F

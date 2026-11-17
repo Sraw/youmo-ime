@@ -237,8 +237,8 @@
 ### KB-107 [P1] 分词不动 ⇧ 的状态；英文、码表打字时 ⇧ 不变
 - **前提**：B0（全拼，全键盘）。
 - **操作**：点 ⇧（字母变大写），点 x i，点「分词」，点 a n，点空格；看字母。切到英文打 `he`，看 ⇧ 的位置；切到五笔打 `gg`，看那个位置。
-- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。之后导入的、恢复 0.6.1 及以后做的备份带进来的主题自带全键盘布局（没写分词键）的 ⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`；升级时已装的见 ST-143，旧备份恢复的见 PR-63。
-- **JVM**：`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
+- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。之后导入的、恢复 0.6.1 及以后做的备份带进来的主题自带全键盘布局（没写分词键），在 **外观 → 布局** 里选它给拼音用后，⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`；升级时已装的见 ST-143，旧备份恢复的见 PR-63。
+- **JVM**：`ShiftSeparatorCanvasTest.aShiftKeptBesideTheSeparatorStaysShift`（布局另有分词键、⇧ 还在时点 ⇧ 仍是 ⇧）、`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
 
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉
 - **前提**：B0。
@@ -429,7 +429,7 @@
 - **前提**：新装（B0），第一次打开键盘，上滑、下滑、上滑图标位置、下滑图标位置都是默认。
 - **操作**：看 a、z、s 和退格的键角；打开 **按键**，看 **上滑图标位置** 和 **下滑图标位置** 两项；**下滑图标位置** 依次选左下、右下、底部、无，每次回来看；**上滑图标位置** 选左上、左下、底部、无，每次回来看；在 **上滑图标位置** 的列表里看快捷键占着的那一项，点它；**按键字符和快捷键** 点 **翻转上下滑** 再看；都改回默认；给 s 设一个文字快捷键再清掉；给 q 设一个文字快捷键，在 **按键字符和快捷键** 页清掉 q 的长按，回测试页看 q，再恢复 q 的长按回来看，每次收起键盘再打开对比；收起键盘再打开。键盘高度选 **紧凑**，上滑图标位置选底部再看，下滑图标位置选右上再看；下滑图标位置改回左上、上滑图标位置改回右上，再把下滑图标位置选底部看；上滑图标位置再选左上看。**按键字符和快捷键** 页每选一个位置也看一遍。
 - **预期**：两项挨着，选项都是"右上 / 右下 / 左上 / 左下 / 顶部 / 底部 / 无"，默认上滑图标位置右上、下滑图标位置左上。默认：a、z 的快捷键图标在左上角，@、「，」在右上角；s 只有右上角的 *；退格上滑的清除在右上、下滑的恢复在左上，空格的编辑菜单图标在右上。下滑图标位置选左下：快捷键都在左下，退格的清除在右上、恢复在左下；选右下：快捷键在右下，退格清除右上、恢复右下；选底部：快捷键在键下边中间，退格的清除在右上、恢复在下边中间；选无：快捷键都不画，下滑照样执行。上滑图标位置选左上、左下：小字和退格的清除在那个角；选底部：在字母下面；选无：不画，上滑照样打出。一项的列表里，另一项占着的位置是灰的，后面注「下滑图标在这里」/「上滑图标在这里」，点了没反应；两项都能选无。点 **翻转上下滑** 后小字和快捷键都不动（两个图标位置跟着一起交换）。数字键盘和符号面板的字符格子不画键角标记；面板上的 ⌫、空格、，。照常画（PAN-25）。每次改完，和改成这个设置后重新打开键盘一模一样；改回默认后和第一次打开时一样。设了快捷键的 s 多一个标记。q 关掉、恢复长按时，键盘不收起看到的 q 键角和收起再打开后一样。上滑图标位置选底部：小字在字母下面，退格的清除在下边中间、恢复照下滑图标位置。紧凑时「底部」画在角上，按右上、右下、左上、左下取第一个另一个方向没占着的：上滑图标底部、下滑图标左上 → 小字和退格的清除右上；下滑图标改右上 → 小字和清除右下；下滑图标底部、上滑图标右上 → 快捷键和退格的恢复右下，上滑图标左上 → 快捷键和恢复右上；标记小一号，都画出来。设置页的键跟着一起变。
-- **JVM**：`KeyMarksUatTest`（`eachWhereItsSettingSays`、`onePlaceStoredInBothTheSymbolYields`、`theFirstOpenIsAsAfterAnySettingChanges`、`eitherChangedTheKeyboardIsMadeAnew`（改两项都重建键盘）、`aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt`（键盘开着时关掉 q 的长按，标记和重开键盘后一样）、`turnedTheSymbolWhereTheNewOrientationPutsIt`、`theSwipesTurnedTheMarksStay`（翻转上下滑后小字和快捷键不动））；`KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut`（两项挨着、同一组选项、另一项的位置置灰并注明、点不了）、`onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards`（备份里两项同位置，改另一项后摘要和键盘一致）；`AppPrefsTest.theSymbolStoredInTheShortcutsPlaceStoredWhereItReads`（这种备份下次启动时存成纠正后的位置）；ime-core `KeyMarksTest`（两个设置 6×6 × 横屏 × 紧凑 × 有无小字和快捷键的全部组合；读出时同一位置的纠正）；`KeyMarksScreenshotTest`（全键盘、九键、大千、手写每个位置的截图，全键盘紧凑）；`KeyShortcutsPageScreenshotTest.theMarksWhereTheirSettingsSay`（设置页每个位置）；设备上新装后看一遍，再切几个位置看。
+- **JVM**：`KeyMarksUatTest`（`eachWhereItsSettingSays`、`onePlaceStoredInBothTheSymbolYields`、`theFirstOpenIsAsAfterAnySettingChanges`、`eitherChangedTheKeyboardIsMadeAnew`（改两项都重建键盘）、`aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt`（键盘开着时关掉 q 的长按，标记和重开键盘后一样）、`turnedTheSymbolWhereTheNewOrientationPutsIt`、`theSwipesTurnedTheMarksStay`（翻转上下滑后小字和快捷键不动））；`KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut`（两项挨着、同一组选项、另一项的位置置灰并注明、点不了）、`onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards`（备份里两项同位置，改另一项后摘要和键盘一致）；`AppPrefsTest.theSymbolStoredInTheShortcutsPlaceStoredWhereItReads`（这种备份下次启动时存成纠正后的位置）；ime-core `KeyMarksTest`（两个设置 7×7 × 横屏 × 紧凑 × 有无小字和快捷键的全部组合；读出时同一位置的纠正）；`KeyMarksScreenshotTest`（全键盘、九键、大千每个位置的截图，全键盘紧凑）；`KeyShortcutsPageScreenshotTest.theMarksWhereTheirSettingsSay`（设置页每个位置）；设备上新装后看一遍，再切几个位置看。
 
 ### KB-89 [P2] 图标位置选「顶部」：键的上边中间
 - **前提**：B0-设置，上滑、下滑、两个图标位置都是默认。
@@ -439,9 +439,9 @@
 
 ### KB-67 [P1] 什么设置下键上的字、小字、快捷键图标都不叠在一起
 - **前提**：任意。
-- **操作**：上滑图标位置和下滑图标位置的每种能选的组合（6×6 去掉两项相同的，都选无可以，共 31 种），在全键盘、九键、14 键、18 键、双拼九键 / 14 / 18、英文九键、大千、注音九键、五笔两行字根、五笔键名、数字键盘、符号页上看，键盘高度标准和紧凑、悬浮、单手、横屏都看。
-- **预期**：每个键上字（或图标）、键角小字、快捷键图标两两不叠。同一类东西整个键盘一样大；碰上时：标记在自己的角里挪（不换到别的角），再字那一类整个键盘一起缩小（最多 6%），再标记那一类一起缩小（最小到 0.875）；还碰上就不画这个标记（先省默认的，后省自己设过的；各按功能键下滑的、快捷键、键角小字的次序；自己设的文字放不下先画成一个字加「…」，再不行画两条横线的图标，见 KB-72），滑动照常能打出它。默认设置下角标符号一个不省（KeyMarksEverywhereUatTest 打印 left out (0)，它只数角标符号；只差不到半个像素的不算碰上）；功能键的标记照上面的次序会省：悬浮的大千、手写、注音九键的 ⌫ 省掉下滑的「恢复」（注音九键清除、恢复两个都省），大千下滑图标在底部时还省快捷键图标（keyboard-scene `BackspaceMarksTest`）。
-- **JVM**：`KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright`、`noKeyDrawsTwoThingsOverEachOtherTurned`（上面每种键盘的每个键 × 31 种组合 × 标准 / 紧凑 / 悬浮 / 单手 / 紧凑单手 / 横屏 / 横屏紧凑，系统字号不影响，按画出来的墨迹量，两两不相交，省掉的标记打印出来）；`KeyMarksScreenshotTest.noRoomAnotherCornerOfTheKey`（紧凑单手全键盘右下、五笔左下，悬浮大千底部的图；测试名是旧规则（换到另一个角）留下的，现在图里标记只在自己的角里挪、放不下就不画，不换角）；keyboard-scene `KeyMarkYieldTest`（让的次序）。
+- **操作**：上滑图标位置和下滑图标位置的每种能选的组合（7×7 去掉两项相同的，都选无可以，共 43 种），在全键盘、九键、14 键、18 键、双拼九键 / 14 / 18、英文九键、大千、注音九键、五笔两行字根、五笔键名、数字键盘、符号页上看，键盘高度标准和紧凑、悬浮、单手、横屏都看。
+- **预期**：每个键上字（或图标）、键角小字、快捷键图标两两不叠。同一类东西整个键盘一样大；碰上时：标记在自己的角里挪（不换到别的角），再字那一类整个键盘一起缩小（最多 6%），再标记那一类一起缩小（最小到 0.875）；还碰上就不画这个标记（先省默认的，后省自己设过的；各按功能键下滑的、快捷键、键角小字的次序；自己设的文字放不下先画成一个字加「…」，再不行画两条横线的图标，见 KB-72），滑动照常能打出它。默认设置下角标符号一个不省（KeyMarksEverywhereUatTest 打印 left out (0)，它只数角标符号；只差不到半个像素的不算碰上）；功能键的标记照上面的次序会省：悬浮的大千、注音九键的 ⌫ 省掉下滑的「恢复」（注音九键清除、恢复两个都省），大千下滑图标在底部时还省快捷键图标（keyboard-scene `BackspaceMarksTest`）。
+- **JVM**：`KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright`、`noKeyDrawsTwoThingsOverEachOtherTurned`（上面每种键盘的每个键 × 43 种组合 × 标准 / 紧凑 / 悬浮 / 单手 / 紧凑单手 / 横屏 / 横屏紧凑，系统字号不影响，按画出来的墨迹量，两两不相交，省掉的标记打印出来）；`KeyMarksScreenshotTest.noRoomAnotherCornerOfTheKey`（紧凑单手全键盘右下、五笔左下，悬浮大千底部的图；测试名是旧规则（换到另一个角）留下的，现在图里标记只在自己的角里挪、放不下就不画，不换角）；keyboard-scene `KeyMarkYieldTest`（让的次序）。
 
 ### KB-68 [P2] 拼音键字母大小写三档
 - **前提**：拼音（全键盘）、英文都已启用。
@@ -628,7 +628,7 @@
 - **前提**：KB-94 的 w，或长按列表里勾了 **使用变量** 的 `${minute}`。
 - **操作**：打开键盘，等到下一分钟，不收起键盘长按选它（或滑 w）。
 - **预期**：打出的是选的那一刻的分钟；键角在下一次画键盘时更新（再长按、换一下键盘都会更新）。
-- **JVM**：ime-core `KeyResolverMarksTest.outputFillsInAgainAsPicked`（选的时候按那一刻再填一次）、`KeyResolverMarksTest.aNewMinuteIsMadeAnewTheSameOneKept`（新的一分钟重做、同一分钟不重做）；设备上等一分钟手工看。
+- **JVM**：ime-core `KeyResolverMarksTest.outputFillsInAgainAsPicked`（选的时候按那一刻再填一次）、`KeyResolverMarksTest.aNewMinuteIsMadeAnewTheSameOneKept`（新的一分钟重做、同一分钟不重做）；app `TextVariablesUatTest.rowsCountedInANewMinuteLeaveTheCatchUpToDrawIt`（过了一分钟时先量键盘行高，键角照样按新的一分钟重画）；设备上等一分钟手工看。
 
 ### KB-97 [P2] 长按首选设到带变量的项：上滑打出填好的值
 - **前提**：q 的长按列表里有勾了 **使用变量** 的 `$month月$day日`，设为首选；**上下滑** 开着。

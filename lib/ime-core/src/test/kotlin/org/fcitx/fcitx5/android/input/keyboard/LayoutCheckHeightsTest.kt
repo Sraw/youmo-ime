@@ -20,7 +20,7 @@ class LayoutCheckHeightsTest {
             for (s in LayoutCheck.SCREENS) {
                 val landscape = ScreenShape.landscape(s.turned, s.widthDp)
                 val large = minOf(s.widthDp, s.tallDp) >= KeyboardHeightLevels.LARGE_SHORT_SIDE_DP
-                assertEquals("$s $level", sizes.heightPx(s.tallDp, landscape, 1f, large), LayoutCheck.keysDp(s, level == KeyboardHeightLevels.ALL[0]))
+                assertEquals("$s $level", sizes.heightPx(s.tallDp, landscape, 1f, large), LayoutCheck.keysDp(s, level == KeyboardHeightLevels.ALL[KeyboardHeightLevels.COMPACT]))
                 assertEquals("$s", large, s.large)
             }
         }

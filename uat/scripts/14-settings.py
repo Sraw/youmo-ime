@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, in_picker, pinyin_keyboard, script)
+from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, in_picker, pinyin_keyboard, script, to_downloads)
 
 
 def kb_box(d, s=None):
@@ -522,7 +522,7 @@ case("ST-36", needs="jvm:SettingsMenuUatTest.followingTheSystemAThemeTappedTakes
 
 
 case("ST-10", needs="jvm:SettingsEffectUatTest.keyboardHeightFollowsTheSetting、KeyboardSizesTest.turnedTheRowIsTheSameOnEveryScreenOfAKind")(lambda d: None)
-case("ST-141", needs="jvm:KeyboardAreaTest.theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut")(lambda d: None)
+case("ST-141", needs="manual:横屏的主题预览和键盘比高度（常见手机和折叠屏、三键和手势导航）；预览用的可用高度由 KeyboardAreaTest.theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut 查")(lambda d: None)
 
 
 case("ST-11", needs="jvm:SettingsEffectUatTest.sideAndBottomMarginsNarrowAndLiftTheKeys")(lambda d: None)
@@ -1798,8 +1798,8 @@ case("ST-128", needs="jvm:BarIconsThemeTest.aThemesBarIconsAreDrawnTheOnesItDoes
 
 case("ST-129", needs="jvm:BarIconsThemeTest.aThemesUndoIsTheToolbarsAndTheShortcutsAlike")(lambda d: None)
 
-case("ST-130", needs="jvm:BarIconsThemeTest.aThemeOfOneMenuStateDrawsThatOneTheOtherTheAppsTurnedNeitherTurned、"
-               "BarIconsThemeTest.noMenuIconOfTheThemesTurnsTheAppsAsEver、BarIconsThemeTest.hideKeyboardsImagesAreEachPlacesOwnTillAThemeWritesIt")(lambda d: None)
+case("ST-130", needs="jvm:BarIconsThemeTest.menuIconsNoneDrawnTurnTheAppsAsEver、BarIconsThemeTest.aThemeOfOneMenuStateDrawsThatOneTheOtherTheAppsTurnedNeitherTurned、"
+               "BarIconsThemeTest.hideKeyboardsImagesAreEachPlacesOwnTillAThemeWritesIt")(lambda d: None)
 
 case("ST-131", needs="manual:主题制作网页；在电脑浏览器上手工看候选栏预览（分组由 panels-smoke.mjs 查）")(lambda d: None)
 
@@ -2015,15 +2015,16 @@ def st175(d):
 
 
 case("ST-176", needs="jvm:ThemeLayoutsToListTest.bothSlotsPacksOfOneBoardTheShownOnesChosenTheOthersToldOf")(lambda d: None)
+case("ST-193", needs="jvm:RenamedKeysTest.aLongPressTurnedOffIsCopiedOff、RenamedKeysTest.swipesAreCopiedEachWayApart、ThemeLayoutsToListTest.theSettingsOfARenamedKeyAreCopiedUnderItsNewName")(lambda d: None)
 
-case("ST-156", needs="jvm:SettingsMenuUatTest.searchingAChoiceOpensItsSetting")(lambda d: None)
+case("ST-156", needs="jvm:SettingsMenuUatTest.searchingAChoiceOpensItsSetting、SettingsIndexTest.strokeFilterFindsFourInEachLanguage")(lambda d: None)
 
 case("ST-151", needs="jvm:PopupOverridesFragmentTest$Cards.theKeyboardsAreEightCardsToPickNotARowToSwipe、SettingsCardsLayoutTest.smallPhonesWindow")(lambda d: None)
 
 case("ST-152", needs="jvm:PopupOverridesFragmentTest$Cards.aKeyboardsCardSaysHowManyOfItsKeysAreChanged、PopupOverridesFragmentTest$Cards.theFunctionKeysAreTwelveCellsFourAcross、"
                "PopupOverridesFragmentTest$Cards.undoIsTheTitleBarsAndResetAllInItsMenu")(lambda d: None)
 
-case("ST-153", needs="jvm:PopupOverridesFragmentTest$Cards.theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet、SettingsCardsLayoutTest.smallPhonesWindow、FoldCardTest.a card folded over its focused field lets the focus and the keyboard go")(lambda d: None)
+case("ST-153", needs="jvm:PopupOverridesFragmentTest$Cards.theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet、PopupOverridesFragmentTest$Row.aGroupOfNoFirstIsSaidToHaveNone、SettingsCardsLayoutTest.smallPhonesWindow、FoldCardTest.a card folded over its focused field lets the focus and the keyboard go")(lambda d: None)
 
 case("ST-154", needs="jvm:PopupOverridesFragmentTest$Cards.theEditorsCardsOpenOneAtATimeEachSayingWhatIsSet、PopupOverridesFragmentTest$Cards.nothingMovesAsAnItemIsSelectedOrATextChosen")(lambda d: None)
 
@@ -2033,7 +2034,7 @@ case("ST-157", needs="jvm:SettingsMenuUatTest.searchingAKeyCommandOpensTheKeysPa
 
 case("ST-158", needs="jvm:SettingsMenuUatTest.searchingBySynonym")(lambda d: None)
 
-case("ST-159", needs="jvm:SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese、SettingsMenuUatTest.strokeFilterFindsTheSameFourInEnglish")(lambda d: None)
+case("ST-159", needs="jvm:SettingsMenuUatTest.strokeFilterFindsTheSameFourInTraditionalChinese、SettingsMenuUatTest.strokeFilterFindsTheSameFourInEnglish、SettingsIndexTest.strokeFilterFindsFourInEachLanguage")(lambda d: None)
 
 
 def settings_search(d, code, word=None):
@@ -2118,6 +2119,9 @@ def st169(d):
     return "外观的主题页，Pixel 看得见"
 
 
+case("ST-194", needs="jvm:SettingsIndexTest.theTablesKeyboardIsFoundWhileALayoutOfTheUsersHasItsKeys")(lambda d: None)
+
+
 # ---------------------------------------------------------------- 外观 → 布局 (061-custom-layout §4)
 
 
@@ -2177,9 +2181,7 @@ def import_layout(d, name):
         n = file(s)
     # opened on DocumentsUI's 最近用过, 下载 not on screen: the drawer's ☰, as 15-privacy-backup has it
     if not n and titled(s, "最近用过", "近期的文件", "最近", "Recent"):
-        menu = next((k for k in picker(s) if k.desc in ("显示根目录", "Show roots")), None)
-        d.tap(menu.c if menu else (77, 148), 1.0)
-        d.tap_text("下载", scroll=False, after=2.0)
+        to_downloads(d, s)
         s = d.screen()
         n = file(s)
     if not n:
@@ -2444,6 +2446,12 @@ def st164(d):
     check(d.wait_text("（读不出，暂用 全键盘）", timeout=5, contains=True), f"拼音的「键盘」没说读不出：{d.screen().texts()[:16]}")
     d.shot("app", "布局文件不见：键盘一项写「读不出，暂用 全键盘」")
     return "文件不见后拼音画全键盘（a 打 a），设置写「uat-qwerty（读不出，暂用 全键盘）」，选择不改"
+
+
+case("ST-191", needs="jvm:InputMethodSettingsScreenTest.aLayoutThatReadsButIsNotOfThisInputMethodIsSaidSo")(lambda d: None)
+case("ST-192", needs="jvm:CustomKeyboardTest.oneBasedOnABoardOfAnotherFamilyFallsBackToItsOwnFamilys、"
+                     "LayoutListFragmentTest.aCardBasedOnAnotherFamilysBoardIsPreviewedAsTheKeyboardDrawsIt、"
+                     "LayoutCheckTest.aGroupedLayoutOnTheTwentySixKeysIsHeldToTheEighteenButToldOfItsOwnBase")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 数字键盘、符号面板用自己的布局 (061-custom-layout §7, §8, L5)
@@ -2810,7 +2818,7 @@ case("ST-187", needs="jvm:SwipeFatesTest.aLayoutOfTheUsersIsNamedByItsName")(lam
 @case("ST-188", base="B0-设置", mutates=True)
 def st188(d):
     told = import_uat_names(d)
-    warn = "第 14 行：g18/we 是18 键的键，这里写的长按、角标、滑动不起作用"
+    warn = "第 14 行：g18/we 是 18 键的键，这里写的长按、角标、滑动不起作用"
     check(any(warn in t for t in told), f"确认框没提醒 WE 写的不起作用：{told[:12]}")
     check(any("哈" in t and "直接打出" in t for t in told) or any(t == "哈" for t in told), f"确认框没列出直接打出的「哈」：{told[:12]}")
     d.open_page("text")
@@ -2824,3 +2832,11 @@ def st188(d):
     d.clear()
     check("我们" not in text, f"WE 下滑打出了布局里写的「我们」：{text!r}")
     return f"确认框提醒「{warn}」；WE 下滑没打出我们（{text!r}）"
+
+
+case("ST-189", needs="manual:键盘布局网页新建、合并、保存，再导入 App 打字：电脑浏览器加设备，手工跑；"
+     "网页一侧 web/theme-maker 的 layout-maker.test.mjs、layout-smoke.mjs 查")(lambda d: None)
+
+
+case("ST-190", needs="manual:键盘布局网页的保存检查、草稿找回、打开 .theme，主题制作网页打开 .layout：电脑浏览器上手工跑；"
+     "web/theme-maker 的 layout-maker.test.mjs、layout-smoke.mjs、maker.test.mjs、panels-smoke.mjs 查")(lambda d: None)

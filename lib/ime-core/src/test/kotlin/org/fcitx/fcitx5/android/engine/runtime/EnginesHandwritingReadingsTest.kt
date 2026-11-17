@@ -20,7 +20,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Handwriting's characters with all their readings, and the card of one looked up (UAT HW-27, HW-28, HW-29). */
+/** Handwriting's characters with all their readings, and the card of one looked up (UAT HW-27, HW-29, HW-40, HW-51, PY-131). */
 class EnginesHandwritingReadingsTest : EnginesFixture() {
 
     init {

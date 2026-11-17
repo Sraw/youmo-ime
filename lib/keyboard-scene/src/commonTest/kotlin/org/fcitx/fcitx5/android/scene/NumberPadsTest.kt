@@ -33,25 +33,24 @@ class NumberPadsTest {
     // a key's right edge as placed, the last key's a sum of widths
     private val eps = 1e-6
 
+    // every pad, each with what it is: the rows of the tests below, each in every form
+    private val pads = listOf(
+        "full" to "the 123 key's pad, whose / it had there moves below the space",
+        "phone" to "a dialler's, whose - moves below the space",
+        "digits" to "a PIN's, blank there before",
+        "signed" to "a signed number's",
+        "decimal" to "a decimal's",
+        "signed-decimal" to "a signed decimal's",
+        "datetime" to "a date's or time's",
+    ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } }
+
+    // what ⌫'s place on the nine keys' frame (everyPadSitsOnTheNineKeysFrame pins it there, in the row of 1 2 3) leaves
+    // to say: nothing right of it, the space still right of 6, and the key it had there now right of 9
     @Test
-    fun backspaceIsTopRightOnEveryPadAsOnTheNineKeys() = assertRows(
-        listOf(
-            "full" to "the 123 key's pad, whose / it had there moves below the space",
-            "phone" to "a dialler's, whose - moves below the space",
-            "digits" to "a PIN's, blank there before",
-            "signed" to "a signed number's",
-            "decimal" to "a decimal's",
-            "signed-decimal" to "a signed decimal's",
-            "datetime" to "a date's or time's",
-        ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
-        { (pad, form, why) -> "$pad $form: $why" },
-    ) { (pad, form, _) ->
+    fun backspaceIsTopRightOnEveryPadAsOnTheNineKeys() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
         val s = scene(pad, form)
         val back = key(s, "backspace").bounds
-        assertEquals(key(s, "3").bounds.top, back.top, "in the row of 1 2 3")
         assertEquals(s.keys.maxOf { it.bounds.right }, back.right, eps, "rightmost")
-        val nine = Forms.scene("nine", Forms.env("nine", Forms.all.getValue(form)))
-        assertEquals(nine.keys.minOf { it.bounds.top }, key(nine, "backspace").bounds.top, "the nine keys' ⌫ the same: top row")
         assertEquals(key(s, "space").bounds.top, key(s, "4").bounds.top, "the space stays right of 6")
         corners[pad]?.let { id ->
             val nine = key(s, "9").bounds
@@ -60,19 +59,23 @@ class NumberPadsTest {
         }
     }
 
+    // the frame the pads are held to: the nine keys' ⌫ in the top row, the row of 1 2 3, in each form
+    @Test
+    fun theNineKeysBackspaceIsInTheTopRow() = assertRows(
+        Forms.all.keys.toList().map { it to "in the $it form" },
+        { (form, why) -> "$form: $why" },
+    ) { (form, _) ->
+        val nine = Forms.scene("nine", Forms.env("nine", Forms.all.getValue(form)))
+        val back = key(nine, "backspace").bounds
+        assertEquals(nine.keys.minOf { it.bounds.top }, back.top, "the top row")
+        assertEquals(key(nine, "3").bounds.top, back.top, "the row of 1 2 3")
+    }
+
     // each pad on the nine keys' frame, in each form: a key the nine keys have a match for sits exactly on it, so going
     // 123 and back from the nine keys moves none of them
     @Test
     fun everyPadSitsOnTheNineKeysFrame() = assertRows(
-        listOf(
-            "full" to "the 123 key's pad",
-            "phone" to "a dialler's",
-            "digits" to "a PIN's",
-            "signed" to "a signed number's",
-            "decimal" to "a decimal's",
-            "signed-decimal" to "a signed decimal's",
-            "datetime" to "a date's or time's",
-        ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
+        pads,
         { (pad, form, why) -> "$pad $form: $why" },
     ) { (pad, form, _) ->
         val s = scene(pad, form)
@@ -151,11 +154,13 @@ class NumberPadsTest {
     @Test
     fun aBlankPlaceDrawsNothingAndTakesNoTouch() = assertRows(
         listOf(
-            "digits" to "a PIN's: the column left of the digits, right of 9 and three of the bottom row blank",
-            "signed" to "left column, right of 9, two of the bottom row",
-            "decimal" to "left column, right of 9, two of the bottom row",
-            "signed-decimal" to "left column, right of 9, one of the bottom row",
-            "datetime" to "right of 9 and two of the bottom row",
+            // each has other blanks (a PIN's the column left of the digits and three of the bottom row): the place right
+            // of 9, which every one of them leaves blank, is the one probed
+            "digits" to "a PIN's",
+            "signed" to "a signed number's",
+            "decimal" to "a decimal's",
+            "signed-decimal" to "a signed decimal's",
+            "datetime" to "a date's or time's",
         ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
         { (pad, form, why) -> "$pad $form: $why" },
     ) { (pad, form, _) ->

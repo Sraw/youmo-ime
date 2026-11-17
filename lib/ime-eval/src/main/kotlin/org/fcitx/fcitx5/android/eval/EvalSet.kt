@@ -44,9 +44,13 @@ object EvalSet {
     }
 
     /** [s] as a line [parse] reads, its touches and places too. */
-    fun line(s: Sample): String = listOf(s.input, s.expected, s.tag, s.context).joinToString("\t") +
-        (s.touches ?: s.taps?.map { null })?.joinToString(" ", "\t") { it?.text() ?: NO_TOUCH }.orEmpty() +
-        s.taps?.joinToString(" ", "\t") { if (it.isNaN()) NO_TOUCH else it.toString() }.orEmpty()
+    fun line(s: Sample): String {
+        val after = (s.touches ?: s.taps?.map { null })?.joinToString(" ", "\t") { it?.text() ?: NO_TOUCH }.orEmpty() +
+            s.taps?.joinToString(" ", "\t") { if (it.isNaN()) NO_TOUCH else it.toString() }.orEmpty()
+        // an empty context with nothing after it is no field: [parse] reads an empty one only before the touches (review F8206)
+        val context = if (s.context.isEmpty() && after.isEmpty()) emptyList() else listOf(s.context)
+        return (listOf(s.input, s.expected, s.tag) + context).joinToString("\t") + after
+    }
 
     private const val NO_TOUCH = "-"
     private const val CONTEXT = 3

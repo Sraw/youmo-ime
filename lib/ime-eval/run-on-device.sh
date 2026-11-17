@@ -59,6 +59,8 @@ fi
 REMOTE="/sdcard/Android/data/$PKG/files/eval/$SET-$IME.tsv"
 # a failed run must not leave the previous result behind to be pulled as this one
 adb shell rm -f "$REMOTE"
+# NINE=1 alone types the nine keys: NINE=0 is off, as INSTALL=0 is (review F8208)
+[ "${NINE:-0}" = 1 ] || NINE=
 # am instrument exits 0 even when the run fails; its report is what tells
 REPORT=$(adb shell am instrument -w -e class org.fcitx.fcitx5.android.EngineEvalRunner \
     -e evalSet "$SET" -e evalIme "$IME" ${NINE:+-e evalNine true} ${GROUPED:+-e evalGrouped "$GROUPED"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")

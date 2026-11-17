@@ -233,5 +233,4 @@ class SettingsCardsLayoutTest : RarePageUat() {
 
     private fun View.dp(v: Int) = context.dp(v)
 
-    private fun s(id: Int) = st.s(id)
 }

@@ -249,7 +249,7 @@ class KeyResolver(
 
     private fun mark(slot: SwipeSlot, first: MarkContent): MarkContent = when (slot) {
         SwipeSlot.First -> first
-        else -> SceneMarks.content(slot.shortcut, clock.calendar()) ?: MarkContent.Empty
+        else -> SceneMarks.content(slot.shortcut, clock::calendar) ?: MarkContent.Empty
     }
 
     // a character key (any but fn/'s, as the scene has it: Content) of `mark="false"` (注音's) draws and says no first of its

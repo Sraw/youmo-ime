@@ -400,6 +400,8 @@ abstract class BaseInputView(
                 setOnDismissListener {
                     candidateActionMenuClosed = SystemClock.uptimeMillis()
                     if (candidateActionMenu === menu) candidateActionMenu = null
+                    // the closed menu's views not held on to (till the input view is replaced) for a test to read
+                    cardFocused = null
                 }
                 // not the platform's drop-down animation: grown out of the candidate pressed (Motion)
                 animationStyle = 0

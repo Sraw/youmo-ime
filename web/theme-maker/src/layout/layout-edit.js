@@ -218,11 +218,18 @@
       if (inc.a.when) {
         const own = attrs(r).when;
         const tag = /^<row\b(?:[^>"']|"[^"]*"|'[^']*')*>/.exec(text)[0];
-        text = LM.withAttr(tag, 'when', own ? inc.a.when + ' ' + own : inc.a.when) + text.slice(tag.length);
+        text = LM.withAttr(tag, 'when', own ? bothWhen(inc.a.when, own) : inc.a.when) + text.slice(tag.length);
       }
       return text;
     });
     return put(xml, inc.start, inc.end, rows.join('\n' + ind));
+  }
+
+  // the include's when= and its row's, both to hold (PackLayouts.both): each of one's `, ` groups with each of the
+  // other's, as `a, b` and `c` joined by a space would read `a, (b c)`
+  function bothWhen(a, b) {
+    const groups = (w) => w.split(', ');
+    return groups(a).flatMap((x) => groups(b).map((y) => x + ' ' + y)).join(', ');
   }
 
   // a fragment's row (the app's files come without their indents) laid out as LayoutWriter does, the row at [ind]
@@ -469,7 +476,8 @@
   /** A label as the panel edits it: `{type: none|text|case|punct|other, arg}` (other: a binding said as written). */
   function labelParts(raw) {
     if (raw == null || raw === '') return { type: 'none', arg: '' };
-    const m = /^\{(case|punct):(.+)\}$/.exec(raw);
+    // one binding alone; a label of two ({punct:,}{punct:.}) is written as it is, never one binding of `,}{punct:.`
+    const m = /^\{(case|punct):([^{}]+)\}$/.exec(raw);
     if (m) return { type: m[1], arg: m[2] };
     return { type: /[{}]/.test(raw) ? 'other' : 'text', arg: raw };
   }

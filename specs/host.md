@@ -340,7 +340,8 @@ backup read as they are, and v0.3.x reads what the host writes.
   failed `mkdirs`) is told as `config_not_settled`; data not settled, a punctuation table, the custom
   phrases, the quick phrases or a theme that does not read, as `user_data_unreadable`
   (`EngineNotices.failedOnce`: once a process). An unreadable punctuation table gives the built-in one
-  and is never saved over (`PunctuationMaps.save` throws); unreadable custom phrases are not saved.
+  and is never saved over (since 0.6.1 the app has no write path for punctuation tables at all); unreadable custom
+  phrases are not saved.
 - `PunctuationTable` / app `PunctuationMaps`: `punc.mb.<lang>` as `ca/punctuation/punctuation.cpp:75-173`
   reads and writes it; the user's file replaces the built-in table whole. Since 0.6.1 no page writes one
   and an edited one is deleted at the upgrade and after a restore (architecture.md, fcitx data).
@@ -376,8 +377,8 @@ the gettext translations are gone, the host's own texts are app resources (`AppH
 - **Settings pages.** `imOptions(im)` is the page's options by path (`Fuzzy/L_N`) to value, the
   leaves of `EngineOptions.page`, null for an input method with no page. `setImOptions` takes those
   a page shows (`InputMethodSettings.only`) into `EngineOptions.setPage`, a partial load that keeps
-  the rest. `punctuationMap(lang)`/`setPunctuationMap` are zh_CN's map as entries, another
-  language's empty.
+  the rest. `punctuationMap(lang)` is zh_CN's map as entries, another language's empty; the map is
+  read-only (0.6.1 dropped the punctuation page, and with it `setPunctuationMap`).
 - **Reloading config.** `reloadConfig` reads the module files again. It calls
   `Chttrans.reload(enabled)` (chttrans.cpp:218), then sends the status area out again.
 - **Focus out.** Pinyin's typing is dropped when the field loses focus, as on the native host:

@@ -78,6 +78,7 @@ class KeyboardStylesTest {
     }
 
     @Test
+    @Uat("LS-42")
     @Config(qualifiers = "w640dp-h360dp-land")
     fun theKeyboardsToggleWritesItsShapeOnlyBothKeys() {
         TestStyles.clear()
@@ -97,6 +98,7 @@ class KeyboardStylesTest {
 
     // the view taken out after a turn docks the shape it was made on, not the one there is now
     @Test
+    @Uat("LS-45")
     @Config(qualifiers = "w393dp-h851dp-port")
     fun aViewMadeOnTheOtherShapeWritesThatOne() {
         TestStyles.set(KeyboardStyle.FLOATING, landscape = true)

@@ -32,7 +32,7 @@ object BlankKeys {
     /** A board, [id] the app's file's it is drawn as (`emoticon`, whose `<keyboard id>` is `emoji`), [base] a layout of the user's `based-on` ([Env.base]). */
     class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap(), val id: String = layout.id, val base: String? = null)
 
-    /** A key left blank: on [board], its id [key], in [scenes], in [states]. */
+    /** A key left blank: on [board] (its [Board.id]), its id [key], in [scenes], in [states]. */
     data class Blank(val board: String, val key: String, val scenes: Set<String>, val states: Set<KeyState>) {
         override fun toString() = if (board == "*") "too many scenes together to check" else "$board/$key" + scenes.sorted().joinToString("") { " @$it" } + states.joinToString("") { ":" + it.xml }
     }
@@ -43,8 +43,11 @@ object BlankKeys {
     /** Said in place of the blanks when a theme's key styles name too many scenes or states together to try them all. */
     val TOO_MANY = Blank("*", "*", emptySet(), emptySet())
 
-    /** Bumped when what is found changes: a pack checked under another rule is checked again (the app's stamp). */
-    const val RULE = 3
+    /**
+     * Bumped when what is found changes: a pack checked under another rule is checked again (the app's stamp).
+     * 4: boards told apart by [Board.id], the emoji board's keys checked too (R26 F8415, F8421).
+     */
+    const val RULE = 4
 
     // the scene sets tried at most; a theme past it is refused (TOO_MANY), never let through half asked
     private const val MAX_SCENE_SETS = 512
@@ -78,18 +81,19 @@ object BlankKeys {
         // the scenes as each board is drawn in them: its own @keyboard= always on, so a set of none and the set of
         // its own are the same scene there, asked once
         val asked = HashSet<Pair<String, Set<String>>>()
-        // the keys expanded once a board and form, not once a scene (only its form changes what is expanded)
-        val expanded = HashMap<List<Any>, List<ExpandedKey>>()
+        // the keys expanded once a board and form, not once a scene (only its form changes what is expanded); by the
+        // board's [Board.id], as what is asked: emoticon.xml's <keyboard id> is emoji's (R26 F8415)
+        val expanded = HashMap<String, HashMap<List<Any>, List<ExpandedKey>>>()
         for (scenes in sceneSets) {
             val named = scenes.firstOrNull { it.startsWith(KEYBOARD) }?.removePrefix(KEYBOARD)
             val rest = scenes.filterTo(HashSet()) { !it.startsWith(KEYBOARD) }
             for (b in boards) {
                 // a board this scene set names not, or its scenes asked already
                 val other = named != null && named != b.layout.id && named != b.base
-                if (other || !asked.add(b.layout.id to rest)) continue
+                if (other || !asked.add(b.id to rest)) continue
                 val builder = SceneBuilder(theme, env(rest, b.layout.id, b.base), FixedMeasurer, cascades = cascades)
-                for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES, stateSets, expanded)) {
-                    out += Blank(b.layout.id, key.key.id, scenes, states)
+                for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES, stateSets, expanded.getOrPut(b.id) { HashMap() })) {
+                    out += Blank(b.id, key.key.id, scenes, states)
                     if (out.size >= limit) return out
                 }
             }

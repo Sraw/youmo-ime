@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.editing
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -159,17 +160,17 @@ class AutoPairsTest {
     @Uat("PAN-30")
     fun theSymbolPanelsBracketsPairEach() {
         val added = listOf("〖〗", "〘〙", "❨❩", "❲❳", "❴❵", "⟨⟩", "❛❜", "❝❞", "«»", "‹›")
-        for (pair in added) {
+        assertRows(added, { "$it pairs, its close steps over, Backspace takes both" }) { pair ->
             val (open, close) = pair[0].toString() to pair[1].toString()
             val t = Typing("")
             t.type(open)
-            assertEquals(pair, "$open|$close", t.shown)
+            assertEquals("$open|$close", t.shown)
             t.type("书" + close)
-            assertEquals(pair, "${open}书$close|", t.shown)
+            assertEquals("${open}书$close|", t.shown)
             val b = Typing("")
             b.type(open)
             b.backspace()
-            assertEquals(pair, "|", b.shown)
+            assertEquals("|", b.shown)
         }
     }
 

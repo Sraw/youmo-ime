@@ -241,7 +241,8 @@ class SceneBuilder(
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
 
-    // the handwriting pad: its face, the grid over it the theme shows, the ink its strokes are drawn in (060-render-p3 T7b)
+    // the handwriting pad: its face, the grid over it the theme shows, the ink its strokes are drawn in (060-render-p3 T7b);
+    // no board of the app's has one since its keyboard went (Pads.KIND), a user's or a pack's layout may
     private fun pad(board: String, s: Slot, cell: Box, face: List<Op>): SlotNode {
         val target = Selector.Target("key", board, s.id, null, setOfNotNull(s.look) + s.classes, emptySet(), slot = true, base = env.base)
         // the grid and the ink are the scene's, flat or not; only the face keeps 3.0's

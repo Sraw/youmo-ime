@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.MotionEvent
+import android.view.View
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -12,21 +13,29 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
+import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.junit.After
@@ -77,7 +86,7 @@ class CustomKeyboardTest {
 
     @After
     fun asItWas() {
-        CustomKeyboards.dir = dirWas
+        forgetTheTestsLayouts(dirWas)
         EngineState.shuangpinScheme = schemeWas
         SceneBoard.forgetScenes()
         prefs.pinyinKeyboard.setValue(prefs.pinyinKeyboard.defaultValue)
@@ -187,19 +196,44 @@ class CustomKeyboardTest {
     }
 
     // grouped keys based on the full keyboard (let in): where the engine refuses it here, or it is refused as read, grouped
-    // keys are drawn in its place, its own family's base, never the full keyboard with dead group keys (L3 review S2)
+    // keys are drawn in its place, its own family's base, never the full keyboard with dead group keys (L3 review S2).
+    // Its theme styles, marks and keys' data are of the board it is based on, as the web's maker draws it (R26 F8117:
+    // they were k18's here, qwerty's there); but the defaults of the keys' shape its own family's, the 18 keys' (R26 F8437)
     @Test
+    @Uat("ST-192")
     fun oneBasedOnABoardOfAnotherFamilyFallsBackToItsOwnFamilys() {
         val mine = own("my-k18", base = "k18") { it.replace("based-on=\"k18\"", "based-on=\"qwerty\"") }!!
         assertTrue(mine.drawn)
         assertEquals("k18", mine.basedOn)
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.baseOf(mine))
         val drawn = SceneLayouts.custom(context, mine.id, mine.stamp)!!
-        assertEquals("k18", drawn.base)
-        assertEquals("grouped", SceneLayouts.builtIn(context, drawn.base)!!.layout.family)
+        assertEquals("styles and marks of, styles of, drawn in its place", listOf("qwerty", "qwerty", "k18"), listOf(drawn.base, drawn.stylesOf, drawn.fallback))
+        // 18 keys typed (its family's KEYS18), the 18 keys' corners and L's `:`: the 11th group's corner 18 keys' `(`, not 14's
+        // `~`, on the keyboard and in the settings' editor alike
+        assertEquals(KeyboardVariant.Form.Grouped18, KeyboardVariants.of(drawn.layout, "", ShuangpinScheme.ZIRANMA, shape = drawn.fallback).form)
+        val h = KeyId.of("g18/h")
+        assertEquals("(", SceneBoard.resolver(drawn, InputMethodCatalog.PINYIN).defaultOf(h)?.first?.text)
+        assertEquals("(", KeyCaps.resolver(context, mine.id)!!.defaultOf(h)?.first?.text)
+        assertEquals("grouped", SceneLayouts.builtIn(context, drawn.fallback)!!.layout.family)
         // the file replaced (by one of another family) since a keyboard was made: not drawn by a stamp it no longer has
         File(dir, "my-k18.xml").writeText(BuiltInLayouts(context).text("qwerty")!!.replaceFirst("id=\"qwerty\"", "id=\"my-k18\""))
         assertNull(SceneLayouts.custom(context, mine.id, mine.stamp + "x"))
+    }
+
+    // a settings cap of a key of the user's layout (按键字符和快捷键) is the keyboard's key: a theme's styles of the board it is
+    // based on are its too (061-custom-layout §10), as SceneBoard has them; R26 F8127: the cap took only its own id's
+    @Test
+    fun aCapOfTheUsersLayoutTakesTheStylesOfItsBaseAsTheKeyboardDoes() {
+        phoneStorage()
+        val pack = materialPack("based", "<style select=\"qwerty/q\" fill=\"#ff0000\"/>")
+        val mine = own("my-qwerty")!!
+        fun red(layout: String): Boolean {
+            val cell = SceneKeyCell(context, pack).apply { board = KeyCaps.board(context, "full/q", layout) }
+            cell.measure(View.MeasureSpec.makeMeasureSpec(CAP, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(CAP, View.MeasureSpec.EXACTLY))
+            cell.layout(0, 0, CAP, CAP)
+            return cell.keyNode!!.ops(false).filterIsInstance<Op.Fill>().any { it.color.value == 0xFFFF0000.toInt() }
+        }
+        assertEquals("the app's qwerty, the user's on it", listOf(true, true), listOf(red("qwerty"), red(mine.id)))
     }
 
     // a nine keys' layout of the user's reads the nine keys' settings: their section shown on its page (§5.4, L3 review S4)
@@ -286,5 +320,10 @@ class CustomKeyboardTest {
             assertEquals(mark, at[1] + node.head.bottom.roundToInt(), bubble.bottom)
             assertEquals(mark, at[1] + node.head.top.roundToInt(), bubble.top)
         }
+    }
+
+    private companion object {
+        // a settings cap's side, px
+        const val CAP = 120
     }
 }

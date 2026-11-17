@@ -222,7 +222,7 @@ def import_grouped(d, name, title):
 @case("PY-153", mutates=True, visual=True)
 def py153(d):
     told = import_grouped(d, "uat-k17-1.0", "UAT 17 键")
-    held = [t for t in told if "是18 键的键" in t]
+    held = [t for t in told if "是 18 键的键" in t]
     check(not held, f"确认框提醒了 App 的键：{held}")
     check(d.wait_text("现在就用在 拼音 上吗？", timeout=6, where="all"), f"没只问拼音：{d.screen().texts('all')[:10]}")
     d.tap_text("用", where="all", scroll=False, after=2.0)
@@ -255,6 +255,10 @@ case("PY-154", needs="jvm:NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrde
 
 
 case("PY-155", needs="jvm:OwnKeysTurnTest.otherGroupsWaitForTheirFirstCodeAndCommitThen、OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey、KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode、KotlinHostOwnKeysTest.aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped")(lambda d: None)
+
+
+case("PY-156", needs="manual:导入 uat-k17-tall-1.0.layout 用在拼音上，FG、BN 点在靠 HJK 的边上和正中各打一次 a 看候选；"
+                     "NeighbourSlipTest.theKeysAroundAKeyAreThoseBesideItAndThoseAboveAndBelowOverlappingIt 只查几何")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 14 键 (B0-14键)
@@ -709,7 +713,25 @@ def py124(d):
 # ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
 
 
-case("PY-137", needs="jvm:NeighbourSlipTest.fullPinyinReadsAKeyAsTheOneItWasTappedTowards、NeighbourSlipTest.aLegalSlipIsReadOnlyNearTheKeyMeant、PinyinSessionSlipTest.aWordReadThroughASlipIsLearnedUnderTheKeyMeant、NeighbourTouchTest.theHostHandsTheTouchToTheEngineWithTheKey")(lambda d: None)
+@case("PY-137")
+def py137(d):
+    # the same nihso twice, only where s is tapped differing: at a fifth of its width, toward a (hso spells nothing),
+    # read as nihao, the code row the spelling read; in the middle, no a read (全拼's floor), as typed. A place lost
+    # (read as no place) reads nihao both times, so the middle's tells it reached the engine (review R26 F8433)
+    keys_at(d, "nihso", [None, None, None, (0.2, 0.5), None])
+    slip = d.cands()
+    code = d.preedit()
+    d.shot("kb", "s 点在靠 a 的边上打 nihso：首选「你好」，编码行 ni hao")
+    d.clear()
+    keys_at(d, "nihso", [None] * 5)
+    mid = d.cands()
+    mid_code = d.preedit()
+    d.shot("kb", "nihso 每个键点在正中：编码行没有 hao（如 ni h so），首选不是「你好」")
+    d.clear()
+    check(slip[:1] == ["你好"] and code == "ni hao", f"s 靠 a 点的 nihso：首选 {slip[:4]}，编码行「{code}」")
+    # how the unread hso is split in the code row is the engine's to choose (no JVM test holds it): only no hao is checked
+    check("hao" not in mid_code and first(mid) != "你好", f"正中点的 nihso：编码行「{mid_code}」，候选 {mid[:6]}")
+    return f"靠边 {slip[:1]}「{code}」；正中 {mid[:3]}「{mid_code}」"
 
 
 case("PY-138", needs="jvm:NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)

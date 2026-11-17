@@ -329,6 +329,9 @@ class PopupOverridesFragmentTest {
                 ),
                 { it.why },
             ) { row ->
+                // one harness for all the rows, and safe so (R26 F8402): each opens the page anew, a new fragment reading
+                // the preferences just set, picks its own tab, and changes nothing (its dialog dismissed: no step to
+                // undo, nothing stored), so no row starts from what the one before left but the pages under it
                 prefs.set(drawing, row.drawn)
                 prefs.set(slotsPref, SwipeSlots.Default.with(row.slotKey, true, row.slot).serialize())
                 st.activity
@@ -1018,6 +1021,25 @@ class PopupOverridesFragmentTest {
             st.activity
             st.open(SettingsRoute.PopupOverrides)
             clickText(page)
+        }
+
+        // R26 F8323: a group with no first is summed up with none, its slots' 长按首选 naming no character: neither its
+        // long press nor that slot types the list's first
+        @Test
+        @Uat("ST-153")
+        fun aGroupOfNoFirstIsSaidToHaveNone() {
+            open(R.string.shortcut_page_zy9)
+            val key = KeyShortcutPages.ZhuyinNine.rows.flatten().filterNot(KeyShortcutPages.ZhuyinNine::elsewhere).first { k ->
+                KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(k.name))!!.let { it.defaultOf(KeyId.of(k.name))?.first == null && it.edit(KeyId.of(k.name)).items.isNotEmpty() }
+            }
+            val items = KeyCaps.resolver(st.activity, KeyCaps.defaultBoard(key.name))!!.edit(KeyId.of(key.name)).items
+            val d = dialogOf(key.label)
+            val texts = KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+            assertTrue(texts.toString(), st.s(R.string.long_press_card_summary_no_first, items.size) in texts)
+            assertTrue(texts.toString(), items.none { st.s(R.string.long_press_card_summary, it, items.size) in texts })
+            assertTrue(texts.toString(), texts.none { t -> items.any { t == st.s(R.string.swipe_way_said, st.s(R.string.slot_first), it) } })
+            d.dismiss()
+            st.idle()
         }
 
         // every item deleted, the row's too: off, as any key (060-row-unlock §1.1)

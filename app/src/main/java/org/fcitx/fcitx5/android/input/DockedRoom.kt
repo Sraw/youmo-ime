@@ -53,7 +53,8 @@ internal class DockedRoom(
         posted = true
         view.post {
             posted = false
-            if (docked()) relayout()
+            // the input view replaced meanwhile (detached, its listeners gone): nothing of it to lay out again
+            if (docked() && view.isAttachedToWindow) relayout()
         }
     }
 }

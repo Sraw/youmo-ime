@@ -23,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.nio.ByteBuffer
 
 /**
  * 生僻字屏蔽's grid as [Engines] makes it of the pack's data (design §6.2): of 扩展 B on, only what
@@ -80,6 +81,27 @@ class RareGridSourcesTest : EnginesFixture() {
             "made once: the same grid asked again" to { assertSame(grid, engines.rareGrid()) },
             "a table not to be read passed over and told" to { assertTrue(told.toString(), told.any { "cj.data" in it.message.orEmpty() }) },
         )
+    }
+
+    // review F8110: a table this build cannot read (another kind or version) threw the engine's
+    // DataFormatException past a catch of java.util.zip's, and the whole grid failed to be made
+    @Test
+    fun aTableOfAnotherKindIsPassedOverAndTold() {
+        val told = ArrayList<IOException>()
+        val loadOther = { path: String ->
+            when {
+                path.endsWith("/cj.data") -> ByteBuffer.wrap(pinyin) // a file of another kind
+                path.startsWith(TABLE_DIR) && !path.endsWith("/wbx.data") -> throw FileNotFoundException(path)
+                else -> load(path)
+            }
+        }
+        Engines(loadOther, MemoryFiles(), onError = { told += it }, warmUps = inPlace).use { engines ->
+            val grid = checkNotNull(engines.rareGrid())
+            assertRows(
+                "the tables read still give their characters" to { assertNotEquals(-1, grid.indexOf(inTable)) },
+                "the table of another kind told" to { assertTrue(told.toString(), told.any { "cj.data" in it.message.orEmpty() }) },
+            )
+        }
     }
 
     private fun Engines.pick(keys: String, text: String) {

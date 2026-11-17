@@ -80,10 +80,12 @@ object FloatingKeyboard {
      * Its size on a screen [screenWidthDp] wide, the docked keys [dockedKeysPx] high: [keptWidthDp] wide, the width the
      * user resized it to (negative: never resized, the default [widthDp]), within [bounds]; its keys as tall, and their
      * text as big, as their default's times its width over the default's. Never resized, as 0.6.0 had it to the pixel.
+     * Not a number (a backup's shared_prefs edited by hand: the app writes whole dp) is taken as never resized.
      */
     fun size(keptWidthDp: Float, screenWidthDp: Int, dockedKeysPx: Int, bounds: Bounds): Size {
         val w0 = widthDp(screenWidthDp)
-        val w = if (keptWidthDp < 0f) w0 else keptWidthDp.roundToInt().coerceIn(bounds.minDp, bounds.maxDp)
+        // NaN is not below 0 and roundToInt throws on it: R26 F8169
+        val w = if (!(keptWidthDp >= 0f)) w0 else keptWidthDp.roundToInt().coerceIn(bounds.minDp, bounds.maxDp)
         val resize = if (w == w0) 1f else w.toFloat() / w0.coerceAtLeast(1)
         val textScale = textScale(w0, screenWidthDp)
         return Size(w, (dockedKeysPx * share(w0, screenWidthDp) * resize).toInt(), textScale, resize)
@@ -91,9 +93,9 @@ object FloatingKeyboard {
 
     /**
      * Where it is kept on a screen held one way (竖屏 and 横屏 each their own, 061-floating-resize §2.6): its own [x],
-     * [y] once kept (negative: never), else [old], the one place 0.6.0 kept for both, for both.
+     * [y] once kept (negative or not a number: never), else [old], the one place 0.6.0 kept for both, for both.
      */
-    fun keptSpot(x: Float, y: Float, old: Spot): Spot = if (x < 0f || y < 0f) old else Spot(x, y)
+    fun keptSpot(x: Float, y: Float, old: Spot): Spot = if (!(x >= 0f) || !(y >= 0f)) old else Spot(x, y)
 
     /** A resize at its limits: [Min] as narrow as it goes, [Max] as wide. */
     enum class Limit { None, Min, Max }

@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Expand
 import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
 import org.fcitx.fcitx5.android.scene.engine.Input
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,27 +112,38 @@ class PackSeparatorTest {
     }
 
     @Test
-    fun theTextAroundIsKeptHoweverWritten() {
-        // single quotes and space about `=`, a line break in the tag
-        val quoted = done(withShift("<key id='shift' role='shift' width='1.5' send='caps'\n         when = '!table'/>"))
-        assertTrue("when = '!table !composing'/>\n    <key id=\"apostrophe\"" in quoted, quoted)
-        // `>` in a value, children: after its end tag
-        val children = done(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" label=\"a&gt;b\" send=\"caps\" when=\"!table\"><variant when=\"roots\" label=\">\"/></key>"))
-        assertTrue("<variant when=\"roots\" label=\">\"/></key>\n    <key id=\"apostrophe\"" in children, children)
-        // no space before `/>`
-        val tight = done(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\"/>"))
-        assertTrue("send=\"caps\" when=\"!composing, table\"/>" in tight, tight)
-        // CRLF, CR, mixed: the break of Shift's line
-        assertTrue(done(v060.replace("\n", "\r\n")).let { "\r\n    <key id=\"apostrophe\"" in it && "\n" !in it.replace("\r\n", "") })
-        assertTrue(done(v060.replace("\n", "\r")).let { "\r    <key id=\"apostrophe\"" in it && "\n" !in it })
-        val mixed = v060.replace(shift060, shift060.replace("\n", "\r\n"))
-        assertTrue("\n    <key id=\"apostrophe\"" in done(mixed))
-        // one line: a space
-        val oneLine = v060.replace(Regex("\\n\\s*"), " ")
-        val out = done(oneLine)
-        assertTrue("when=\"!table !composing\"/> <key id=\"apostrophe\"" in out, out)
-        assertFalse('\n' in out)
-    }
+    fun theTextAroundIsKeptHoweverWritten() = assertRows(
+        listOf<Pair<String, () -> Unit>>(
+            "single quotes and space about `=`, a line break in the tag" to {
+                val quoted = done(withShift("<key id='shift' role='shift' width='1.5' send='caps'\n         when = '!table'/>"))
+                assertTrue("when = '!table !composing'/>\n    <key id=\"apostrophe\"" in quoted, quoted)
+            },
+            "`>` in a value, children: after its end tag" to {
+                val children = done(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" label=\"a&gt;b\" send=\"caps\" when=\"!table\"><variant when=\"roots\" label=\">\"/></key>"))
+                assertTrue("<variant when=\"roots\" label=\">\"/></key>\n    <key id=\"apostrophe\"" in children, children)
+            },
+            "no space before `/>`" to {
+                val tight = done(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\"/>"))
+                assertTrue("send=\"caps\" when=\"!composing, table\"/>" in tight, tight)
+            },
+            "CRLF: the break of Shift's line" to {
+                assertTrue(done(v060.replace("\n", "\r\n")).let { "\r\n    <key id=\"apostrophe\"" in it && "\n" !in it.replace("\r\n", "") })
+            },
+            "CR: the break of Shift's line" to {
+                assertTrue(done(v060.replace("\n", "\r")).let { "\r    <key id=\"apostrophe\"" in it && "\n" !in it })
+            },
+            "mixed: the break of Shift's line" to {
+                val mixed = v060.replace(shift060, shift060.replace("\n", "\r\n"))
+                assertTrue("\n    <key id=\"apostrophe\"" in done(mixed))
+            },
+            "one line: a space" to {
+                val out = done(v060.replace(Regex("\\n\\s*"), " "))
+                assertTrue("when=\"!table !composing\"/> <key id=\"apostrophe\"" in out, out)
+                assertFalse('\n' in out)
+            },
+        ),
+        { it.first },
+    ) { it.second() }
 
     @Test
     fun aRowsConditionIsSeparatorsToo() {
@@ -151,57 +163,66 @@ class PackSeparatorTest {
         }
     }
 
-    // two Shifts in two rows: whether they show together is their rows' conditions too
+    // two Shifts: one 分词 each where they never show together while typed, by their rows' conditions or their own; none
+    // where both would be 分词 at once (and the other Shift types ')
     @Test
-    fun twoShiftsInRowsThatNeverShowTogetherGetOneEach() {
+    fun twoShiftsGetOneEachWhereTheyNeverShowTogether() {
         val portrait = v060.replace("<row split=\"halves\">\n    <!-- 码表时", "<row split=\"halves\" when=\"!landscape\">\n    <!-- 码表时")
         check(portrait != v060)
         fun withRow(rowWhen: String) =
             portrait.replace("</keyboard>", "  <row when=\"$rowWhen\"><key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/></row>\n</keyboard>")
-        assertEquals(2, Regex("id=\"apostrophe\"").findAll(done(withRow("landscape"))).count())
-        // both rows there in portrait unless compact: both would be 分词 at once
-        kept(withRow("!compact"), "two Shifts")
-    }
-
-    @Test
-    fun twoShiftsGetOneEachWhereTheyNeverShowTogether() {
-        val two = withShift(
-            "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table !landscape\"/>\n" +
-                "    <key id=\"shift\" role=\"shift\" width=\"2\" send=\"caps\" when=\"!table landscape\"/>",
-        )
-        val out = done(two)
-        assertEquals(2, Regex("id=\"apostrophe\"").findAll(out).count())
-        assertTrue("width=\"2\" label=\"分词\"" in out)
-        // two that show together while typed: both would be 分词 at once, and the other Shift types '
-        val both = withShift(
-            "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>\n" +
-                "    <key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>",
-        )
-        kept(both, "two Shifts")
-        // the other one never there while typed (table only): one 分词, the other left alone
-        val other = withShift(
-            "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>\n" +
-                "    <key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"table looking-up\"/>",
-        )
-        assertEquals(1, Regex("id=\"apostrophe\"").findAll(done(other)).count())
+        fun apostrophes(text: String) = Regex("id=\"apostrophe\"").findAll(done(text)).count()
+        assertRows(
+            listOf<Pair<String, () -> Unit>>(
+                "by their rows' when=: one in portrait, one in landscape" to { assertEquals(2, apostrophes(withRow("landscape"))) },
+                "by their keys' when=: each its own width" to {
+                    val two = withShift(
+                        "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table !landscape\"/>\n" +
+                            "    <key id=\"shift\" role=\"shift\" width=\"2\" send=\"caps\" when=\"!table landscape\"/>",
+                    )
+                    assertEquals(2, apostrophes(two))
+                    assertTrue("width=\"2\" label=\"分词\"" in done(two))
+                },
+                "shown together by their rows (both in portrait unless compact): kept" to { kept(withRow("!compact"), "two Shifts") },
+                "shown together by their keys: kept" to {
+                    val both = withShift(
+                        "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>\n" +
+                            "    <key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>",
+                    )
+                    kept(both, "two Shifts")
+                },
+                "the other only under a table, never while typed: one 分词, the other left alone" to {
+                    val other = withShift(
+                        "<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table\"/>\n" +
+                            "    <key id=\"shift2\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"table looking-up\"/>",
+                    )
+                    assertEquals(1, apostrophes(other))
+                },
+            ),
+            { it.first },
+        ) { it.second() }
     }
 
     @Test
     fun aPackWith分词OrWhatShiftCannotGiveWayToIsKept() {
-        kept(done(v060), "a key apostrophe")
-        kept(withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" shortcut=\"separator\" when=\"!table\"/>"), "a 分词")
-        kept(withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" when=\"composing\"/>"), "a ' key while typing")
-        kept(
-            withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" when=\"!composing\"><variant when=\"composing\" shortcut=\"fn/separator\"/></key>"),
-            "a 分词",
-        )
-        kept(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"table\"/>"), "never shows")
-        kept(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table !composing\"/>"), "never shows")
-        kept(withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"composing !table\"/>"), "only while pinyin")
-        kept(v060.replace(Regex("<key id=\"shift\"[^>]*>"), ""), "no Shift")
-        kept("<keyboard", "does not read")
-        kept(v060.replace("family=\"letters\"", "family=\"nine\""), "not drawn")
-        kept(v060.replace("</keyboard>", "<!--" + "x".repeat(PackLayouts.MAX_BYTES.toInt()) + "-->\n</keyboard>"), "bytes")
+        assertRows(
+            listOf(
+                "rewritten already" to { done(v060) } to "a key apostrophe",
+                "a 分词 of its own" to { withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" shortcut=\"separator\" when=\"!table\"/>") } to "a 分词",
+                "a ' key while typing" to { withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" when=\"composing\"/>") } to "a ' key while typing",
+                "a 分词 by a variant's name" to {
+                    withShift(shift060 + "\n    <key id=\"sep\" label=\"'\" send=\"'\" when=\"!composing\"><variant when=\"composing\" shortcut=\"fn/separator\"/></key>")
+                } to "a 分词",
+                "Shift only under a table" to { withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"table\"/>") } to "never shows",
+                "Shift never while typed" to { withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"!table !composing\"/>") } to "never shows",
+                "Shift only while typing" to { withShift("<key id=\"shift\" role=\"shift\" width=\"1.5\" send=\"caps\" when=\"composing !table\"/>") } to "only while pinyin",
+                "no Shift" to { v060.replace(Regex("<key id=\"shift\"[^>]*>"), "") } to "no Shift",
+                "a file that does not read" to { "<keyboard" } to "does not read",
+                "a board not drawn" to { v060.replace("family=\"letters\"", "family=\"nine\"") } to "not drawn",
+                "a file past the size limit" to { v060.replace("</keyboard>", "<!--" + "x".repeat(PackLayouts.MAX_BYTES.toInt()) + "-->\n</keyboard>") } to "bytes",
+            ),
+            { it.first.first },
+        ) { (made, why) -> kept(made.second(), why) }
         // a ' key of its own, not while typing: given 分词 all the same
         done(withShift(shift060 + "\n    <key id=\"quote\" label=\"'\" send=\"'\" width=\"0\" when=\"field=never\"/>"))
     }
@@ -221,6 +242,20 @@ class PackSeparatorTest {
         val own = bottom.replace("</row>", "<key id=\"shift2\" role=\"shift\" send=\"caps\" when=\"field=never\"/></row>")
         check(own != bottom)
         kept(including, "a Shift in a fragment", mapOf("grouped-bottom" to own))
+    }
+
+    // a row's when= alternatives with its Shift's (every pair of them) bounded (R26 F8348): 17 of each, each shown
+    // whatever the rest (landscape or not), is kept for that; 16 of each is not
+    @Test
+    fun aShiftAndItsRowOfTooManyAlternativesAreKept() {
+        fun alternatives(n: Int, under: String, name: String) =
+            (listOf("landscape", "!landscape") + (1..n - 2).map { "ime=$name$it" }).joinToString(", ") { "$under $it".trim() }
+        fun of(n: Int) = withShift(shift060.replace("when=\"!table\"", "when=\"${alternatives(n, "!table", "b")}\""))
+            .replace("<row split=\"halves\">\n    <!-- 码表时", "<row split=\"halves\" when=\"${alternatives(n, "", "a")}\">\n    <!-- 码表时")
+            .also { check("ime=a1" in it) }
+        kept(of(17), "alternatives")
+        val r = rewrite(of(16))
+        assertFalse(r is PackSeparator.Rewrite.Kept && "alternatives" in r.why, (r as? PackSeparator.Rewrite.Kept)?.why)
     }
 
     @Test

@@ -12,10 +12,15 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.settings.AddressSettingsFragment
@@ -32,7 +37,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -46,6 +53,9 @@ import java.util.Locale
 // run alone, or first, found none
 @Config(application = FcitxApplication::class)
 class SettingsIndexTest {
+
+    @get:Rule
+    val folder = TemporaryFolder()
 
     private fun context(): Context = PlaceholderStrings(RuntimeEnvironment.getApplication())
 
@@ -144,7 +154,40 @@ class SettingsIndexTest {
         for (table in InputMethodCatalog.TABLES.keys) {
             val on = all.filter { (it.target.route as? SettingsRoute.InputMethodConfig)?.uniqueName == table }
             assertEquals(table, 1, on.count { it.target.key == null })
-            assertEquals(table, keysOn(ctx, table) - InputMethodSettings.SHARED_LINK, on.mapNotNull { it.target.key }.toSet())
+            // the tables' keyboard not: hidden, no layout of the user's having the table's keys here (R26 F8136: five results
+            // that opened a page without it; found while one has, theTablesKeyboardIsFoundWhileALayoutOfTheUsersHasItsKeys)
+            assertEquals(table, keysOn(ctx, table) - InputMethodSettings.SHARED_LINK - AppPrefs.TABLE_KEYBOARD_LAYOUT, on.mapNotNull { it.target.key }.toSet())
+        }
+    }
+
+    // the tables' keyboard found while it is on their pages, a layout of the user's with the tables' keys there: the five
+    // results then (R26 F8479: never found, though shown); none again as it goes (F8136)
+    @Test
+    @Uat("ST-194")
+    fun theTablesKeyboardIsFoundWhileALayoutOfTheUsersHasItsKeys() {
+        val ctx = context()
+        val dirWas = CustomKeyboards.dir
+        val dir = File(folder.root, "layouts").apply { mkdirs() }
+        CustomKeyboards.dir = { dir }
+        try {
+            fun found() = entries(ctx).filter { it.target.key == AppPrefs.TABLE_KEYBOARD_LAYOUT }
+                .map { (it.target.route as SettingsRoute.InputMethodConfig).uniqueName }.sorted()
+            assertEquals("none of the user's", emptyList<String>(), found())
+            val qwerty = BuiltInLayouts(ctx).text("qwerty")!!
+            File(dir, "my-qwerty.xml").writeText(qwerty.replaceFirst("id=\"qwerty\"", "id=\"my-qwerty\" based-on=\"qwerty\""))
+            CustomKeyboards.forget("my-qwerty")
+            assertTrue(CustomKeyboards.choice("my-qwerty")!!.tableExtras)
+            assertEquals("the tables' pages", InputMethodCatalog.TABLES.keys.sorted(), found())
+            // each on a page that has it, as the page draws it
+            for (table in InputMethodCatalog.TABLES.keys) {
+                assertTrue(table, AppPrefs.TABLE_KEYBOARD_LAYOUT in keysOn(ctx, table))
+                assertTrue(table, pageOf(ctx, table).findPreference<Preference>(AppPrefs.TABLE_KEYBOARD_LAYOUT)!!.isVisible)
+            }
+            File(dir, "my-qwerty.xml").delete()
+            CustomKeyboards.forget("my-qwerty")
+            assertEquals("gone", emptyList<String>(), found())
+        } finally {
+            forgetTheTestsLayouts(dirWas)
         }
     }
 
@@ -332,7 +375,8 @@ class SettingsIndexTest {
     @Test
     fun everyCommandIsFoundOnThePageOfTheKeysSwipes() {
         val commands = SettingsIndex.build(context()).filter { it.kind == Kind.COMMAND }
-        assertEquals(KeyCommand.entries.size - 4, commands.size)
+        // every command but the strokes, and the strokes' one (R26 F8321: so a stroke or group added counts as it should)
+        assertEquals(KeyCommand.entries.count { it.group != KeyCommand.Group.Stroke } + 1, commands.size)
         assertTrue(commands.all { it.target == SettingsIndex.Target(SettingsRoute.PopupOverrides, null) })
         assertEquals(1, commands.count { it.id == SettingsIndex.STROKES })
         assertTrue(commands.none { it.id == "cmd:stroke_h" })
@@ -374,8 +418,7 @@ class SettingsIndexTest {
      * 061 §4.5's example (ST-156, ST-159): 笔画筛选 finds four, in this order, in each language: the choice of
      * 在键上划 itself, 笔画筛选灵敏度, then 首页至少几个单字 and the stroke commands, each also called so.
      */
-    private fun strokeFilterFindsFour(query: String) {
-        val ctx = RuntimeEnvironment.getApplication()
+    private fun strokeFilterFindsFour(ctx: Context, query: String) {
         val found = SettingsSearch(SettingsIndex.build(ctx)).find(query)
         assertEquals(
             found.map { it.entry.id }.toString(),
@@ -385,15 +428,16 @@ class SettingsIndexTest {
         assertEquals(listOf(null, null, query, query), found.map { it.alias?.lowercase() })
     }
 
+    // each language's own words for it, its index built in that language (R26 F8158: one table, not three tests)
     @Test
-    @Config(qualifiers = "zh-rCN")
-    fun strokeFilterFindsFourInSimplifiedChinese() = strokeFilterFindsFour("笔画筛选")
-
-    @Test
-    @Config(qualifiers = "zh-rTW")
-    fun strokeFilterFindsFourInTraditionalChinese() = strokeFilterFindsFour("筆畫篩選")
-
-    @Test
-    @Config(qualifiers = "en")
-    fun strokeFilterFindsFourInEnglish() = strokeFilterFindsFour("stroke filter")
+    @Uat("ST-156", "ST-159")
+    fun strokeFilterFindsFourInEachLanguage() {
+        val app = RuntimeEnvironment.getApplication()
+        fun inLanguage(tag: String) = app.createConfigurationContext(Configuration(app.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) })
+        assertRows(
+            "zh-CN: 笔画筛选" to { strokeFilterFindsFour(inLanguage("zh-CN"), "笔画筛选") },
+            "zh-TW: 筆畫篩選" to { strokeFilterFindsFour(inLanguage("zh-TW"), "筆畫篩選") },
+            "en: stroke filter" to { strokeFilterFindsFour(inLanguage("en"), "stroke filter") },
+        )
+    }
 }

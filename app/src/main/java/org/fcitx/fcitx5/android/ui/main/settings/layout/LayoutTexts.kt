@@ -73,8 +73,8 @@ object LayoutTexts {
             "too-big" -> ctx.getString(R.string.layout_finding_too_big, a.getOrElse(0) { "" }, ((a.getOrNull(1)?.toLongOrNull() ?: 0L) / KB).toString())
             "no-way" -> ctx.getString(R.string.layout_finding_no_way, a.joinToString(sep) { board(ctx, it) })
             // a key of the app's and its board by the name its key page has, whichever it is told of
-            "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { appBoard(ctx, it) } ?: "")
-            "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { appBoard(ctx, it) } ?: "")
+            "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
+            "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
             "pad-lacks" -> ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", a.getOrElse(1) { "" })
             "bottom-left" -> ctx.getString(R.string.layout_finding_bottom_left, a.getOrElse(0) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(sep) { role(ctx, it) })
             else -> string(f.key)?.let { ctx.getString(it, *Array(ARGS) { i -> a.getOrElse(i) { "" } }) }
@@ -86,6 +86,15 @@ object LayoutTexts {
         "Number" -> ctx.getString(R.string.layout_section_number)
         "Symbol" -> ctx.getString(R.string.layout_section_symbols)
         else -> b
+    }
+
+    // a board's name set between Chinese words: a space where it begins or ends with a digit or a Latin letter
+    // (「是 18 键的键」, as 「第 12 行」), none where it is Chinese (「是数字键盘的键」); other languages space their own words
+    // (R26 F8374)
+    private fun spaced(ctx: Context, name: String): String {
+        if (ctx.resources.configuration.locales[0].language != "zh" || name.isEmpty()) return name
+        fun latin(c: Char) = c < '\u0080' && c.isLetterOrDigit()
+        return (if (latin(name.first())) " " else "") + name + (if (latin(name.last())) " " else "")
     }
 
     // one of the app's boards (LayoutCheck's held: KeyData's ids) by the name its key page has

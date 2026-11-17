@@ -139,7 +139,7 @@ Backspace take any of it.
 Where the preedit shows is the input method's (`KeyRouter.composesText`, set as the
 input context's `preeditEnabled` on activation and again at each event the engine sends; turned off as
 quick phrase or Unicode starts, so their code shows above the candidates in English too): English's
-word is the text itself and go into the app's text as composing
+word is the text itself and goes into the app's text as composing
 text, where the field takes it (`CapabilityFlag.Preedit`), kept there as the keyboard goes. A code
 (pinyin, the nine keys', a table's), and what is written over the keys (the toolbar's 手写, in the code row as the input method it is written over has it), are not text, and are shown in the keyboard's own row above the
 candidates (`PreeditComponent`, `KawaiiBarComponent.preeditHeight`: 18 dp, 32 where the input method has the syllable strip; there whether or not a code is
@@ -159,7 +159,9 @@ composing text, under the rule that nothing the keyboard cannot prove it wrote i
 ## The engine host
 
 `InputMethodCatalog` (`engine/`) lists the input methods by name (`PINYIN`, `SHUANGPIN`,
-`TABLES`, `HANDWRITING`, `ENGLISH` = `keyboard-us`; the nine, 18 and 14 keys are keyboards of
+`TABLES`, `ENGLISH` = `keyboard-us`; `HANDWRITING_RETIRED`, 0.6.0's handwriting, is no longer listed and turns
+into the toolbar's 手写 (`HandwritingRetire`): writing on the keys is an `InkOver` with its own `HandwritingSession`
+(learned under `Kinds.HANDWRITING`) over another input method's keys, not an input method; the nine, 18 and 14 keys are keyboards of
 pinyin and 双拼, not input methods: their sessions `T9`, `PINYIN_KEYS18`, `PINYIN_KEYS`, `PINYIN_KEYS_OWN` (a theme's own groups),
 `SHUANGPIN_KEYS18`, `SHUANGPIN_KEYS14`, `SHUANGPIN_NINE` live inside `KeyboardPair`), what the host lists of each, the keys each types
 with and the data files' names: fixed, read by `host/` and `input/`, which never name `Engines`.

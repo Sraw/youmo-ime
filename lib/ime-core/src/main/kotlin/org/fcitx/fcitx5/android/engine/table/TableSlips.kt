@@ -101,7 +101,9 @@ class TableSlips internal constructor(
     // the table's first text of [code], read: none where it leads nowhere, to pinyin alone, or to the very text
     // the key would commit ([whole]: the key is the next code's, nothing gained). The table's first, not the
     // order the session would show: that is weighed for the code typed only, and its lookups are what a key on
-    // target would pay for
+    // target would pay for. Nor does it pass over what the session hides (blocked under the code, held by 生僻字屏蔽):
+    // a slip whose code's first is one of those is read, and the code then shows the next text or none (review F8393;
+    // rare, the session's hiding is by the code and not to be had here)
     private fun firstOf(code: String, whole: String?): String? {
         if (!leadsAnywhere(code)) return null
         val first = table.firstOf(code)

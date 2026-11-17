@@ -195,7 +195,7 @@ def kb106(d):
     return f"编码行「{pre}」，上屏「西安」"
 
 
-case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce")(lambda d: None)
+case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.aShiftKeptBesideTheSeparatorStaysShift、ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce")(lambda d: None)
 
 
 case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo、StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing、StrokeUatTest.aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt、StrokeUatTest.aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail、StrokeUatTest.noOtherLayoutHasAGap、StrokeUatTest.theSweepFindsTheSplitGap")(lambda d: None)
@@ -802,7 +802,8 @@ case("KB-94", needs="jvm:TextVariablesUatTest.aSwipesTextOfVariablesTypesTheTime
 
 case("KB-95", needs="jvm:TextVariablesUatTest.withoutTheMarkAsWrittenWithItAsFilledIn")(lambda d: None)
 
-case("KB-96", needs="manual:键盘开着等到下一分钟再选带变量的项，打出新时间；JVM 见 KeyResolverMarksTest.outputFillsInAgainAsPicked")(lambda d: None)
+case("KB-96", needs="manual:键盘开着等到下一分钟再选带变量的项，打出新时间；JVM 见 KeyResolverMarksTest.outputFillsInAgainAsPicked、"
+                     "TextVariablesUatTest.rowsCountedInANewMinuteLeaveTheCatchUpToDrawIt")(lambda d: None)
 
 case("KB-97", needs="jvm:TextVariablesUatTest.anItemOfVariablesFirstIsTypedBySwipingUp")(lambda d: None)
 

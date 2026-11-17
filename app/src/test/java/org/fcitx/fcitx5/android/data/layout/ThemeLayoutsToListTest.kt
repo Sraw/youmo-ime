@@ -7,11 +7,15 @@ package org.fcitx.fcitx5.android.data.layout
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.backupZip
 import org.fcitx.fcitx5.android.core.dirsUnder
+import org.fcitx.fcitx5.android.core.rawPrefs
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFixture
@@ -21,8 +25,10 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
+import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListFragment
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -37,7 +43,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
@@ -92,7 +100,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
 
     @After
     fun asItWas() {
-        CustomKeyboards.dir = dirWas
+        forgetTheTestsLayouts(dirWas)
         EngineState.shuangpinScheme = schemeWas
         ThemeLayoutsToList.listedFile = realListed
         ThemeLayoutsToList.restoredFile = realRestored
@@ -107,6 +115,8 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
             keyboard.numberKeyboardLayout, keyboard.symbolsPanelLayout).forEach { it.setValue("") }
         prefs.internal.themeLayoutsUnseen.setValue("")
         prefs.setStoredKeyLists(null)
+        // a switch's notice (tellUnseen) left in EngineNotices' static sets would be dropped or said with another class's
+        EngineNotices.forgetToldOnce()
     }
 
     // a pack [name] imported with [files] in its layouts/
@@ -254,6 +264,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
 
     // the names a pack's keys had that the rule refuses (§2.3): what the user set under one copied under its new one
     @Test
+    @Uat("ST-193")
     fun theSettingsOfARenamedKeyAreCopiedUnderItsNewName() {
         val mint = pack("mint", "k18.xml" to k17.replace("shortcut=\"g18/q\"", "shortcut=\"mine\""))
         prefs.setStoredKeyLists("@2\nfn/mine\tset\t:Y\tY\tZ")
@@ -275,7 +286,11 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
             CustomLayouts.save("own$i", builtIn.text("qwerty")!!.replaceFirst("id=\"qwerty\"", "id=\"own$i\" based-on=\"qwerty\""), layouts)
         }
         val mint = pack("mint", "k18.xml" to k17)
-        assertEquals(emptyList<ThemeLayoutsToList.Listed>(), ThemeLayoutsToList.run(mint))
+        val made = ThemeLayoutsToList.run(mint)
+        assertEquals(emptyList<ThemeLayoutsToList.Listed>(), made)
+        // and the import says so (R26 F8518): its board not listed
+        assertEquals(appContext.getString(R.string.theme_pack_layouts_not_listed), ThemeListFragment.layoutsNotListedNotice(appContext, made, 1))
+        assertNull("none expected: nothing said", ThemeListFragment.layoutsNotListedNotice(appContext, made, 0))
         assertEquals(CustomLayoutFiles.MAX_LAYOUTS, CustomLayouts.list(layouts).size)
         assertEquals(listOf("mint@${mint.stamp}"), CustomLayouts.record(layouts).packs)
         // its confirmation says so first (NIT4)
@@ -337,7 +352,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
 
     // NIT1: one imported unticked is recorded, so a restore of a backup holding it does not list it
     @Test
-    @Uat("PR-68")
+    @Uat("PR-68", "ST-72")
     fun onePackImportedUntickedIsRecordedNotListed() {
         val mint = pack("mint", "k18.xml" to k17)
         ThemeLayoutsToList.notListed(mint, layouts)
@@ -402,7 +417,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         assertEquals("", prefs.internal.themeLayoutsUnseen.getValue())
         ThemeLayoutsToList.restored(listOf("late"), switch = false)
         // a pack imported or 外观 → 布局 opened meanwhile waits for the switch too (the choices it reads made)
-        val waiting = thread { ThemeLayoutsToList.awaitStart() }
+        val waiting = thread(isDaemon = true) { ThemeLayoutsToList.awaitStart() }
         waiting.join(WAIT_MS)
         assertTrue(waiting.isAlive)
         switching.removeFirst().run()
@@ -473,30 +488,105 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         }
     }
 
-    // a restore waits for the start's listing (the packs and the layouts not written under it), and drops its switch
-    // not yet made (the settings it copies in not written over by it); a restore recorded after the listing is the
-    // next start's
+    // a restore (UserDataManager.import) as the first start lists, the listing and the switch held: it waits for the
+    // listing (the packs and the layouts not written under it). Past its checks it drops the switch not yet made (the
+    // settings it copies in not written over by it), and the packs it records are the next start's; refused at them
+    // (R26 F8134) it copied no settings in, and the upgrade's switch is made all the same, not lost with its end written.
+    // Each row a pack and a phone of its own (R26 F8431: the drop was the test's own call, not the import's)
     @Test
     @Uat("PR-68")
-    fun aRestoreWaitsForTheStartsListingAndDropsItsSwitch() {
+    fun aRestoreAsTheStartListsDropsItsSwitchOnlyPastItsChecks() {
+        // [name]'s pack listed by a first start, a backup of [versionCode] restored meanwhile: the restore's result
+        fun restoredAsItStarts(name: String, versionCode: Long): Result<*> {
+            // a row's own queues: not a start an earlier row left held (R26 F8505)
+            listing.clear()
+            switching.clear()
+            held()
+            listOf(marker, restored, trying).forEach { it.delete() }
+            keyboard.setImKeyboard(PINYIN, ImKeyboard.KEYS18)
+            prefs.internal.themeLayoutsUnseen.setValue("")
+            val p = pack(name, "k18.xml" to k17)
+            start(listOf(p), p, null)
+            val phone = File(folder.root, "phone-$name").let { dirsUnder(it, data = File(it, "files/host-data"), theme = File(it, "files/host-theme")) }
+            var result: Result<*>? = null
+            val restoring = thread(isDaemon = true) {
+                // its record of none (a 0.6.1 phone's: #l7 alone), so its packs listed, not switched
+                val record = "layouts/${CustomLayoutFiles.CONVERTED}" to "${CustomLayoutFiles.CURRENT}\n"
+                result = UserDataManager.import(backupZip("external/theme/v4/$name/theme.xml" to "<theme/>", record, versionCode = versionCode), phone)
+            }
+            restoring.join(WAIT_MS)
+            assertTrue("waits for the listing", restoring.isAlive)
+            listing.removeFirst().run()
+            restoring.join(WAIT_MS * 20)
+            assertFalse(restoring.isAlive)
+            switching.removeFirst().run()
+            return result!!
+        }
+        assertRows(
+            "past its checks: the switch dropped, the install's listing done, its own packs the next start's" to {
+                assertTrue(restoredAsItStarts("mint", V061).isSuccess)
+                assertTrue(listed().containsKey("mint · 17 键"))
+                assertEquals(ImKeyboard.KEYS18 to null, chosen(PINYIN))
+                assertEquals("", prefs.internal.themeLayoutsUnseen.getValue())
+                assertFalse(trying.exists())
+                // not listed and switched again over its settings
+                assertTrue(marker.isFile)
+                // recorded after the listing: 0.6.1's of no record listed alone, by the next start
+                assertEquals(listOf("list", "mint"), restored.readLines())
+            },
+            "refused at its checks (too old a backup): the switch made" to {
+                assertTrue(restoredAsItStarts("fern", TOO_OLD).isFailure)
+                assertEquals(ImKeyboard.CUSTOM to listed().getValue("fern · 17 键"), chosen(PINYIN))
+                assertTrue(prefs.internal.themeLayoutsUnseen.getValue().isNotEmpty())
+                assertTrue(marker.isFile)
+            },
+        )
+    }
+
+    // a restore past its checks as the start's switch is being made (begun before it came, here held in it): no more to
+    // drop, waited for, the backup's settings copied over the switch's, not the switch's over the backup's (R26 F8423).
+    // Through UserDataManager.import onto AppPrefs' own file (R26 F8504): pins the order, the switch ended before the
+    // backup's settings are copied in. On a phone the switch's apply() may still be writing then (dropStart's
+    // awaitWritten); Robolectric's apply() writes at once, so that wait is not pinned here
+    @Test
+    @Uat("PR-68")
+    fun aRestoreWaitsForASwitchBegunBeforeIt() {
         held()
         val mint = pack("mint", "k18.xml" to k17)
-        start(listOf(mint), mint, null)
-        val waiting = thread { ThemeLayoutsToList.awaitStart(restoring = true) }
-        waiting.join(WAIT_MS)
-        assertTrue(waiting.isAlive)
+        val inSwitch = CountDownLatch(1)
+        val goOn = CountDownLatch(1)
+        ThemeLayoutsToList.atStart(listOf(mint)) {
+            inSwitch.countDown()
+            goOn.await(WAIT_MS * 50, TimeUnit.MILLISECONDS)
+            ThemeLayoutsToList.InUse(mint, null, dark = false)
+        }
         listing.removeFirst().run()
-        waiting.join(WAIT_MS * 20)
-        assertFalse(waiting.isAlive)
-        ThemeLayoutsToList.restored(listOf("other"), switch = true)
-        switching.removeFirst().run()
-        assertEquals(setOf("mint · 17 键"), listed().keys)
-        assertEquals(ImKeyboard.KEYS18 to null, chosen(PINYIN))
-        assertEquals("", prefs.internal.themeLayoutsUnseen.getValue())
-        assertFalse(trying.exists())
-        // the install's listing done (the restore's own matter): not listed and switched again over its settings
+        val switch = thread(isDaemon = true) { switching.removeFirst().run() }
+        assertTrue(inSwitch.await(WAIT_MS * 20, TimeUnit.MILLISECONDS))
+        // the backup's settings: pinyin on the nine keys; copied in where AppPrefs keeps its own
+        val file = rawPrefs().javaClass.getDeclaredField("mFile").apply { isAccessible = true }.get(rawPrefs()) as File
+        val backupPrefs = """<map><string name="${keyboard.pinyinKeyboard.key}">${PinyinKeyboard.NineKeys.name}</string></map>"""
+        val phone = File(folder.root, "phone").let {
+            dirsUnder(it, data = File(it, "files/host-data"), theme = File(it, "files/host-theme"), sharedPrefs = file.parentFile!!)
+        }
+        // a 0.6.1 phone's backup, its record of none: its packs listed, not switched
+        val record = "layouts/${CustomLayoutFiles.CONVERTED}" to "${CustomLayoutFiles.CURRENT}\n"
+        val zip = backupZip("external/theme/v4/mint/theme.xml" to "<theme/>", record, "shared_prefs/${file.name}" to backupPrefs, versionCode = V061)
+        var result: Result<*>? = null
+        val restoring = thread(isDaemon = true) { result = UserDataManager.import(zip, phone) }
+        restoring.join(WAIT_MS)
+        assertTrue("waits for the switch begun", restoring.isAlive)
+        goOn.countDown()
+        restoring.join(WAIT_MS * 20)
+        assertFalse(restoring.isAlive)
+        switch.join(WAIT_MS * 20)
+        assertTrue(result.toString(), result!!.isSuccess)
+        // made: begun before the restore came
+        assertEquals(ImKeyboard.CUSTOM to listed().getValue("mint · 17 键"), chosen(PINYIN))
         assertTrue(marker.isFile)
-        assertEquals(listOf("switch", "other"), restored.readLines())
+        // every write of the phone's settings on disk by now (the app started again after a restore): the backup's remain
+        AppPrefs.getInstance().awaitWritten()
+        assertEquals(backupPrefs, file.readText())
     }
 
     // nothing to list (the install's done, none restored; or no pack has a board): no switch, nothing to wait for
@@ -515,7 +605,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         assertTrue(switching.isEmpty())
         assertTrue(marker.isFile)
         assertFalse(trying.exists())
-        val waiting = thread { ThemeLayoutsToList.awaitStart() }
+        val waiting = thread(isDaemon = true) { ThemeLayoutsToList.awaitStart() }
         waiting.join(WAIT_MS * 20)
         assertFalse(waiting.isAlive)
     }
@@ -523,8 +613,11 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
     private companion object {
         const val WAIT_MS = 200L
 
-        // 0.6.0's version code and 0.6.1's lowest (UserDataManager.FIRST_WITH_SEPARATOR)
+        // 0.6.0's version code and 0.6.1's lowest
         const val V060 = 5122L
-        const val V061 = 5130L
+        const val V061 = UserDataManager.FIRST_WITH_SEPARATOR
+
+        // a backup of before 0.3.1 (UserDataManager.FIRST_WITH_THE_RECORD): refused at its checks
+        const val TOO_OLD = 2000L
     }
 }

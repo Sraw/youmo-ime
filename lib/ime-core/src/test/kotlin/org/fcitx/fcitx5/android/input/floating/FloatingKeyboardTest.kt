@@ -146,6 +146,8 @@ class FloatingKeyboardTest {
         val bounds = FloatingKeyboard.bounds(411, 411, 1000, 100, 5000)
         assertEquals(260, FloatingKeyboard.size(100f, 411, 1000, bounds).widthDp)
         assertEquals(411, FloatingKeyboard.size(900f, 411, 1000, bounds).widthDp)
+        // R26 F8169: a width not a number (a backup edited by hand) threw in roundToInt; never resized instead
+        assertEquals(FloatingKeyboard.size(-1f, 411, 1000, bounds), FloatingKeyboard.size(Float.NaN, 411, 1000, bounds))
         // a tablet turned, 1280 × 800: the height stops it long before the docked width. Its keys 500 × 0.85 high at
         // 420 dp, the bars 64, the room 696: (696 - 64) / (425 / 420) = 624
         assertEquals(FloatingKeyboard.Bounds(260, 624), FloatingKeyboard.bounds(1280, 1280, 500, 64, 696))
@@ -161,6 +163,9 @@ class FloatingKeyboardTest {
         assertEquals(old, FloatingKeyboard.keptSpot(-1f, -1f, old))
         assertEquals(old, FloatingKeyboard.keptSpot(0.5f, -1f, old))
         assertEquals(Spot(0f, 1f), FloatingKeyboard.keptSpot(0f, 1f, old))
+        // R26 F8169: not a number, as a backup edited by hand may have it: never kept
+        assertEquals(old, FloatingKeyboard.keptSpot(Float.NaN, 0.5f, old))
+        assertEquals(old, FloatingKeyboard.keptSpot(0.5f, Float.NaN, old))
     }
 
     // a 300 dp keyboard, density 2: 600 × 800 px, its keys 600 of that; the strip at the bottom, the handle at its

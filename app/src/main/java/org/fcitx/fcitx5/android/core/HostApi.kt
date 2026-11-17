@@ -212,14 +212,14 @@ interface EngineSettingsApi {
     suspend fun setImOptions(im: String, values: Map<String, String>)
 }
 
-/** The punctuation map of a language, as the user edits it; only zh_CN has one. */
+/**
+ * The punctuation map of a language, read only: only zh_CN has one, and no page edits it since 0.6.1
+ * (one edited before is deleted, PunctuationMaps.dropEdited), so there is no way to save one.
+ */
 interface PunctuationApi {
 
     /** [lang]'s map in order; empty for a language with none. */
     suspend fun punctuationMap(lang: String): List<PunctuationMapEntry>
-
-    /** Saves [entries] as [lang]'s map and uses it; nothing for a language with none. */
-    suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>)
 }
 
 /** The engine's words: the user's own, added, blocked, imported, and the dictionary's readings of them. */

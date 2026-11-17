@@ -434,15 +434,16 @@ class HostCoreEnginesTest : EnginesFixture() {
             "nine keys" to "64".map(Keyboard::pinyinNineKey),
             "注音九键" to listOf(Keyboard.zhuyinNineKey(6), Keyboard.zhuyinNineKey(5)),
         )
+        // each row's keys sent inside its own check: one keyboard that throws is that row's failure (review F8301)
         val rows = keyboards.map { (name, keys) ->
-            val core = core(engines())
-            val panels = mutableListOf<HostEvent.InputPanel>()
-            core.events += HostEvents { if (it is HostEvent.InputPanel) panels += it }
-            core.activate(1)
-            core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
-            core.focus(true)
-            keys.forEach { core.sendKey(Key(KeySyms.fromUnicode(it)), virtual = true) }
             "$name: a code, its characters no private use's" to {
+                val core = core(engines())
+                val panels = mutableListOf<HostEvent.InputPanel>()
+                core.events += HostEvents { if (it is HostEvent.InputPanel) panels += it }
+                core.activate(1)
+                core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
+                core.focus(true)
+                keys.forEach { core.sendKey(Key(KeySyms.fromUnicode(it)), virtual = true) }
                 val codes = panels.filter { it.code }.map { it.preedit.toString() }
                 assertTrue("$name ${panels.map { it.preedit }}", codes.isNotEmpty() && codes.last().isNotEmpty())
                 codes.forEach { code -> assertTrue("$name '$code'", code.codePoints().noneMatch(KeySyms::isPrivateUse)) }

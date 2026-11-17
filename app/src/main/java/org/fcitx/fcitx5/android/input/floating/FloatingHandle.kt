@@ -168,7 +168,8 @@ class FloatingHandle(
                 true
             }
         }
-        dock?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.END or Gravity.CENTER_VERTICAL)) }
+        // physical right, as the resize button is physical left: END is the left in a right-to-left language, under it
+        dock?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.RIGHT or Gravity.CENTER_VERTICAL)) }
         resizer?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.LEFT or Gravity.CENTER_VERTICAL)) }
     }
 
@@ -238,6 +239,10 @@ class FloatingHandle(
     /** The dock button's icon as drawn now (null: none, or the theme's not read yet). */
     @get:VisibleForTesting
     internal val dockDrawable: Drawable? get() = dock?.drawable
+
+    /** The dock button (null docked). */
+    @get:VisibleForTesting
+    internal val dockButton: ImageView? get() = dock
 
     /** The resize button (null docked). */
     @get:VisibleForTesting

@@ -106,11 +106,15 @@ class XmlTest {
             assertIs<Parsed.Failed>(Xml.parse("<a x=\"$r\"/>"), r)
         }
         Xml.parse("<a x=\"&#x10FFFF;\"/>").ok()
-        // written as they are, the same: before a reference in the value and after one
+        // written as they are: dropped, before a reference in the value and after one, and between elements, so a value is
+        // only ever XML's characters and a file 0.6.0 wrote or read with one still reads (R26 F8187)
         for (c in listOf('\u0000', '\u0001', '\u000B', '\u001F', '￾', '￿')) {
-            assertIs<Parsed.Failed>(Xml.parse("<a x=\"a${c}b\"/>"), c.code.toString())
-            assertIs<Parsed.Failed>(Xml.parse("<a x=\"&amp;${c}b\"/>"), c.code.toString())
+            assertEquals("ab", Xml.parse("<a x=\"a${c}b\"/>").ok()["x"], c.code.toString())
+            assertEquals("&b", Xml.parse("<a x=\"&amp;${c}b\"/>").ok()["x"], c.code.toString())
+            assertEquals("a&b", Xml.parse("<a x=\"a${c}&amp;b\"/>").ok()["x"], c.code.toString())
+            Xml.parse("<a> $c </a>").ok()
         }
+        for (c in listOf('\t', '\n', '\r', ' ', '\uFFFD', '\uFEFF')) assertTrue(Xml.allows(c), c.code.toString())
     }
 
     @Test

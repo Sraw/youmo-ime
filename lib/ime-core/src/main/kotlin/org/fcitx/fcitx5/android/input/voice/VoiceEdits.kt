@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
  * 语音先问再记 (061-voice-learn-from-edits.md): what voice input put in the field ([said]), followed
@@ -159,9 +160,18 @@ class VoiceEdits(
         val cells = cells ?: return
         pending = null
         if (cursor < 0) return clear()
-        // what a Backspace takes away of an emoji sequence is the editor's to say: the cursor not known,
-        // till a context finds it again (a Backspace before that ends the window)
-        if (cells.any { !countable(it.now) } || gone.any { !countable(it.now) } || fill.any { !countable(it) }) {
+        // what a Backspace takes away of an emoji sequence is the editor's to say: where the unit it takes
+        // is one, the cursor is not known. The cells still hold what it took, so the next context finds
+        // no cursor in them and ends the window, as a Backspace before that does. Only that unit decides:
+        // an emoji elsewhere in the window changes nothing of what this one takes (R26 F8293)
+        val taken = when {
+            selection -> null
+            fill.isNotEmpty() -> fill[fill.length - 1]
+            gapAt > 0 -> cells[gapAt - 1].now
+            gapAt < 0 && cursor > 0 -> cells[cursor - 1].now
+            else -> null
+        }
+        if (taken != null && !countable(taken)) {
             cursor = -1
             return
         }
@@ -538,8 +548,8 @@ class VoiceEdits(
         // as VoiceHomophones.reading packs them: a syllable times 8 plus its tone
         private const val READING_TONES = 8
 
-        // as much as the host reads either side ([Action.Context.HOST_CHARS]): one that long may be cut short
-        private const val READ_CHARS = 64
+        // as much as the host reads either side: one that long may be cut short
+        private const val READ_CHARS = Action.Context.HOST_CHARS
 
         private fun han(c: Char) = c in '一'..'鿿'
 

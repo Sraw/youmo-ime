@@ -66,6 +66,7 @@ import org.fcitx.fcitx5.android.ui.rare.RareEdits.Found
 import org.fcitx.fcitx5.android.ui.rare.RareLayout
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.item
+import org.fcitx.fcitx5.android.utils.letGoOfFocusedField
 import org.fcitx.fcitx5.android.utils.materialTextInput
 import org.fcitx.fcitx5.android.utils.styledColor
 import org.fcitx.fcitx5.android.utils.toast
@@ -106,6 +107,9 @@ class RareCharsFragment : Fragment(), SearchAnchors {
     // what the search found in each group, for its section's title
     private var found = emptyMap<Level, Int>()
     private var drag: DragRange? = null
+    // a finger on the list now, as its touch listener saw: a long press with none (a screen reader's, a held Enter) is
+    // no drag, which only a lift ends (R26 F8161)
+    private var fingerDown = false
     private val adapter = CellAdapter()
     private val number = NumberFormat.getIntegerInstance()
 
@@ -387,7 +391,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
                 val held = page.edits.heldIn(level)
                 card.bind(
                     name, getString(groupAbout(level)), if (samples) page.samples[level].orEmpty() else emptyList(),
-                    getString(R.string.rare_chars_card_a11y, name, number.format(page.grid.count(level)), number.format(held)),
+                    getString(R.string.rare_chars_card_a11y, name, number.format(page.total(level)), number.format(held)),
                     getString(R.string.rare_chars_card_open),
                 )
                 showStrip(card.strip, page, level, held)
@@ -402,7 +406,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
      * read-only, faded and inert (§2.5: the switch off 50%, a later version's file 38%).
      */
     private fun showStrip(strip: CheckStrip, page: Page, level: Level, held: Int) {
-        val total = page.grid.count(level)
+        val total = page.total(level)
         val box = when (held) {
             0 -> Box.NONE
             total -> Box.ALL
@@ -454,6 +458,8 @@ class RareCharsFragment : Fragment(), SearchAnchors {
     internal fun open(level: Level) {
         val page = page ?: return
         if (viewModel.opened != null) return
+        // the search hidden with the keyboard on it: put away, or what is typed goes on searching unseen (R26 F8184)
+        searchLayout.letGoOfFocusedField()
         viewModel.opened = level
         relayout(page)
         restoreScroll(level)
@@ -488,6 +494,8 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
     /** The rows anew: the opened group's alone, or what the search finds; on the cards, none. */
     private fun relayout(page: Page) {
+        // the rows anew: a drag's positions are the old rows' (R26 F8161)
+        drag = null
         val query = viewModel.query
         val opened = viewModel.opened
         message.visibility = View.GONE
@@ -593,9 +601,15 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         // a step before a save is no more to take back (RareEdits.undo): ↶ grayed at once, whatever is saved
         dropUndo()
         if (page.readOnly || page.edits.changes.isEmpty()) return
-        val changes = page.edits.changes.toList()
+        val before = RareCharsViewModel.saving
         // outlives the page, whose scope leaving cancels
         val saved = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
+            // the last stop's save still writing: its changes taken off first (RareEdits.saved), or they are sent again
+            // and this one's saved drops as many, changes made after it among them, never written (R26 F8376). At
+            // once where there is none
+            before?.join()
+            if (page.edits.changes.isEmpty()) return@async false
+            val changes = page.edits.changes.toList()
             try {
                 val file = withContext(Dispatchers.IO) { RareCharsManager.update(changes, page.levels) }
                 page.edits.saved(file, changes.size)
@@ -705,6 +719,11 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         val page = page ?: return false
         val position = holder.bindingAdapterPosition
         if (!editable(page) || position == RecyclerView.NO_POSITION) return false
+        // no finger to drag with: the cell changed, as a long press lifted where it began would
+        if (!fingerDown) {
+            toggle(holder)
+            return true
+        }
         drag = DragRange(position, { page.edits.held(layout.cell(it)) }, { layout.kind(it) == RareLayout.Kind.CELL })
         list.parent?.requestDisallowInterceptTouchEvent(true)
         adapter.notifyItemChanged(position, PAYLOAD_STATE)
@@ -739,6 +758,10 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
         // the event the list is taken over by is not handed to onTouchEvent too: handled here
         override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> fingerDown = true
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> fingerDown = false
+            }
             if (drag == null) return false
             onTouchEvent(rv, e)
             return true
@@ -762,6 +785,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         override fun onRequestDisallowInterceptTouchEvent(disallowIntercept: Boolean) = Unit
 
         private fun finish(apply: Boolean) {
+            fingerDown = false
             val range = drag ?: return
             list.removeCallbacks(edgeScroll)
             drag = null

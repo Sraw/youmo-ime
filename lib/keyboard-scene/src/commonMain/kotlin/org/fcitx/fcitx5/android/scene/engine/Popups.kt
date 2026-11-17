@@ -248,7 +248,7 @@ internal class PopupBuilder(
                 val states = if (index == selected) setOf(KeyState.Selected) else emptySet()
                 val (cellLook, textLook) = cellLook(states)
                 val face = face(cell, cellLook)
-                val m = Content.measure(measurer, cut(label, keys.width - 2 * padding()) { Content.measure(measurer, it, textLook, textLook.weight, keys.size).m.advance }, textLook, textLook.weight, keys.size)
+                val m = cut(label, keys.width - 2 * padding()) { Content.measure(measurer, it, textLook, textLook.weight, keys.size) }
                 // the one in focus its face (`popup:selected`'s fill, radius, inner shadow, border), no shadow
                 val selected = if (KeyState.Selected in states) {
                     val g = geometry(face, cellLook, cell)
@@ -263,15 +263,26 @@ internal class PopupBuilder(
         return Scene(panel.width, panel.height, base, nodes, emptyList())
     }
 
-    // [label] as it fits [room] measured by [width]: whole, or its most characters as seen (clusterEnds) that do with
-    // 「…」 after them
-    private fun cut(label: String, room: Double, width: (String) -> Double): String {
-        if (room <= 0 || width(label) <= room) return label
-        for (end in clusterEnds(label).asReversed().drop(1)) {
-            val shown = label.substring(0, end) + ELLIPSIS
-            if (width(shown) <= room) return shown
+    // [label] as it fits [room], measured by [measure]: whole, or its most characters as seen (clusterEnds) that do with
+    // 「…」 after them, found by halving (a longer start is no narrower), each measure once (R26 F8295)
+    private fun cut(label: String, room: Double, measure: (String) -> Content.Measured): Content.Measured {
+        val whole = measure(label)
+        if (room <= 0 || whole.m.advance <= room) return whole
+        val ends = clusterEnds(label).dropLast(1)
+        var best: Content.Measured? = null
+        var low = 0
+        var high = ends.size - 1
+        while (low <= high) {
+            val mid = (low + high) / 2
+            val shown = measure(label.substring(0, ends[mid]) + ELLIPSIS)
+            if (shown.m.advance <= room) {
+                best = shown
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
         }
-        return ELLIPSIS
+        return best ?: measure(ELLIPSIS)
     }
 
     // a long press's key: `popup`'s fill and radius as they cascade, but its border, inner shadow and shape only a

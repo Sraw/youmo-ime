@@ -19,10 +19,8 @@ import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.ui.cards.Accordion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -181,10 +179,9 @@ class FoldCardTest {
             content.addView(View(big), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(400)))
         }, FoldCard(big, "b"))
         val a = AccordionLayout(big, cards)
-        // titles ~104 dp: 300 leaves ~196, under 160 × 2
+        // titles ~104 dp: 300 leaves ~196, under Accordion.MIN_CONTENT_DP (160) × 2 (R26 F8278: the constant no longer echoed)
         a.measure(MeasureSpec.makeMeasureSpec(dp(360), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(dp(300), MeasureSpec.AT_MOST))
         assertFalse(a.fixedTitles)
-        assertEquals(Accordion.MIN_CONTENT_DP, 160)
     }
 
     @Test
@@ -206,6 +203,6 @@ class FoldCardTest {
         cards[0].infoButton!!.performClick()
         cards[0].header.performClick()
         assertFalse(cards[0].infoShown)
-        assertNotNull(words)
+        assertFalse(words.isVisible)
     }
 }

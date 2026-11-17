@@ -124,13 +124,13 @@ class SceneBoard(
     // the scene's env asks the keyboard of that layout, so the keys touched are the ones drawn (BaseKeyboard.keyMarks).
     // Null where [layout] is the app's already: nothing else to draw
     private fun ownLayout(layout: SceneLayout): SceneLayout? =
-        SceneLayouts.builtIn(context, layout.base)?.takeIf { it !== layout }
+        SceneLayouts.builtIn(context, layout.fallback)?.takeIf { it !== layout }
 
     // what the keys of [layout] show now as the engine's environment, the board's id its theme's @keyboard= (060-render-p3 T5),
     // a layout of the user's the board it is based on too (the theme's styles of that board its, 061-custom-layout §10)
     // [keyStyle]: the key style settings over a pack's own keys (a look's has them in it)
     private fun envOf(look: ThemeLook, layout: SceneLayout, width: Int, height: Int, keyStyle: KeyStyleOver?): Env =
-        SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, base = layout.base.takeIf { it != layout.id }, keyStyle = keyStyle) }
+        SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, base = layout.stylesOf, keyStyle = keyStyle) }
 
     // the scene of [sceneTheme] in [env] ([layout]'s): the last kept for the same values, or made; null, the engine refused it
     private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, measurer: TextMeasurer, env: Env): Scene? {
@@ -299,7 +299,7 @@ class SceneBoard(
          */
         @MainThread
         fun resolver(layout: SceneLayout, im: String, nineLetters: Map<Char, String>? = null, slots: SwipeSlots = SwipeSlotsCache.current): KeyResolver =
-            resolver(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters, layout.base), slots)
+            resolver(layout, KeyboardVariants.of(layout.layout, im, EngineState.shuangpinScheme, nineLetters, layout.fallback), slots)
 
         /** [layout]'s resolver for [variant] as given: the long press editor's (060-row-unlock §2: 18 键's L with its `:`), as [resolver]. */
         @MainThread

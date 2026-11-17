@@ -6,7 +6,7 @@ import time
 import zipfile
 
 from uat import (PKG, Blocked, case, check, choose, ensure_ime, first, home, open_url,
-                 reset, script, in_picker)
+                 reset, script, in_picker, to_downloads)
 
 
 def words13():
@@ -112,11 +112,7 @@ def restore(d, fname, refused=None, took=None):
     s = d.screen()
     # 近期的文件 (Android 14+) or 最近 (Android 10's)
     if not s.find(text=fname) and any(s.find(text=t, where="all") for t in ("近期的文件", "最近")):
-        # the drawer's ☰, by what it says to a screen reader (DocumentsUI's drawer_open); not found, where it is on
-        # this AVD (1080×2340, 440 dpi), as import_packs_ui has it
-        menu = next((n for n in s.nodes if n.desc in ("显示根目录", "Show roots")), None)
-        d.tap(menu.c if menu else (77, 148), 1.0)
-        d.tap_text("下载", scroll=False, after=2.0)
+        to_downloads(d, s)
     for _ in range(4):
         n = d.screen().find(text=fname)
         if n:
@@ -383,7 +379,6 @@ case("PR-41", needs="release:要 v0.4.0 正式版升级后以 root 删 Android/d
 case("PR-42", needs="jvm:KotlinHostTest.anUnreadableFileIsNeverWrittenOverAndTheUserIsTold、"
      "KotlinHostTest.filesNotSettledAreReadButNotWrittenAndTheUserIsTold、"
      "UserDataManagerTest.aBackupAndARestoreAreRefusedWhileNotSettled、"
-     "PunctuationMapsTest.where the data is not settled nothing is saved、"
      "EngineBridgeTest.theKeyboardsPinIsRefusedWhereTheFileWouldBeLost、EngineBridgeTest.theKeyboardsPinIsRefusedWhereDataIsNotSettled、PhraseBookTest.aRefusedSaveTakesNoEffect、"
      "ThemeFilesManagerTest.themesNotSettledAreNotWritten")(lambda d: None)
 case("PR-43", needs="release:要 v0.4.0 正式版里并入雾凇拼音，再覆盖安装这一版正式版；发版时手动跑")(lambda d: None)
@@ -449,4 +444,8 @@ case("PR-63", needs="manual:要 0.6.0 的正式包：升级后已装主题包的
 
 case("PR-64", needs="jvm:BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones、BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays")(lambda d: None)
 
-case("PR-68", needs="jvm:ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched、ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone")(lambda d: None)
+case("PR-68", needs="jvm:ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched、"
+                     "ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone、"
+                     "ThemeLayoutsToListTest.onePackImportedUntickedIsRecordedNotListed、"
+                     "ThemeLayoutsToListTest.aRestoreAsTheStartListsDropsItsSwitchOnlyPastItsChecks、"
+                     "ThemeLayoutsToListTest.aRestoreWaitsForASwitchBegunBeforeIt")(lambda d: None)

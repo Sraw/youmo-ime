@@ -443,14 +443,14 @@ class StrokeFilterTest {
     @Test
     fun theFirstSinglesComeRightAfterTheFirstWithTheirEmojiTheWordsAfterThemInOrder() {
         val rows = listOf(
-            0 to wang,
-            1 to listOf("王者", "王", "🙂", "王国", "样子", "杨树", "样", "杨", "望"),
-            2 to listOf("王者", "王", "🙂", "样", "王国", "样子", "杨树", "杨", "望"),
-            5 to listOf("王者", "王", "🙂", "样", "杨", "望", "王国", "样子", "杨树"),
+            Triple(0, "none: as the session has them", wang),
+            Triple(1, "one: 王 and its 🙂 after the first", listOf("王者", "王", "🙂", "王国", "样子", "杨树", "样", "杨", "望")),
+            Triple(2, "two: 样 next, the words after in their order", listOf("王者", "王", "🙂", "样", "王国", "样子", "杨树", "杨", "望")),
+            Triple(5, "five, more than there are: every one", listOf("王者", "王", "🙂", "样", "杨", "望", "王国", "样子", "杨树")),
         )
-        for ((n, expected) in rows) {
+        assertRows(rows, { (n, why) -> "$n singles, $why" }) { (n, _, expected) ->
             val (_, filter) = singles(wang, n)
-            assertEquals("$n", expected, filter.candidates(0, 100).map { it.text })
+            assertEquals(expected, filter.candidates(0, 100).map { it.text })
         }
         // the page shows them: the first, then 王 and its 🙂
         val pinyin = FakePinyin(mapOf("x" to wang))
@@ -461,16 +461,17 @@ class StrokeFilterTest {
 
     @Test
     fun aFirstAloneIsNoneOfThemTooFewAreAsManyAsThereAreOnesAlreadyThereStillMoved() {
-        // the first a character alone: it stays, and two more come after it
-        assertEquals(listOf("王", "样", "杨", "王者", "王国"), singles(listOf("王", "王者", "王国", "样", "杨"), 2).second.candidates(0, 9).map { it.text })
-        // one alone: that one
-        assertEquals(listOf("王者", "望", "王国", "样子"), singles(listOf("王者", "王国", "样子", "望"), 2).second.candidates(0, 9).map { it.text })
-        // none: as it was
-        assertEquals(listOf("王者", "王国"), singles(listOf("王者", "王国"), 2).second.candidates(0, 9).map { it.text })
-        // one already second: the next moved up after it all the same
-        assertEquals(listOf("王者", "王", "样", "样子"), singles(listOf("王者", "王", "样子", "样"), 2).second.candidates(0, 9).map { it.text })
-        // an emoji after the first stays with it
-        assertEquals(listOf("王者", "😀", "王", "王国"), singles(listOf("王者", "😀", "王国", "王"), 2).second.candidates(0, 9).map { it.text })
+        // two singles asked for, each row the session's candidates and what the filter shows
+        val rows = listOf(
+            Triple("the first a character alone: it stays, and two more come after it", listOf("王", "王者", "王国", "样", "杨"), listOf("王", "样", "杨", "王者", "王国")),
+            Triple("one alone: that one", listOf("王者", "王国", "样子", "望"), listOf("王者", "望", "王国", "样子")),
+            Triple("none: as it was", listOf("王者", "王国"), listOf("王者", "王国")),
+            Triple("one already second: the next moved up after it all the same", listOf("王者", "王", "样子", "样"), listOf("王者", "王", "样", "样子")),
+            Triple("an emoji after the first stays with it", listOf("王者", "😀", "王国", "王"), listOf("王者", "😀", "王", "王国")),
+        )
+        assertRows(rows, { it.first }) { (_, words, shown) ->
+            assertEquals(shown, singles(words, 2).second.candidates(0, 9).map { it.text })
+        }
     }
 
     @Test

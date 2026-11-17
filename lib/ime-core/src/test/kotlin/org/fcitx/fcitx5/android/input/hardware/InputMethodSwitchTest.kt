@@ -41,13 +41,9 @@ class InputMethodSwitchTest {
         // from one no longer in the list: the first
         assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next("gone", list))
         assertNull(InputMethodSwitch.next(InputMethodCatalog.PINYIN, listOf(InputMethodCatalog.PINYIN)))
-    }
-
-    @Test
-    fun nextFromOneNotInTheListReachesTheLastToo() {
-        // fcitx fallen back to an English the user removed, or its input method not read yet
+        // but the first of a list of one, from one not in it: fcitx fallen back to an English the user removed, or its
+        // input method not read yet (R26 F8212: was a test of its own, its other line the "gone" one's)
         assertEquals(InputMethodCatalog.PINYIN, InputMethodSwitch.next(en, listOf(InputMethodCatalog.PINYIN)))
-        assertEquals(InputMethodCatalog.WUBI, InputMethodSwitch.next(en, listOf(InputMethodCatalog.WUBI, InputMethodCatalog.PINYIN)))
     }
 
     @Test

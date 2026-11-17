@@ -62,6 +62,14 @@ internal class VoiceEditsGlue(
      * before it (InkOver.inking), whose commit it is. Nothing is followed where nothing is [learning].
      */
     fun answered(im: String, event: Int, s: Snapshot, predicting: Boolean, learning: Boolean, reading: String? = null, inking: Boolean = false) {
+        try {
+            follow(im, event, s, predicting, learning, reading, inking)
+        } finally {
+            releaseIfClosed()
+        }
+    }
+
+    private fun follow(im: String, event: Int, s: Snapshot, predicting: Boolean, learning: Boolean, reading: String?, inking: Boolean) {
         if (!edits.open) return
         // the engine taking back what was before the cursor (English's correction, say): not followed
         if (!learning || s.deleteBefore > 0) return edits.clear()
@@ -73,8 +81,29 @@ internal class VoiceEditsGlue(
 
     /** The host's context, as [Engines.context] has it. */
     fun context(before: String, learning: Boolean, cleared: Boolean, after: String?, selected: Boolean, said: Boolean) {
-        if (!edits.open) return
-        if (!learning) edits.clear() else edits.context(before, after, selected, said, cleared)
+        if (!edits.open) return releaseIfClosed()
+        try {
+            if (!learning) edits.clear() else edits.context(before, after, selected, said, cleared)
+        } finally {
+            releaseIfClosed()
+        }
+    }
+
+    /** Nothing of voice's text followed any more (another field, the habits off): what its edits read let go. */
+    fun end() {
+        edits.clear()
+        releaseIfClosed()
+    }
+
+    /** Whether the user's words read for an edit, or voice's tables of them, are held. */
+    val holdsWords: Boolean get() = userWords.isNotEmpty() || tables.isNotEmpty()
+
+    // the window closed: the user's words (all of them) and voice's tables made for its edits let go, not kept with
+    // the engines till the next window's (review F8342)
+    private fun releaseIfClosed() {
+        if (edits.open) return
+        userWords = emptyList()
+        tables.clear()
     }
 
     /**

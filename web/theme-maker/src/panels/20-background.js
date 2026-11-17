@@ -93,9 +93,9 @@
       return panels.next(d, seeThrough(d.xml, on));
     },
 
-    /** The keyboard's width over its height in [env] (the page's: its device and orientation): the crop's shape. */
-    ratio(env) {
-      const j = root.YoumoMaker.envJson(Object.assign({}, env, { form: 'normal' }));
+    /** The keyboard's width over its height in [env] (the page's: its device and orientation; [E] the engine): the crop's shape. */
+    ratio(E, env) {
+      const j = root.YoumoMaker.envJson(E, Object.assign({}, env, { form: 'normal' }));
       return j.width / j.height;
     },
   };
@@ -112,7 +112,7 @@
     const box = h('div', { className: 'crop' });
     if (!bmp) return h('p', { className: 'muted', textContent: '图片还没读进来' });
     const env = Object.assign({}, api.env(), { landscape: orientation === 'landscape' });
-    const ratio = ops.ratio(env);
+    const ratio = ops.ratio(api.engine, env);
     const was = p.cuts[orientation] && p.cuts[orientation].rect;
     const bytes = d.files[p.src];
     const key = [orientation, p.src, bytes ? contentIdOf(api.lib, bytes) : '', bmp.width + 'x' + bmp.height, ratio, String(was)].join('|');

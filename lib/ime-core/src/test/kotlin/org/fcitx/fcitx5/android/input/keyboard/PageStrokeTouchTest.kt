@@ -117,6 +117,9 @@ class PageStrokeTouchTest {
         assertEquals(Route.LIST, t.up(700f, 400f, 360))
         // held still past it and lifted: the cell's lift (its menu), no tap
         assertEquals(Route.LIST, touch().up(500f, 400f, 450))
+        // R26 F8291: at 长按延迟 itself not yet, past it as GlideTouch.move has a key's
+        assertEquals(Route.HOLD, touch().move(505f, 400f, 300))
+        assertEquals(Route.TAP, touch().up(500f, 400f, 300))
         // 长按延迟 450: at 320 the stroke starts still
         val slow = touch(longPress = 450)
         assertEquals(Route.CANCEL_LIST, slow.move(560f, 400f, 320))

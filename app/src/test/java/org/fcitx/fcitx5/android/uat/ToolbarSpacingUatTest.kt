@@ -64,7 +64,9 @@ class ToolbarSpacingUatTest {
         val open = barCells(h)
         assertEquals("ten slots, all filled: $open", 10, open.size)
         assertOnSlots(open)
-        assertEvenlyApart(open, bigGapAfter = open.indexOfFirst { it.first == s(R.string.status_area) }, gap = open.size)
+        // whole px slots (IdleUi.sizeCells): the bar's width over them leaves under a px a slot, all of it between ⋯ and the right's
+        val roundingPx = open.size
+        assertEvenlyApart(open, bigGapAfter = open.indexOfFirst { it.first == s(R.string.status_area) }, gap = roundingPx)
         h.tap(h.described(s(R.string.hide_toolbar)))
         assertTheEndsStay(h, "393 dp")
     }

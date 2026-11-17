@@ -101,7 +101,7 @@ class LearnedItemsFragmentTest {
             assertTrue(label(Kinds.shuangpin("Ziranma")).startsWith(ctx.getString(R.string.learning_kind_shuangpin) + " · "))
             // the other kinds as before, no scheme added
             assertEquals(ctx.getString(R.string.learning_kind_keys14), label(Kinds.keys(NineKeyLetters.G14.tag())))
-            assertEquals("Pinyin, a theme's keys", label(Kinds.keys(OWN.tag())))
+            assertEquals("Pinyin, own grouped keys", label(Kinds.keys(OWN.tag())))
         }
     }
 }

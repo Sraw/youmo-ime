@@ -199,49 +199,53 @@ class PacksUatTest {
                 h.start()
                 PackStore.useShelf(shelf)
                 h.idle()
+                // what the keyboard shows taken first, the space held before the microphone opens anything; the
+                // table only reads them, so no row stands on another's (review R26 F8179)
+                val status = shelf.status(PackKind.VOICE)
+                val voiceDir = PackStore.dir(PackKind.VOICE)
+                val gated = gate(h)
+                val needed = PackImports.describe(h.service, status)
+                val space = h.keyNamed("space")
+                val f = h.finger(space, h.at(space))
+                h.advance(700)
+                f.up(h.at(space))
+                h.idle()
+                val spaceHeld = h.noticeTexts() to opened()
+                val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
+                h.tap(mic)
+                h.idle()
+                val micTapped = h.noticeTexts() to opened()
                 assertRows(
                     "this build takes the voice pack from v3: 0.6.0's v2 is too old" to {
                         assertEquals(3, BuildConfig.PACK_VOICE_MIN_VERSION)
-                        assertTrue("${shelf.status(PackKind.VOICE)}", shelf.status(PackKind.VOICE) is PackStatus.NeedsUpdate)
+                        assertTrue("$status", status is PackStatus.NeedsUpdate)
                     },
-                    "nothing reads the old pack's models: no directory is given for it" to { assertNull(PackStore.dir(PackKind.VOICE)) },
-                    "the keyboard still types: the text pack is ready" to { assertNull(gate(h)) },
+                    "nothing reads the old pack's models: no directory is given for it" to { assertNull(voiceDir) },
+                    "the keyboard still types: the text pack is ready" to { assertNull(gated) },
                     "the space held does nothing, as without the pack: no notice, no page" to {
-                        val space = h.keyNamed("space")
-                        val f = h.finger(space, h.at(space))
-                        h.advance(700)
-                        f.up(h.at(space))
-                        h.idle()
-                        assertEquals(emptyList<String>(), h.noticeTexts())
-                        assertNull(opened())
+                        assertEquals(emptyList<String>(), spaceHeld.first)
+                        assertNull(spaceHeld.second)
                     },
                     "the microphone says to import v3 and opens the packs page" to {
-                        val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
-                        h.tap(mic)
-                        h.idle()
-                        assertEquals(listOf(h.service.getString(R.string.pack_voice_needed_update, 3)), h.noticeTexts())
-                        assertTrue(openedPacks(opened()))
+                        assertEquals(listOf(h.service.getString(R.string.pack_voice_needed_update, 3)), micTapped.first)
+                        assertTrue(openedPacks(micTapped.second))
                     },
                     "the packs page says which version is needed and which is there" to {
-                        assertEquals(
-                            h.service.getString(R.string.pack_status_needs_update, 3, 2),
-                            PackImports.describe(h.service, shelf.status(PackKind.VOICE)),
-                        )
-                    },
-                    "the old v2 imported again is refused, saying v3 is needed; the one there stays" to {
-                        val again = shelf.import(TestShelves.pack(PackKind.VOICE, version = 2, format = BuildConfig.PACK_VOICE_FORMAT).inputStream())
-                        assertEquals(
-                            h.service.getString(R.string.pack_incompatible_old, "youmo-voice-v2.youmopack", h.service.getString(R.string.pack_voice), 2, 3),
-                            PackImports.describe(h.service, PackImports.Outcome("youmo-voice-v2.youmopack", again)),
-                        )
-                        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.NeedsUpdate)
-                    },
-                    "importing v3 over it makes voice ready" to {
-                        assertTrue(shelf.import(TestShelves.pack(PackKind.VOICE, version = 3, format = BuildConfig.PACK_VOICE_FORMAT).inputStream()) is ImportResult.Imported)
-                        assertTrue(shelf.status(PackKind.VOICE) is PackStatus.Ready)
-                        assertNotNull(shelf.dir(PackKind.VOICE))
+                        assertEquals(h.service.getString(R.string.pack_status_needs_update, 3, 2), needed)
                     },
                 )
+                // then the imports, in order: the old v2 again is refused, saying v3 is needed, the one there staying;
+                // v3 over it makes voice ready
+                val again = shelf.import(TestShelves.pack(PackKind.VOICE, version = 2, format = BuildConfig.PACK_VOICE_FORMAT).inputStream())
+                assertEquals(
+                    "v2 again: refused",
+                    h.service.getString(R.string.pack_incompatible_old, "youmo-voice-v2.youmopack", h.service.getString(R.string.pack_voice), 2, 3),
+                    PackImports.describe(h.service, PackImports.Outcome("youmo-voice-v2.youmopack", again)),
+                )
+                assertTrue("v2 refused: the one there stays", shelf.status(PackKind.VOICE) is PackStatus.NeedsUpdate)
+                assertTrue("v3 imported", shelf.import(TestShelves.pack(PackKind.VOICE, version = 3, format = BuildConfig.PACK_VOICE_FORMAT).inputStream()) is ImportResult.Imported)
+                assertTrue("v3: voice ready", shelf.status(PackKind.VOICE) is PackStatus.Ready)
+                assertNotNull("v3: its models read", shelf.dir(PackKind.VOICE))
             }
         } finally {
             TestShelves.use()

@@ -326,22 +326,24 @@ class HandwritingDecoderTest {
     @Test
     fun `a character held back is never read, nor put in as all the ink reads`() {
         val held = setOf("𤝰", "人")
-        val holding = handwritingDecoder(held = { t -> held.any { it in t } })
+        // a decoder a row: decode() goes on from the beams of the positions it saw before, so one shared would
+        // read a row on from the row before it (review F8118)
+        fun holding() = handwritingDecoder(held = { t -> held.any { it in t } })
         val gao = read("高")
         val ren = read("人", "𤝰")
         assertRows(
-            "a reading with no word id (𤝰) held: the other" to { assertEquals(listOf("山"), holding.decode(listOf(read("𤝰", "山"))).sentences) },
+            "a reading with no word id (𤝰) held: the other" to { assertEquals(listOf("山"), holding().decode(listOf(read("𤝰", "山"))).sentences) },
             "one position, every reading held: nothing, not the ink's best as a block leaves" to {
-                assertEquals(emptyList<String>(), holding.decode(listOf(read("人", "𤝰"))).sentences)
+                assertEquals(emptyList<String>(), holding().decode(listOf(read("人", "𤝰"))).sentences)
             },
             "three positions, the middle's all held: the two either side read as one sentence" to {
-                assertEquals("高山", holding.decode(listOf(gao, ren, read("山"))).text)
+                assertEquals("高山", holding().decode(listOf(gao, ren, read("山"))).text)
             },
             "held, as blocked, in no word either" to {
-                assertTrue(holding.decode(listOf(gao, read("人", "山"))).sentences.none { "人" in it })
+                assertTrue(holding().decode(listOf(gao, read("人", "山"))).sentences.none { "人" in it })
             },
             "a stroke more goes on from the beams before, the positions held left out as they were" to {
-                val d = handwritingDecoder(held = { t -> held.any { it in t } })
+                val d = holding()
                 d.decode(listOf(gao, ren))
                 val shan = read("山")
                 assertEquals("高山", d.decode(listOf(gao, ren, shan)).text)

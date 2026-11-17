@@ -400,13 +400,20 @@ class TextKeyboard(
     /**
      * A tap's action: 分词's ([separatorTyped], whenever it lands), and Shift's tapped as typing began (down while
      * Shift was drawn, up once 分词 is: the key a finger is on stays the one it went down on, SceneTouch.Pointer) the
-     * same. Only where the scene shows 分词: a theme's or user's qwerty with none keeps its Shift Shift.
+     * same. Only where the scene shows 分词 and no longer the key pressed: a theme's or user's qwerty with none keeps its
+     * Shift Shift, and one that keeps its Shift beside an `apostrophe` key too (R26 F8178).
      */
     override fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = when {
         // 分词's alone: a theme's plain `'` key types as any other key (Shift once used up on it, as in 0.6.0)
         key.id == SEPARATOR_KEY && action is KeyAction.HostKeyAction && action.act == ShiftSeparator.TYPED -> separatorTyped
-        action is KeyAction.CapsAction && separating && canvas?.shownKeys?.any { it.id == SEPARATOR_KEY } == true -> separatorTyped
+        action is KeyAction.CapsAction && separating && separatorTookShift(key) -> separatorTyped
         else -> action
+    }
+
+    // 分词 drawn, and [key] (a Shift pressed as it was drawn) no longer: 分词 is in its place
+    private fun separatorTookShift(key: KeyRef): Boolean {
+        val shown = canvas?.shownKeys ?: return false
+        return shown.any { it.id == SEPARATOR_KEY } && shown.none { it.id == key.id }
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {

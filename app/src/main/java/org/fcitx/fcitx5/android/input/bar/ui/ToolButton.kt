@@ -89,28 +89,34 @@ class ToolButton(context: Context) : CustomGestureView(context) {
     // a toggle's state, said by TalkBack as checked or not; null: no toggle
     private var on: Boolean? = null
 
+    // [on] said as checked or not: false where the button's name already says its state (setOn)
+    private var checkable = true
+
     /**
      * A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it, and
      * said so: a checkable node, checked while on (061-handwriting-toolbar §3.8; stateDescription is API 30's).
+     * [checkable] false: drawn so only, its name the state's or the tap's (简繁, 我的输入习惯), which a checked
+     * state would contradict (R26 F8269: 已选中，恢复我的输入习惯).
      */
-    fun setOn(on: Boolean) {
+    fun setOn(on: Boolean, checkable: Boolean = true) {
         this.on = on
+        this.checkable = checkable
         val look = toolbar ?: return
         setIconTint((if (on) look.onIcon else look.icon).value)
         if (look.fill != look.onFill) background = background(look, on)
     }
 
     /** [setOn] with the icon of that state ([icon]): drawn once, in the state's colour. */
-    fun setOn(on: Boolean, icon: BarIcons.Icon) {
+    fun setOn(on: Boolean, icon: BarIcons.Icon, checkable: Boolean = true) {
         shown = icon
-        setOn(on)
+        setOn(on, checkable)
         // the app's: set by its resource, the tint list already the state's
         if (!themed) drawIcon()
     }
 
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
-        on?.let {
+        on?.takeIf { checkable }?.let {
             info.isCheckable = true
             info.isChecked = it
         }
@@ -221,8 +227,8 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         drawIcon()
     }
 
-    /** Whether the icon shown is the theme's by its name (or will be, once read). */
-    val themed: Boolean get() = shown?.let { BarIconDrawables.themed(icons, it) } == true
+    /** Whether the icon shown is the theme's (or will be, once read): not where its file failed and the app's is drawn. */
+    val themed: Boolean get() = shown?.let { BarIconDrawables.drawsOwn(icons, it) } == true
 
     /** The icon as drawn now; null where the theme's is not read yet. */
     @get:VisibleForTesting

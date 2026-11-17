@@ -186,11 +186,12 @@ class ScreenTest(unittest.TestCase):
         letters = screen(("ABC", "2", ""), ("", "language", f"{uat.PKG}:id/button_lang"))
         pad = screen(("符", "symbols", ""), ("返回", "back", ""))
         panel = screen(("返回", "back", ""), ("123", "numbers", ""))
-        stuck = screen(("返回", "back", ""))
+        # four reads of the same screen, each its own object: the one returned is the one read after the third tap
+        stuck = [screen(("返回", "back", "")) for _ in range(4)]
         for name, shown, taps in (("the letters: nothing tapped, not their ABC", [letters], 0),
                                   ("a number pad", [pad, letters], 1),
                                   ("the symbol panel over a number pad", [panel, pad, letters], 2),
-                                  ("a way back that does not go: three taps, then left", [stuck] * 4, 3)):
+                                  ("a way back that does not go: three taps, then left", stuck, 3)):
             with self.subTest(name):
                 d = uat.Device("5556")
                 tapped, screens = [], iter(shown[1:])
@@ -199,6 +200,31 @@ class ScreenTest(unittest.TestCase):
                 last = d.to_letters(shown[0])
                 self.assertEqual(taps, len(tapped))
                 self.assertIs(shown[taps], last)
+
+    def test_the_pickers_roots_drawer_is_found_by_its_name_or_blocks(self):
+        # the ☰ where this AVD does not have it: tapped where it is; 下载 listed with no ☰ (a wide window's roots):
+        # tapped as it is (review R26 F8494); neither on screen blocks, no blind tap
+        def screen(desc, text=""):
+            node = f'<node package="com.android.documentsui" content-desc="{desc}" bounds="[10,300][110,400]"/>' if desc else ""
+            if text:
+                node += f'<node package="com.google.android.documentsui" text="{text}" bounds="[0,500][400,600]"/>'
+            return uat.Screen(f'<hierarchy><window type="1">{node}</window></hierarchy>')
+        d = uat.Device("5556")
+        tapped, texts = [], []
+        d.tap = lambda xy, after=None: tapped.append(xy)
+        d.tap_text = lambda t, **kw: texts.append(t)
+        uat.to_downloads(d, screen("显示根目录"))
+        self.assertEqual([(60, 350)], tapped)
+        self.assertEqual(["下载"], texts)
+        tapped.clear()
+        texts.clear()
+        uat.to_downloads(d, screen(None, "下载"))
+        self.assertEqual([(200, 550)], tapped)
+        self.assertEqual([], texts)
+        tapped.clear()
+        with self.assertRaises(uat.Blocked):
+            uat.to_downloads(d, screen(None))
+        self.assertEqual([], tapped)
 
     def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
         # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's
@@ -492,6 +518,13 @@ class JvmTest(unittest.TestCase):
                    '<testcase name="menu[jvm]" classname="org.x.PopupsTest" time="0.1"/></testsuite>')
         results = uat.junit_results([os.path.join(self.tmp.name, "k")])
         self.assertEqual("通过", uat.jvm_record({"KB-105": [("org.x.PopupsTest", "menu")]}, results)["KB-105"][0])
+
+    def test_a_testcase_with_no_name_is_read_not_raised(self):
+        # JUnit XML always names a testcase; one without is read under "" rather than raising TypeError
+        self.write("n/TEST-org.x.KeysTest.xml", '<testsuite name="org.x.KeysTest">'
+                   '<testcase classname="org.x.KeysTest" time="0.1"/></testsuite>')
+        results = uat.junit_results([os.path.join(self.tmp.name, "n")])
+        self.assertEqual("通过", results[("org.x.KeysTest", "")][0])
 
     def test_a_case_fails_with_any_of_its_tests_and_is_blocked_without_a_result(self):
         self.write("r/TEST-org.x.KeysTest.xml", '<testsuite name="org.x.KeysTest">'

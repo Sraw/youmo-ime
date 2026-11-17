@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings.theme
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -13,10 +14,12 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -99,11 +102,7 @@ class ThemeListFragment : Fragment() {
                         } else {
                             themeListAdapter.replaceTheme(theme)
                         }
-                        if (migrated) {
-                            ctx.toast(R.string.theme_migrated)
-                        }
-                        // its name another theme's (a built-in one's since 0.6.0): said under which it is
-                        opened.imported.renamedFrom?.let { ctx.toast(ctx.getString(R.string.theme_imported_renamed, it, theme.name), Toast.LENGTH_LONG) }
+                        importedNotice(ctx, migrated, opened.imported.renamedFrom, theme.name)?.let { (text, length) -> ctx.toast(text, length) }
                     } catch (e: Exception) {
                         ctx.importErrorDialog(e)
                     }
@@ -227,12 +226,24 @@ class ThemeListFragment : Fragment() {
                     try {
                         withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
                         ThemeManager.packPlaced(pack.staged.name)
-                        if (withLayouts != null) listLayouts(pack.staged.name, listLayouts, pack.staged.layoutReport.listed.size)
                         // its versions one card, a pack it replaced gone: the list made again
                         themeListAdapter.resetThemes(ThemeManager.getAllThemes())
                         updateSelectedThemes()
                     } catch (e: Exception) {
                         ctx.importErrorDialog(e)
+                        return@withLoadingDialog
+                    }
+                    // the theme in, whatever becomes of its layouts: what fails listing them said as theirs, not as the
+                    // import's failure (R26 F8378: it was, the list not made again)
+                    if (withLayouts != null) {
+                        try {
+                            listLayouts(pack.staged.name, listLayouts, pack.staged.layoutReport.listed.size)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                            Timber.w(e, "theme pack %s: layouts not listed", pack.staged.name)
+                            context?.toast(R.string.theme_pack_layouts_not_listed, Toast.LENGTH_LONG)
+                        }
                     }
                 }
             }
@@ -257,7 +268,7 @@ class ThemeListFragment : Fragment() {
         }
         // here, on the main thread, where the settings pages change them too
         made?.forEach { ThemeLayoutsToList.copySettings(it.done.renames) }
-        if (made == null || made.size < expected) context?.toast(R.string.theme_pack_layouts_not_listed, Toast.LENGTH_LONG)
+        context?.let { ctx -> layoutsNotListedNotice(ctx, made, expected)?.let { ctx.toast(it, Toast.LENGTH_LONG) } }
     }
 
     private fun themeInfo(theme: Theme) {
@@ -282,5 +293,32 @@ class ThemeListFragment : Fragment() {
     override fun onDestroy() {
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
         super.onDestroy()
+    }
+
+    companion object {
+        /**
+         * What a theme imported says, one toast and its length: [migrated] (an older format's, made anew), and where its
+         * name was another theme's (a built-in one's since 0.6.0) [renamedFrom], the name it is under now, [name]. One
+         * toast: the newest takes the place of one shown (showBriefly), so a second would hide the first (R26 F8137).
+         * Null, nothing to say.
+         */
+        @VisibleForTesting
+        internal fun importedNotice(ctx: Context, migrated: Boolean, renamedFrom: String?, name: String): Pair<String, Int>? {
+            val lines = listOfNotNull(
+                ctx.getString(R.string.theme_migrated).takeIf { migrated },
+                renamedFrom?.let { ctx.getString(R.string.theme_imported_renamed, it, name) },
+            )
+            if (lines.isEmpty()) return null
+            return lines.joinToString("\n") to if (renamedFrom != null) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+        }
+
+        /**
+         * What an import with 「一起导入」 says of its boards: [made] (null: the listing failed) fewer than the [expected]
+         * the confirmation listed (the list full, one failed), that not all were put in 外观 → 布局 (ST-72, ST-84). Null,
+         * all listed (R26 F8518).
+         */
+        @VisibleForTesting
+        internal fun layoutsNotListedNotice(ctx: Context, made: List<ThemeLayoutsToList.Listed>?, expected: Int): String? =
+            ctx.getString(R.string.theme_pack_layouts_not_listed).takeIf { made == null || made.size < expected }
     }
 }

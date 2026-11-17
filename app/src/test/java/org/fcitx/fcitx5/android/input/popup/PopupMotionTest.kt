@@ -12,11 +12,9 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -43,10 +41,7 @@ import splitties.dimensions.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import java.io.ByteArrayOutputStream
 import java.time.Duration
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
  * 060-render-p3 A2: a theme's popups coming up (`appear`) and going (`transition`): a bubble and a long
@@ -68,21 +63,7 @@ class PopupMotionTest {
     private val five = KeyDef.Popup.Keyboard.Explicit(arrayOf("1", "2", "3", "4", "5"))
 
     // a user's pack: material's file, named its own, [styles] put last; its light version (as KeyMotionTest's)
-    private fun pack(vararg styles: String): Theme {
-        val text = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_material)
-            .replace("name=\"material\"", "name=\"moving\"")
-            .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
-        val zip = ByteArrayOutputStream().also { bytes ->
-            ZipOutputStream(bytes).use {
-                it.putNextEntry(ZipEntry("theme.xml"))
-                it.write(text.encodeToByteArray())
-            }
-        }.toByteArray()
-        val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
-        val versions = opened.commit().getOrThrow()
-        ThemeManager.packPlaced(versions[0].file)
-        return versions.first { !it.isDark }
-    }
+    private fun pack(vararg styles: String): Theme = materialPack("moving", *styles)
 
     private val moving by lazy {
         pack(

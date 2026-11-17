@@ -101,8 +101,8 @@ class PageStrokeTouch {
     /** The finger at [x], [y] at [time] (its history [add]ed first). */
     fun move(x: Float, y: Float, time: Long): Route = when (state) {
         State.PENDING -> {
-            if (time - t0 >= longPressMillis) {
-                // the long press came first: the cell's, as a key's is (GlideTouch.move)
+            if (time - t0 > longPressMillis) {
+                // the long press came first: the cell's, as a key's is (GlideTouch.move: past the delay, not at it)
                 state = State.LIST
                 Route.LIST
             } else {
@@ -154,7 +154,7 @@ class PageStrokeTouch {
             far = maxOf(far, hypot(x - x0, y - y0))
             when {
                 // held still past the long press: it came up, the lift is the cell's (its menu's)
-                time - t0 >= longPressMillis -> Route.LIST
+                time - t0 > longPressMillis -> Route.LIST
                 far <= slop -> Route.TAP
                 else -> Route.NONE
             }

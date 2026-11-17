@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.KeyBoxes
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
@@ -117,7 +118,7 @@ class HabitOrderReadsAlongTest {
         }
     }
 
-    private fun touches(keys: String, board: org.fcitx.fcitx5.android.engine.pinyin.KeyBoxes, random: Random): Array<Touch?> =
+    private fun touches(keys: String, board: KeyBoxes, random: Random): Array<Touch?> =
         keys.map { c -> if (random.nextBoolean()) TouchBoxes.tap(board, c) else TouchBoxes.tap(board, c, random.nextFloat() - 0.5f, random.nextFloat() - 0.5f) }
             .toTypedArray()
 

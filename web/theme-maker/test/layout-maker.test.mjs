@@ -3,6 +3,10 @@
 // saved as the app imports it, every finding the checker may give said in words, the preview's environment as the app's;
 // its editing (src/layout/layout-edit.js): moves, keys added and taken out, widths, rows=, long-press lists, merges, rows
 // and the app's bottom row made the layout's own, each read back by the engine as meant.
+// contract: a theme pack's board made one of the user's is PackConvertTest's snapshot (commonTest/data/convert/
+// k17-motion.layout); LM.WORDS says every finding FORMAT.keys holds; LM.refusal every why PackLayouts.convert and
+// LayoutCheck.kept give (their Kotlin read here); the examples are as the app takes them, the page's youmo-format block
+// the generated youmo-format.json.
 // Run: node --test web/theme-maker/test/layout-maker.test.mjs   (needs ./gradlew :lib:keyboard-scene:youmoEngine)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,6 +31,8 @@ const FORMAT = E.layoutFormat();
 const fixed = E.fixedMeasurer();
 const material = E.readTheme(E.themeSource('material'), null, null).theme;
 const enc = (t) => new TextEncoder().encode(t);
+// the line of [xml] where key [id] is written (its `<key id="…"`), 0 where none
+const lineOfKey = (xml, id) => xml.split('\n').findIndex((l) => l.includes('<key id="' + id + '"')) + 1;
 const fresh = (base = 'k18') => LM.fromBuiltin(E, base, 'my-' + base, '我的' + LM.BASE_LABEL[base]);
 
 test('the page is made of src/layout/ and the shared scripts, runs only its own by their hashes, and the theme maker and it link each other', () => {
@@ -84,10 +90,13 @@ test('each finding is said in Chinese with what it names; one the table lacks as
   assert.equal(LM.words({ key: 'bottom-left', args: ['back numbers'] }), '左下角通常是 返回、123（和 App 自带的一样）');
   assert.equal(LM.words({ key: 'label-long', args: ['hjk', '16'] }), '键「hjk」显示的字太长：最多 16 个字符');
   assert.equal(LM.words({ key: 'gap-look', args: [] }), '空位（gap）的 look=、class= 不起作用');
-  assert.equal(LM.words({ key: 'held', args: ['g18/h', 'k18'] }), 'g18/h 是18 键的键，这里写的长按、角标、滑动不起作用');
+  assert.equal(LM.words({ key: 'held', args: ['g18/h', 'k18'] }), 'g18/h 是 18 键的键，这里写的长按、角标、滑动不起作用');
   assert.equal(LM.words({ key: 'held', args: ['fn/x', 'number-row'] }), 'fn/x 是数字行的键，这里写的长按、角标、滑动不起作用');
-  assert.equal(LM.words({ key: 'held-letters', args: ['g18/h', 'k18'] }), 'g18/h 是18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名');
-  assert.equal(LM.words({ key: 'held-popups', args: ['k18'] }), '这里写的 popups= 不起作用，跟18 键一样');
+  assert.equal(LM.words({ key: 'held-letters', args: ['g18/h', 'k18'] }), 'g18/h 是 18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名');
+  assert.equal(LM.words({ key: 'held-popups', args: ['k18'] }), '这里写的 popups= 不起作用，跟 18 键一样');
+  // a name of Latin letters at both ends spaced on both sides; a Chinese one on neither (R26 F8374, as the app's)
+  assert.equal(LM.words({ key: 'held-popups', args: ['mine'] }), '这里写的 popups= 不起作用，跟 mine 一样');
+  assert.equal(LM.words({ key: 'held-popups', args: ['number-row'] }), '这里写的 popups= 不起作用，跟数字行一样');
   assert.equal(LM.words({ key: 'later', args: ['a'] }), 'later：a');
 });
 
@@ -221,7 +230,7 @@ test('保存: errors keep it from being saved; else min-app written as the check
   const described = LM.setMeta(xml, 'description', "min-app='0.1'");
   const d = LM.saveCheck(E, described, FORMAT.version, material);
   assert.deepEqual(d.errors, []);
-  assert.deepEqual(LM.info(d.xml).meta, { description: "min-app='0.1'", 'min-app': ok.minApp ?? LM.info(ok.xml).meta['min-app'] });
+  assert.deepEqual(LM.info(d.xml).meta, { description: "min-app='0.1'", 'min-app': E.checkLayout(xml, FORMAT.version, null).minApp });
   assert.ok(E.checkLayout(d.xml, FORMAT.version, null).ok);
   // the text with min-app is checked again and given only where it passes: else its errors, the text as it was
   let calls = 0;
@@ -242,15 +251,14 @@ test('the problems: the checker\'s with their lines, the preview environment\'s 
   // a key with no long press name: a warning with its line
   const unnamed = LM.check(E, xml.replace(/(<key id="q"[^>]*?) shortcut="[^"]*"/, '$1'), LM.ENV, material, fixed, FORMAT.version);
   const u = unnamed.problems.find((p) => /没有按键名/.test(p.message));
-  assert.ok(u && u.line === LM.lineOfKey(xml, 'q'), JSON.stringify(unnamed.problems));
+  assert.ok(u && u.line === lineOfKey(xml, 'q'), JSON.stringify(unnamed.problems));
   // a key of the app's name writing a swipe of its own: told by its line (the app's is taken)
   const held = LM.check(E, xml.replace(/(<key id="q"[^>]*?) shortcut="full\/q"/, '$1 shortcut="full/q" swipe-down="x"'), LM.ENV, material, fixed, FORMAT.version);
   const h = held.problems.find((p) => p.message === 'full/q 是全键盘的键，这里写的长按、角标、滑动不起作用');
-  assert.ok(h && h.level === 'warning' && h.line === LM.lineOfKey(xml, 'q'), JSON.stringify(held.problems));
+  assert.ok(h && h.level === 'warning' && h.line === lineOfKey(xml, 'q'), JSON.stringify(held.problems));
   // an engine that throws is a problem, not a page that stops
   const thrown = LM.check({ checkLayout: () => { throw new Error('boom'); } }, xml, LM.ENV, material, fixed, FORMAT.version);
   assert.deepEqual(thrown.problems, [{ level: 'error', line: 0, message: '引擎出错：boom' }]);
-  assert.equal(LM.lineOfKey(xml, 'nope'), 0);
   // the checker's problems as it says them, each once; the preview environment's after them, said as its own
   const clean = LM.check(E, xml, LM.ENV, material, fixed, FORMAT.version);
   assert.deepEqual(clean.problems, LM.findings(clean.report));
@@ -261,14 +269,13 @@ test('the problems: the checker\'s with their lines, the preview environment\'s 
   const retired = xml.replace('<key id="q" ', '<key id="q" role="reading" ');
   const rr = LM.check(E, retired, LM.ENV, material, fixed, FORMAT.version);
   const w = rr.problems.find((p) => /^读取：/.test(p.message));
-  assert.ok(w && w.level === 'warning' && w.line === LM.lineOfKey(retired, 'q'), JSON.stringify(rr.problems));
+  assert.ok(w && w.level === 'warning' && w.line === lineOfKey(retired, 'q'), JSON.stringify(rr.problems));
   // past the app's size: that one error, nothing read or drawn
   const big = xml.replace('</keyboard>', '<!--' + 'x'.repeat(FORMAT.limits.bytes) + '--></keyboard>');
   const b = LM.check(E, big, LM.ENV, material, fixed, FORMAT.version);
   assert.deepEqual(b.problems.map((p) => p.message), ['文件 ' + enc(big).length + ' 字节，超过 64 KB']);
   assert.equal(b.layout, null);
   assert.equal(b.scene, null);
-  assert.equal(LM.lineOfKey(xml, 'q'), xml.split('\n').findIndex((l) => l.includes('<key id="q"')) + 1);
 });
 
 test('横屏 is never a toggle: the device and its turn say it, as the app (ScreenShape); the keyboard as tall as the app makes it', () => {
@@ -336,8 +343,7 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
   const xml = readFileSync(join(data, 'mint-k17', 'theme.xml'), 'utf8').replace('<colors>', '<meta author="小明" license="CC-BY-4.0"/>\n  <colors>');
   // a pack as the page opens it: zipped, its zhuyin.xml (a board the app still has replaced) and a broken number.xml beside
   const tf = JSON.parse(readFileSync(join(here, '..', 'generated', 'youmo-format.json'), 'utf8'));
-  const enc = new TextEncoder();
-  const zip = L.writeZip([['theme.xml', enc.encode(xml)], ['layouts/k18.xml', enc.encode(k18)], ['layouts/zhuyin.xml', enc.encode(E.layoutSource('zhuyin'))], ['layouts/number.xml', enc.encode('<keyboard')]]);
+  const zip = L.writeZip([['theme.xml', enc(xml)], ['layouts/k18.xml', enc(k18)], ['layouts/zhuyin.xml', enc(E.layoutSource('zhuyin'))], ['layouts/number.xml', enc('<keyboard')]]);
   const d = (await M.open(E, L, tf, zip)).doc;
   const theme = E.readTheme(d.xml, null, null).theme;
   const boards = LM.themeBoards(E, d, theme, [...FORMAT.bases], FORMAT.version);
@@ -353,6 +359,46 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
   assert.equal(LM.refusal("the app's k18 does not read"), 'App 自带的 k18 读不出来');
   assert.equal(LM.refusal('made one that does not take: a letters board lacks the keys x'), '转出来的布局检查不过：a letters board lacks the keys x');
   assert.equal(LM.refusal('its fragment grouped-bottom does not read'), '它用的片段 grouped-bottom 读不出来');
+  // a number board's pads (PackLayouts.forPads) and what LayoutCheck.kept holds a board to (review R26 F8106)
+  assert.equal(LM.refusal('its pads lack keys: phone datetime'), '它写的数字键盘缺键：「电话」、「日期时间」');
+  assert.equal(LM.refusal("over 256 when= alternatives an include's and its rows' make"), '它用的片段和片段里的行，when= 条件合起来超过 256 种');
+  assert.equal(LM.refusal('it serves no pad'), '哪种数字键盘都缺键，一种也用不了');
+  assert.equal(LM.refusal('it has no slot [nine-side, symbol-grid]'), '少了 App 这块必有的位置：九键左边的符号列、符号面板的符号格子');
+  assert.equal(LM.refusal('it has no key [backspace, enter]'), '少了 App 这块必有的键：删除、回车');
+  assert.equal(LM.refusal('it has no key [2, 3]'), '少了 App 这块必有的键：2、3');
+  // kept's sets as the engine writes them
+  const nine = E.layoutSource('nine');
+  const why = (text) => E.convertPackLayout('t', null, 'nine', text, null, FORMAT.version).why;
+  assert.equal(LM.refusal(why(nine.replace('kind="nine-side"', 'kind="symbol-grid"'))), '少了 App 这块必有的位置：九键左边的符号列');
+  assert.equal(LM.refusal(why(nine.replace('role="backspace"', ''))), '少了 App 这块必有的键：删除');
+  // each why the Kotlin gives (PackLayouts.convert, judge, forPads; LayoutCheck.kept), read from it: one added there
+  // and not here comes out in English
+  const kotlin = (f) => readFileSync(join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonMain', 'kotlin', 'org', 'fcitx', 'fcitx5', 'android', 'scene', 'layout', f), 'utf8');
+  // a function's body, up to its closing brace at four spaces (a member's): one renamed or written otherwise fails here
+  // by its name, not as a null read further on
+  const fun = (text, file, name) => {
+    const m = new RegExp('fun ' + name + '\\([\\s\\S]*?\\n    }\\n').exec(text);
+    assert.ok(m, file + ': no fun ' + name + '( closed by a "    }" line');
+    return m[0];
+  };
+  const literal = '"((?:\\$\\{[^}]*\\}|[^"\\\\]|\\\\.)*)"';
+  const pack = kotlin('PackLayouts.kt');
+  const found = (what, list, least) => {
+    assert.ok(new Set(list).size >= least, what + ': ' + new Set(list).size + ' whys read, fewer than its ' + least + ': ' + list.join(' | '));
+    return list;
+  };
+  // the floors are the whys each has now, distinct (one fewer read: the pattern no longer finds one): convert's and
+  // forPads' 8 (9 written, a fragment's `does not read` twice), judge's 3, kept's 2 (`no key` for two sets); 13 in all
+  const whys = new Set([
+    ...found('PackLayouts Converted.Not/ForPads', [...pack.matchAll(new RegExp('(?:Converted\\.Not\\(|ForPads\\(null, )' + literal, 'g'))].map((m) => m[1]), 8),
+    ...found('PackLayouts.judge', [...fun(pack, 'PackLayouts.kt', 'judge').matchAll(new RegExp('return ' + literal, 'g'))].map((m) => m[1]), 3),
+    ...found('LayoutCheck.kept', [...fun(kotlin('LayoutCheck.kt'), 'LayoutCheck.kt', 'kept').matchAll(new RegExp('return ' + literal, 'g'))].map((m) => m[1].replace('$it', '[$it]')), 2),
+  ]);
+  for (const w of whys) {
+    const said = LM.refusal(w.replace(/\$\{[^}]*\}|\$\w+/g, 'k18'));
+    // what the page writes in Latin letters itself: App, id, an attribute's name (when=)
+    assert.doesNotMatch(said.replaceAll('k18', '').replaceAll('App', '').replace(/[a-z-]+=/g, ''), /[A-Za-z]{3,}/, w);
+  }
   assert.deepEqual(LM.saveCheck(E, boards[0].text, FORMAT.version, theme).errors, []);
   // the pack's own fragment written in, as the app's import does
   const bottom = E.layoutSource('grouped-bottom').replace('<fragment', '<!-- mine -->\n<fragment');
@@ -485,11 +531,14 @@ test('a key\'s attributes: width (snapped as dragged), rows=, kind, label and ac
   const cell = LE.parse(n).rows.flatMap((r) => r.cells).find((c) => !c.a.width);
   assert.equal(cell ? LE.widthOf(n, LE.parse(n), cell) : '22', '22', 'the board\'s <defaults>');
   assert.deepEqual([LE.snap(1.26, 10), LE.snap(1.24, 10), LE.snap(0.1, 10), LE.snap(14.4, 100), LE.snap(400, 10)], [1.5, 1, 0.5, 14, 100]);
-  for (const raw of [null, 'x', '{case:x}', '{punct:,}', '{ime-name}']) {
+  for (const raw of [null, 'x', '{case:x}', '{punct:,}', '{ime-name}', '{punct:,}{punct:.}']) {
     const p = LE.labelParts(raw);
     assert.equal(LE.labelText(p.type, p.arg), raw, String(raw));
   }
   assert.equal(LE.labelParts('{ime-name}').type, 'other');
+  // two bindings: written as they are (review R26 F8272), so the panel takes an edit of them
+  assert.deepEqual(LE.labelParts('{punct:,}{punct:.}'), { type: 'other', arg: '{punct:,}{punct:.}' });
+  assert.equal(LE.labelProblem('other', '{punct:,}{punct:.}'), null);
   // braces are a binding's: refused as a text, said why
   assert.match(LE.labelProblem('text', 'a{b'), /不能有 \{ 或 \}/);
   assert.match(LE.labelProblem('case', 'x}'), /不能有/);
@@ -619,6 +668,31 @@ test('group letters set: the face the group\'s own follows them, a face written 
   // a {group:hjk} of the page before L8 (refused by the reader): followed, and so made right
   const old = LE.setAttrs(hjk, h, { label: '{group:hjk}' });
   assert.equal(a(LE.setLetters(old, h, 'hjkl', held)).label, 'HJKL');
+  // and one opened or a draft restored (review R26 D8): its face written as now, the reader taking it; a face of
+  // other letters than its own, or of two, as it was
+  assert.notDeepEqual(errorsOf(old), []);
+  const back = M.oldGroupFaces(old);
+  assert.equal(back.keys, 1);
+  assert.equal(back.xml, hjk);
+  assert.deepEqual(errorsOf(back.xml), []);
+  assert.deepEqual(M.oldGroupFaces(hjk), { xml: hjk, keys: 0 });
+  const other = LE.setAttrs(hjk, h, { label: '{group:xyz}' });
+  assert.deepEqual(M.oldGroupFaces(other), { xml: other, keys: 0 });
+  // its own scan of the tag's attributes (R26 F8515): a label= in single quotes written as now; a `label="…"` inside an
+  // attribute's value before it is that value, left as it is, the key's own label= the one written
+  assert.deepEqual(M.oldGroupFaces(old.replace('label="{group:hjk}"', "label='{group:hjk}'")), { xml: hjk, keys: 1 });
+  const inValue = (xml, label) => xml.replace(label, `swipe-down='commit:label="{group:hjk}"' ${label}`);
+  const face = /label="[^"]*"/.exec(hjk.slice(hjk.indexOf('id="r2c4"')))[0];
+  assert.deepEqual(M.oldGroupFaces(inValue(old, 'label="{group:hjk}"')), { xml: inValue(hjk, face), keys: 1 });
+  // the face written as this page writes it (M's own copy of LE.groupLabel's capitals), by rows or not
+  const rowsOld = LE.setAttrs(LE.setLetters(hjk, h, 'h jk', held), h, { label: '{group:hjk}' });
+  assert.equal(a(M.oldGroupFaces(rowsOld).xml).label, LE.groupLabel('h jk'));
+  // and the theme maker's 打开 .layout (F8459): such a file drawn as the engine reads it now, how many said (as it is,
+  // the reader refuses it: a line error, nothing said why)
+  assert.equal(E.readOwnLayout(old).ok, false);
+  const opened = M.openLayout(E, enc(old));
+  assert.deepEqual([opened.id, opened.oldFaces], ['my-k18', 1]);
+  assert.equal(M.openLayout(E, enc(hjk)).oldFaces, 0);
   // letters by rows: the face followed after, and again
   const rows = LE.setLetters(hjk, h, 'h jk', held);
   assert.deepEqual([a(rows).label, a(rows).letters], ['HJK', 'h jk']);
@@ -655,6 +729,11 @@ test('rows: added, moved, taken out; their height and indent; the app\'s bottom 
   assert.deepEqual(engineIds(own), [...ids(xml), ...ids(src('grouped-bottom'))], 'the same keys as the include drew');
   const when = LE.ownRows(xml.replace('<include src="grouped-bottom"/>', '<include src="grouped-bottom" when="ime=pinyin"/>'), 0, src('grouped-bottom'));
   assert.match(when, /<row when="ime=pinyin">/);
+  // both when= held, each of the include's `, ` groups with the row's (review R26 F8368: `a, b c` read `a, (b c)`)
+  const rowWhen = '<fragment id="f2">\n<row when="landscape">\n<key id="zc" label="c" send="c"/>\n</row>\n</fragment>';
+  const anded = LE.ownRows(xml.replace('<include src="grouped-bottom"/>', '<include src="grouped-bottom" when="ime=pinyin, ime=wubi"/>'), 0, rowWhen);
+  assert.match(anded, /<row when="ime=pinyin landscape, ime=wubi landscape">/);
+  assert.ok(E.readOwnLayout(anded).ok, 'the engine reads it');
   assert.equal(LE.ownRows(xml, 0, null), xml, 'no fragment text: nothing');
   // a fragment's own <defaults> (under its rows', over the board's) carried into each row's, a row's own winning
   const frag = '<fragment id="f1">\n<defaults kind="function" width="2"/>\n<row>\n<key id="za" label="a" send="a"/>\n</row>\n<row>\n<defaults width="3"/>\n<key id="zb" label="b" send="b"/>\n</row>\n</fragment>';
@@ -679,7 +758,7 @@ test('a key the scene shows found where it is written: once, twice (each its whe
   assert.match(tag(phone), /when="pad=phone"/);
   assert.deepEqual(LE.locate(fresh('qwerty'), 'q', () => assert.fail('not asked for a key written once')), { row: 0, index: 0 });
   const q = fresh('qwerty');
-  assert.deepEqual(LE.atLine(q, LM.lineOfKey(q, 'e')), { row: 0, index: 2 });
+  assert.deepEqual(LE.atLine(q, lineOfKey(q, 'e')), { row: 0, index: 2 });
   assert.equal(LE.atLine(q, 1), null);
 });
 

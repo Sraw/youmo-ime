@@ -4,6 +4,9 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import kotlinx.serialization.json.Json
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.utils.appContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -45,3 +48,28 @@ fun ThemeFilesManager.exportJson(theme: Theme.Custom, dest: OutputStream): Resul
             zip.closeEntry()
         }
     }
+
+/**
+ * A user's pack (what no built-in theme is, as motion, effects or a style of a layout's): the built-in material's file
+ * named [name], [styles] put last, [files] (name to bytes) beside it, imported as the theme page imports it and placed;
+ * its light version.
+ */
+fun materialPack(name: String, vararg styles: String, files: Map<String, ByteArray> = emptyMap()): Theme {
+    val text = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_material)
+        .replace("name=\"material\"", "name=\"$name\"")
+        .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
+    val zip = ByteArrayOutputStream().also { bytes ->
+        ZipOutputStream(bytes).use {
+            it.putNextEntry(ZipEntry(ThemePackFiles.THEME_XML))
+            it.write(text.encodeToByteArray())
+            for ((file, content) in files) {
+                it.putNextEntry(ZipEntry(file))
+                it.write(content)
+            }
+        }
+    }.toByteArray()
+    val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
+    val versions = opened.commit().getOrThrow()
+    ThemeManager.packPlaced(versions[0].file)
+    return versions.first { !it.isDark }
+}

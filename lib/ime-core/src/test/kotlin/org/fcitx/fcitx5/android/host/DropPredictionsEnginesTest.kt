@@ -30,6 +30,8 @@ class DropPredictionsEnginesTest : EnginesFixture() {
     private val log = mutableListOf<HostEvent>()
 
     private fun core(im: String): HostCore {
+        // each row's own events: a row before that failed leaves its own behind (review F8120)
+        log.clear()
         // what follows the and hello: predictions, which a model offers by its pairs alone
         english = EnglishDataBuilder()
             .unigram("<unk>", -7f, 0f)

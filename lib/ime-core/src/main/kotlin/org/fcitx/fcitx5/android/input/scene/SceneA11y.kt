@@ -70,8 +70,9 @@ object SceneA11y {
     }
 
     /**
-     * [key]'s a11y, a toggle's (handwriting's 注, role `reading`; the symbol panel's lock, `lock`) with its state in it as the views
-     * said it (`a11y_key_reading_on`, `…_off`: "候选词注音，已开"), no state description of its own.
+     * [key]'s a11y, a toggle's (the symbol panel's lock, role `lock`) with its state in it as the views said it (its
+     * resource's name and `_on` or `_off`), no state description of its own. One that is no resource's name is said as
+     * it is.
      */
     private fun onOrOff(key: KeyNode): String = when {
         key.role !in TOGGLES || !RESOURCE.matches(key.a11y) -> key.a11y

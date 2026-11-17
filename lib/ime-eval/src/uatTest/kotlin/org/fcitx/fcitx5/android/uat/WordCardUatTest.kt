@@ -98,10 +98,13 @@ class WordCardUatTest {
             for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) {
                 // the style alone changed: the session and what was typed kept (Engines.settings), nothing made anew
                 r.engines.settings = r.engines.settings.copy(candidateReading = style)
-                // the first page alone: what is held is on it
-                val page = r.engines.candidates(r.im, 0, PAGE)
-                val at = page.indexOfFirst { it.text == target }.takeIf { it >= 0 } ?: 0
-                val miss = page.getOrNull(at)?.let { sameAsTheBar(r, style, at, it.text, it.readings, keys) } ?: continue
+                // what is held: the first page, or for a misreading the pages its target is on (compiled at a lower
+                // weight, lexicon/misreadings.tsv: 绮丽 under yili is on the second). Its target not there is a miss,
+                // not the first candidate checked instead (review F8175)
+                val page = r.engines.candidates(r.im, 0, if (target == null) PAGE else MISREAD_PAGES * PAGE)
+                val at = if (target == null) 0 else page.indexOfFirst { it.text == target }
+                val miss = if (at < 0) "$style $keys: $target not in the first $MISREAD_PAGES pages"
+                else page.getOrNull(at)?.let { sameAsTheBar(r, style, at, it.text, it.readings, keys) } ?: continue
                 misses += miss
                 checked++
             }
@@ -140,5 +143,6 @@ class WordCardUatTest {
         const val CHAT_ROWS = 100
         const val SHOWN = 10
         const val PAGE = 20
+        const val MISREAD_PAGES = 3
     }
 }

@@ -139,6 +139,13 @@ a view's focus and, in touch mode, gives it back to nobody (`View.sizeChange`; i
 the host). The focus stays lost after turning back; a tap on the page brings it back, with no new input
 started.
 
+Some fields use the text and empty themselves (terminals, remote desktops, scan or command boxes
+that clear the buffer in the same batch edit). To tell them from a drop, a first commit whose text
+before the cursor is not known is read again right after the write: text seen then and gone when the
+wait ends was used, not dropped. A field that empties itself inside the write call itself still can't
+be told from a drop. `kept` holds at most its last `CommitCheck.KEPT_MAX` (256) units, and a
+surrogate pair is never cut (R26 F8168).
+
 So every commit is checked (`CommitCheck`, `EditingSession.commitText`): the text before the cursor is
 read before it (32 units), and it has landed when the editor reports the cursor where the commit was
 to leave it. With no such report

@@ -110,7 +110,7 @@ class CodeInFieldUatTest {
 
     // the toolbar's 手写 with 编码行 输入框里: what is written is the session's code as typed code is (the host's panel
     // says so, HostCoreEnginesTest), so it is in the field underlined while written, and stays there as the input ends
-    // (the host commits it then); no strip
+    // (the host commits it then); no strip. Not a UAT case: 061-code-in-field.md §4.2, §7 item 7
     @Test
     fun handwritingsWrittenTextIsInTheFieldUnderlined() {
         val shared = HandwritingRecognition.shared
@@ -231,6 +231,7 @@ class CodeInFieldUatTest {
         assertEquals("ni", stripCode())
     }
 
+    // the fields that say what they are keep the code on the strip (061-code-in-field.md §6.1; no UAT case)
     @Test
     fun aPasswordOrNumberFieldNeverHasTheCode() {
         val password = open(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD).let {
@@ -285,6 +286,7 @@ class CodeInFieldUatTest {
         )
     }
 
+    // 061-code-in-field-code-review.md item 10: a pair committed over the code in the field was not recorded
     @Test
     fun aPairChosenWithTheCodeInTheFieldIsSteppedOverAsOnTheStrip() {
         open(prefill = { it.setText("AB"); it.setSelection(2) })
@@ -456,6 +458,7 @@ class CodeInFieldUatTest {
         )
     }
 
+    // 编码行's other choices leave the field as it was (061-code-in-field.md §4.1; no UAT case)
     @Test
     fun anotherCodeRowKeepsTheFieldFreeOfTheCode() {
         open(style = CodeRowStyle.Floating)
@@ -464,15 +467,22 @@ class CodeInFieldUatTest {
         assertEquals("ni", stripCode())
     }
 
+    // what is read before the cursor leaves the code out (061-code-in-field.md §7 item 9; no UAT case)
     @Test
     fun theContextTheEngineIsToldLeavesTheCodeOut() {
-        open(prefill = { it.setText("说："); it.setSelection(2) })
+        open(prefill = { it.setText("说：。"); it.setSelection(2) })
         typed("n", "ni")
-        h.api.calls.clear()
         chosen("你")
         typed("h")
-        // what the engine is told of the field after the commit: what is there, not the code typed since
-        assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("engineContext(") && "h" in it.substringBefore(",") })
+        h.api.calls.clear()
+        // a commit, predicted, tells the engine nothing (its own text); the tap past 。 does: the code taken away,
+        // the field read after it. Told at all first: none told would leave nothing to find the code in (review R26
+        // F8156); then what is there, not the code typed since
+        h.field.setSelection(5)
+        h.idle()
+        val told = h.api.calls.filter { it.startsWith("engineContext(") }
+        assertTrue(h.api.calls.toString(), told.isNotEmpty())
+        assertEquals(told.toString(), "说：你。", told.last().removePrefix("engineContext(").substringBefore(", "))
     }
 
     // the touch keyboard up: the floating window (the hardware keyboard's), with its 显示屏幕键盘 button, is

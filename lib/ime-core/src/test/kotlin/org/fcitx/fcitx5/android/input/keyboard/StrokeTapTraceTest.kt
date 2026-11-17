@@ -6,9 +6,13 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StrokeTapTraceTest {
+
+    // a line's last field; JUnit's asserts, as Kotlin's assert holds only under -ea (R26 F8302)
+    private fun res(line: String?) = line!!.substringAfterLast(' ')
 
     // 2 px a dp; a cell 80x128 px (40x64 dp) at 100,200; touch slop 16 px
     private fun trace() = StrokeTapTrace(density = 2f, touchSlop = 16f)
@@ -48,7 +52,7 @@ class StrokeTapTraceTest {
         t.otherFinger()
         t.read('h')
         val line = t.up(150, cancelled = false)!!
-        assert(line.endsWith("far=30.0 dir=-2 lift=30.0,1.0 start=40@10.0 out=1 multi=1 res=Sh")) { line }
+        assertTrue(line, line.endsWith("far=30.0 dir=-2 lift=30.0,1.0 start=40@10.0 out=1 multi=1 res=Sh"))
     }
 
     @Test
@@ -58,27 +62,27 @@ class StrokeTapTraceTest {
         t.move(140f, 200f)
         t.started(30)
         t.read(null)
-        assert(t.up(100, false)!!.endsWith("res=U"))
+        assertEquals("res=U", res(t.up(100, false)))
 
         t.downAt(140f, 264f, 0)
         t.started(30)
         t.tapped()
-        assert(t.up(100, false)!!.endsWith("res=T"))
+        assertEquals("res=T", res(t.up(100, false)))
 
         t.downAt(140f, 264f, 0, strokeMode = false)
         t.started(30)
-        assert(t.up(100, false)!!.endsWith("res=G"))
+        assertEquals("res=G", res(t.up(100, false)))
 
         t.downAt(140f, 264f, 0)
-        assert(t.up(400, false)!!.endsWith("res=P"))
+        assertEquals("res=P", res(t.up(400, false)))
 
         // past the cell and its slop: 100 - 16 = 84 is the edge
         t.downAt(104f, 264f, 0)
         t.move(83f, 264f)
-        assert(t.up(100, false)!!.endsWith("out=1 multi=0 res=O"))
+        t.up(100, false)!!.let { assertTrue(it, it.endsWith("out=1 multi=0 res=O")) }
 
         t.downAt(140f, 264f, 0)
-        assert(t.up(50, true)!!.endsWith("res=C"))
+        assertEquals("res=C", res(t.up(50, true)))
     }
 
     @Test

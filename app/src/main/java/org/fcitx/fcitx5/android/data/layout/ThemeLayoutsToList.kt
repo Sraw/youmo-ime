@@ -137,7 +137,9 @@ object ThemeLayoutsToList {
 
     /**
      * Pack [theme]'s boards in [layouts] as its import with 「一起导入」 would list them in [dir]'s ([targets]): what its
-     * confirmation says (§4.2 第 4 步: 「替换已有的『…』」; the list full).
+     * confirmation says (§4.2 第 4 步: 「替换已有的『…』」; the list full). Read as the pack is opened, outside the lock:
+     * for the confirmation's words alone. What the import does is decided again on OK ([run]), and a list changed
+     * meanwhile told then, by fewer listed than said (R26 F8196).
      */
     fun staged(layouts: File, theme: String, meta: Meta?, appVersion: String, dir: File = CustomKeyboards.dir()): Staged {
         val targets = targets(theme, dir = dir) { board, id -> madeDigest(layouts, theme, meta, appVersion, board, id) }
@@ -280,7 +282,7 @@ object ThemeLayoutsToList {
 
     /**
      * A start's: its files as they were as it began (not another's set after, a test's), its listing ended, it ended
-     * (its switch made, or none to make), its switch dropped (a restore came first: [awaitStart]).
+     * (its switch made, or none to make), its switch dropped (a restore came first: [dropStart]).
      */
     @VisibleForTesting
     internal class Start(val listed: File, val restored: File, val trying: File) {
@@ -289,6 +291,9 @@ object ThemeLayoutsToList {
 
         // under ThemeLayoutsToList's lock
         var dropped = false
+
+        // its switch begun ([chooseAtStart]): no more to drop, waited for instead (under the lock too)
+        var switching = false
     }
 
     // the last start begun: what [awaitStart] waits for
@@ -332,16 +337,33 @@ object ThemeLayoutsToList {
     /**
      * Waits for the start ([atStart]) to end, its switch made: what writes the packs or the layouts (a pack imported)
      * does not do so under it, nor reads the list or the choices before they are made (外观 → 布局 opened at once). Not
-     * on the main thread, where the switch is made. [restoring] (a backup restored): its listing alone waited for, its
-     * switch, not yet made, dropped (the settings copied in are the backup's; its marker of trying cleared, the next
-     * start finds the packs it listed recorded). One that does not end in a minute is not waited for longer.
+     * on the main thread, where the switch is made. [restoring] (a backup restored): its listing alone waited for; its
+     * switch dropped only once the restore is past its checks ([dropStart]), as a refused one copies no settings in.
+     * One that does not end in a minute is not waited for longer.
      */
     fun awaitStart(restoring: Boolean = false) {
         val start = current ?: return
         if (!(if (restoring) start.listing else start.ended).await(START_WAIT_S, TimeUnit.SECONDS)) {
             Timber.w("theme packs' layouts: the start not waited for longer")
         }
-        if (restoring) synchronized(this) { start.dropped = true }
+    }
+
+    /**
+     * The start's switch, not yet made, dropped: a restore past its checks, about to copy the backup's settings in, which
+     * the switch would write the phone's over (its marker of trying cleared all the same, the next start finds the packs
+     * it listed recorded). A restore refused before this leaves the switch to be made (R26 F8134: else an upgrade's
+     * packs were never switched in, its end written). One begun already is waited for, its settings' writes on disk, so
+     * that the backup's are copied over them, not they over the backup's (R26 F8423). Not on the main thread.
+     */
+    fun dropStart() {
+        val start = current ?: return
+        val begun = synchronized(this) {
+            start.dropped = true
+            start.switching
+        }
+        if (!begun) return
+        if (!start.ended.await(START_WAIT_S, TimeUnit.SECONDS)) Timber.w("theme packs' layouts: the switch not waited for longer")
+        AppPrefs.getInstance().awaitWritten()
     }
 
     /**
@@ -395,14 +417,18 @@ object ThemeLayoutsToList {
     /**
      * On the main thread, what [listAtStart] listed: the settings of the keys they renamed copied, the boards chosen
      * switched ([switchIn], planned on the settings now, told once; [inUse] read now), then its end written ([ended]:
-     * not before, or a start killed between would never switch, L7 review B1). Dropped ([awaitStart]: a restore's
+     * not before, or a start killed between would never switch, L7 review B1). Dropped ([dropStart]: a restore's
      * settings are the backup's): its end alone. One that throws is tried again by the next start (logged).
      */
     @VisibleForTesting
     @Suppress("TooGenericExceptionCaught")
     internal fun chooseAtStart(start: Start, started: Started, inUse: () -> InUse) {
         try {
-            if (!synchronized(this) { start.dropped }) {
+            val switching = synchronized(this) {
+                if (!start.dropped) start.switching = true
+                start.switching
+            }
+            if (switching) {
                 started.listed.forEach { copySettings(it.done.renames) }
                 if (started.read.isNotEmpty()) {
                     val use = inUse()

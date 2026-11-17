@@ -187,10 +187,13 @@ def hw42(d):
     x0, y0, x1, y1 = letters_box(d)
     dot = STROKES["主"][0][0]
     at = (int(x0 + (x1 - x0) * dot[0]), int(y0 + (y1 - y0) * dot[1]))
+    # the letter key under the dot (t or y on most boards): the one a tap that typed would have typed
+    tapped = min(((ch, c) for ch, c in d.keys().items() if len(ch) == 1 and ch.isascii() and ch.isalpha()),
+                 key=lambda kc: (kc[1][0] - at[0]) ** 2 + (kc[1][1] - at[1]) ** 2)[0]
     d.sh("; ".join(["input tap %d %d" % at, "sleep 0.1"] + key_strokes(d, STROKES["主"][1:])))
     time.sleep(1.6)
-    c, f = d.cands(), d.field_text()
-    check("q" not in (d.preedit() + f).lower() and "w" not in (d.preedit() + f).lower(), f"点的那下打出了字母：「{d.preedit()}」「{f}」")
+    c, f, p = d.cands(), d.field_text(), d.preedit()
+    check(tapped.lower() not in (p + f).lower(), f"点的那下（{tapped} 键上）打出了字母：「{p}」「{f}」")
     check("主" in c[:5], f"点一下再写「主」，候选 {c[:5]}")
     return f"候选 {c[:3]}"
 
@@ -245,7 +248,8 @@ case("HW-40", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAnd
 case("HW-49", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores、"
               "KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain")(lambda d: None)
 
-case("HW-50", needs="jvm:KeyHandwritingUatTest.glideTypingWaitsWhileHandwritingIsOn、KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner")(lambda d: None)
+case("HW-50", needs="jvm:KeyHandwritingUatTest.glideTypingWaitsWhileHandwritingIsOn、KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner、"
+              "KeyHandwritingUatTest.strokeFilteringWaitsWhileHandwritingIsOn")(lambda d: None)
 
 case("HW-51", needs="jvm:EnginesHandwritingReadingsTest.aWrittenCharacterShowsItsReadingsTheWordsFirst、"
               "EnginesHandwritingReadingsTest.aCharacterPinyinLooksUpAfterWritingShowsOneReading、"

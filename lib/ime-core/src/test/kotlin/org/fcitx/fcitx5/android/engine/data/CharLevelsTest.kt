@@ -72,8 +72,10 @@ class CharLevelsTest {
             "a rank missing" to {
                 assertThrows(IllegalStateException::class.java) { CharLevelsBuilder().tgh(tgh.dropLast(1).asSequence(), "kTGH").build() }
             },
+            // told by its code point as the file writes it (R26 F8202, F8470: once U+U+4E00)
             "a character twice" to {
-                assertThrows(SourceException::class.java) { CharLevelsBuilder().tgh((tgh + tgh.first()).asSequence(), "kTGH").build() }
+                val e = assertThrows(SourceException::class.java) { CharLevelsBuilder().tgh((tgh + tgh.first()).asSequence(), "kTGH").build() }
+                assertEquals("kTGH:${tgh.size + 1}: ${tgh.first().substringBefore('\t')} twice", e.message)
             },
             "a kTGH line of another edition" to {
                 assertThrows(SourceException::class.java) { CharLevelsBuilder().tgh(sequenceOf("U+4E00\tkTGH\t1988:1"), "kTGH") }

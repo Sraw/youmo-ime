@@ -37,6 +37,17 @@ class LayoutWriterTest {
         }
     }
 
+    // a control in a name (pasted on the maker's page): left out as written, as the reader drops one, so what is written
+    // reads back (R26 F8187)
+    @Test
+    fun aCharacterXmlHasNoneForIsLeftOut() {
+        val l = LayoutReader.layout(testData("qwerty.xml")).ok()
+        val named = Layout(l.id, "26\u0001键\uFFFE", l.family, l.columns, l.onSplit, l.defaults, l.parts, l.preview, l.popups, l.basedOn, l.meta, l.pads)
+        val text = LayoutWriter.write(named)
+        assertTrue('\u0001' !in text && '\uFFFE' !in text)
+        assertEquals("26键", LayoutReader.layout(text).ok().name)
+    }
+
     // the same board: every scene of it in the app's environments drawn alike from the file and from what is written of it
     @Test
     fun whatIsWrittenDrawsAsTheFileDoes() {

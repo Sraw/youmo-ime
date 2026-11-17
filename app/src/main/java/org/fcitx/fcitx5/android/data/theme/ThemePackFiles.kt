@@ -561,9 +561,11 @@ object ThemePackFiles {
     @VisibleForTesting
     internal var onRefused: () -> Unit = { ContextCompat.getMainExecutor(appContext).execute { ThemeManager.refreshThemes() } }
 
-    private fun stampOf(dir: File, source: String): String {
+    // [rule]: the blank-key rule's version, the app's own but in a test of a stamp of an earlier one (R26 F8421)
+    @VisibleForTesting
+    internal fun stampOf(dir: File, source: String, rule: Int = BlankKeys.RULE): String {
         val md = MessageDigest.getInstance("SHA-256")
-        md.update("${BlankKeys.RULE} ${builtInHash()}\n${source.removePrefix(BOM)}".toByteArray())
+        md.update("$rule ${builtInHash()}\n${source.removePrefix(BOM)}".toByteArray())
         File(dir, LAYOUTS).listFiles().orEmpty().filter { it.isFile }.sortedBy { it.name }.forEach {
             md.update("\n${it.name}\n".toByteArray())
             md.update(it.readBytes())

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.layout
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.TEST_DATA
+import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.readText
 import org.fcitx.fcitx5.android.scene.recording
 import org.fcitx.fcitx5.android.scene.testData
@@ -39,6 +40,33 @@ class LayoutCheckTest {
     // [text] with [key]'s element (`<key id="key" …/>`, one line or more, no children) replaced by [with]
     private fun replaceKey(text: String, key: String, with: String) =
         text.replaceFirst(Regex("<key id=\"${Regex.escape(key)}\"[^>]*?/>"), with)
+
+    // what the check of a layout read to be drawn (LayoutCheck.loaded) finds in [text], by key
+    private fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
+        is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
+        else -> listOf("unread $p")
+    }
+
+    // [board] (qwerty made one's own) with a row of [keys] added
+    private fun withRow(keys: String, board: String = qwerty) = board.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
+
+    // the import's check's `command` and the drawn layout's check's, each once
+    private fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
+
+    // both checks refusing a command
+    private val commandBoth = listOf("command") to listOf("command")
+
+    private fun refused(key: String, board: String = qwerty) = assertEquals(commandBoth, commands(withRow(key, board)), key)
+
+    // a key that reads, with no error at all
+    private fun passes(key: String, board: String = qwerty) {
+        assertEquals(emptyList(), errors(withRow(key, board)), key)
+        assertEquals(emptyList(), loaded(withRow(key, board)), key)
+    }
+
+    // a function key on a layout made of [board] showing [label], its swipe clearing
+    private fun swiping(label: String, board: String = "qwerty") =
+        "<key id=\"x2\" kind=\"function\" label=\"$label\" send=\"layout:Number\" swipe-up=\"shortcut:clear\" shortcut=\"my-$board/x2\"/>"
 
     @Test
     fun theAppsBoardsMadeOnesOwnPass() {
@@ -386,8 +414,6 @@ class LayoutCheckTest {
     // other than the space's and a function key's name are commands too
     @Test
     fun aListsTextsAndALettersNamesAndSymbolsAreHeldAsWhatTheyDo() {
-        fun loaded(text: String) = LayoutCheck.loaded((LayoutReader.layout(text) as Parsed.Ok).value, sources, "0.6.1").map { it.key }
-        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
         fun listed(vararg items: String) = withRow(
             "<key id=\"it\" kind=\"function\" label=\"x\" send=\"commit:xy\" shortcut=\"my-qwerty/it\"><popup from=\"list\">" +
                 items.joinToString("") { "<item text=\"$it\"/>" } + "</popup></key>",
@@ -433,28 +459,14 @@ class LayoutCheckTest {
     // its base's key lacks; a name is the base's key's of its id, or the key is a true copy of one taking it
     @Test
     fun everyStateOfAKeyIsJudgedAndOnlyATrueCopyBorrowsAName() {
-        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
-            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
-            else -> listOf("unread $p")
-        }
-        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
-        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
-        val held = listOf("command") to listOf("command")
-        val free = emptyList<String>() to emptyList<String>()
-        fun refused(key: String) = assertEquals(held, commands(withRow(key)), key)
-        // a key that reads, with no error at all
-        fun passes(key: String) {
-            assertEquals(emptyList(), errors(withRow(key)), key)
-            assertEquals(emptyList(), loaded(withRow(key)), key)
-        }
         val e = "<key id=\"e\" label=\"{case:e}\" send=\"e\" shortcut=\"full/e\">"
         // the first re-check's M-1: no send, named 删除 or 回车 (its name's preset would clear and send)
         for (name in listOf("backspace", "return")) {
-            assertEquals(held, commands(qwerty.replace(e, "<key id=\"e\" label=\"{case:e}\" shortcut=\"$name\">")), name)
+            assertEquals(commandBoth, commands(qwerty.replace(e, "<key id=\"e\" label=\"{case:e}\" shortcut=\"$name\">")), name)
         }
-        assertEquals(held, commands(qwerty.replace(e, "<key id=\"e\" label=\"{case:e}\" letters=\"e\" shortcut=\"backspace\">")))
+        assertEquals(commandBoth, commands(qwerty.replace(e, "<key id=\"e\" label=\"{case:e}\" letters=\"e\" shortcut=\"backspace\">")))
         refused("<key id=\"bs\" kind=\"letter\" label=\"x\" shortcut=\"backspace\"/>")
-        assertEquals(held, commands(qwerty.replace("send=\"sym:space\" swipe-axis=\"both\" shortcut=\"space\"", "swipe-axis=\"both\" shortcut=\"return\"")))
+        assertEquals(commandBoth, commands(qwerty.replace("send=\"sym:space\" swipe-axis=\"both\" shortcut=\"space\"", "swipe-axis=\"both\" shortcut=\"return\"")))
         refused("<key id=\"bs\" label=\"e\" shortcut=\"backspace\"/>")
         // S-1: several characters typed: held as a letter
         for (send in listOf("commit:ee", "commit:hello world")) {
@@ -501,14 +513,6 @@ class LayoutCheckTest {
     // name (SHOULD-1); the fourth: a key showing a letter is no true copy of one whose tap is a command (MUST-1)
     @Test
     fun aLetterShownIsALetterAndABaseFunctionsIdTypingLosesItsName() {
-        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
-            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
-            else -> listOf("unread $p")
-        }
-        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
-        val held = listOf("command") to listOf("command")
-        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
-        fun refused(key: String) = assertEquals(held, commands(withRow(key)), key)
         // with no send of its own, or one typing none
         refused("<key id=\"w2\" label=\"e\" swipe-up=\"shortcut:clear\" shortcut=\"my-qwerty/w2\"/>")
         refused("<key id=\"w2\" label=\"{case:e}\" send=\"caps\" swipe-up=\"shortcut:clear\" shortcut=\"my-qwerty/w2\"/>")
@@ -516,8 +520,8 @@ class LayoutCheckTest {
         val copy = "<key id=\"bs2\" kind=\"function\" label=\"⌫\" send=\"sym:BackSpace\" shortcut=\"backspace\"/>"
         for ((id, name) in listOf("backspace" to "backspace", "enter" to "return")) {
             val made = Regex("<key id=\"$id\"[^>]*?/?>").replace(qwerty) { "<key id=\"$id\" label=\"e\" send=\"e\" shortcut=\"$name\"" + if (it.value.endsWith("/>")) "/>" else ">" }
-            assertEquals(held, commands(made), id)
-            assertEquals(held, commands(made.replace("</keyboard>", "<row>$copy</row>\n</keyboard>")), "$id with a copy")
+            assertEquals(commandBoth, commands(made), id)
+            assertEquals(commandBoth, commands(made.replace("</keyboard>", "<row>$copy</row>\n</keyboard>")), "$id with a copy")
         }
         // a 删除 copy labelled e looks like e: no copy (its name's preset would clear)
         for (label in listOf("e", "{case:e}")) refused("<key id=\"bs\" kind=\"function\" label=\"$label\" send=\"sym:BackSpace\" shortcut=\"backspace\"/>")
@@ -528,29 +532,15 @@ class LayoutCheckTest {
     // one: a {punct:} drawn as is, a letter spaced, folded or of another script (SHOULD-1, -2), a few together (SHOULD-3)
     @Test
     fun aCommandShowingALetterIsNoCopyAndALetterIsWhatTheEyeTakesForOne() {
-        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
-            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
-            else -> listOf("unread $p")
-        }
-        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
-        val held = listOf("command") to listOf("command")
-        fun withRow(board: String, keys: String) = board.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
         val nine = own("nine")
-        fun refused(key: String, board: String = qwerty) = assertEquals(held, commands(withRow(board, key)), key)
-        fun passes(key: String, board: String = qwerty) {
-            assertEquals(emptyList(), errors(withRow(board, key)), key)
-            assertEquals(emptyList(), loaded(withRow(board, key)), key)
-        }
         for (label in listOf("e", "{case:e}", "{group:we}")) refused("<key id=\"r2\" kind=\"function\" label=\"$label\" send=\"sym:Return\" shortcut=\"return\"/>")
         val enter = "width=\"1.5\" icon=\"{return-icon}\" a11y=\"{return}\""
         assertEquals(1, Regex(Regex.escape(enter)).findAll(qwerty).count())
-        assertEquals(held, commands(qwerty.replace(enter, "width=\"1.5\" label=\"e\"")), "enter labelled e")
+        assertEquals(commandBoth, commands(qwerty.replace(enter, "width=\"1.5\" label=\"e\"")), "enter labelled e")
         refused("<key id=\"l2\" kind=\"function\" label=\"e\" send=\"lang\" shortcut=\"lang\"/>")
         refused("<key id=\"r2\" kind=\"function\" label=\"e\" send=\"sym:Escape\" shortcut=\"retype\"/>", nine)
-        assertEquals(held, commands(nine.replace("label=\"重输\"", "label=\"e\"")), "retype labelled e")
+        assertEquals(commandBoth, commands(nine.replace("label=\"重输\"", "label=\"e\"")), "retype labelled e")
         // a letter as the eye takes it, each with a swipe clearing
-        fun swiping(label: String, board: String) =
-            "<key id=\"x2\" kind=\"function\" label=\"$label\" send=\"layout:Number\" swipe-up=\"shortcut:clear\" shortcut=\"my-$board/x2\"/>"
         for (label in listOf("{punct:e}", "{punct:5}", " e", "e\u200B", "ｅ", "\u0435", "é", "e\u0301", "ab", "E;")) refused(swiping(label, "qwerty"))
         refused(swiping("abc", "nine"), nine)
         refused(swiping("qw", "k18"), own("k18"))
@@ -561,33 +551,26 @@ class LayoutCheckTest {
     // (MUST-1); what draws nothing next to a letter is not seen (SHOULD-1); boxed capitals and regional indicators
     @Test
     fun aBaseFunctionKeyShownAsALetterKeepsNoCommandAndWhatDrawsNothingIsNotSeen() {
-        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
-            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
-            else -> listOf("unread $p")
-        }
-        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
-        val held = listOf("command") to listOf("command")
         // [board]'s first key [id] labelled e, its icon, a11y and name dropped
         fun shownAsE(board: String, id: String): String {
             val key = Regex("<key id=\"$id\"[^>]*>").find(board)!!.value
             val made = key.replace(Regex(" (icon|a11y|label|shortcut)=\"[^\"]*\""), "").replace("<key id=\"$id\"", "<key id=\"$id\" label=\"e\"")
             return board.replaceFirst(key, made)
         }
-        for (id in listOf("enter", "backspace", "lang")) assertEquals(held, commands(shownAsE(qwerty, id)), id)
-        assertEquals(held, commands(shownAsE(own("nine"), "reset")), "reset")
+        for (id in listOf("enter", "backspace", "lang")) assertEquals(commandBoth, commands(shownAsE(qwerty, id)), id)
+        assertEquals(commandBoth, commands(shownAsE(own("nine"), "reset")), "reset")
         // e with what draws nothing beside it, on a 删除 or 回车 copy
-        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
         val unseen = listOf("\uDB40\uDC20", "\uDB40\uDC01", "\uDB40\uDD00", "\u3164", "\u115F", "\u1160", "\uFFA0", "\u2800", "\u00AD", "\uFE0F")
         for (pad in unseen) {
             for ((send, name) in listOf("sym:BackSpace" to "backspace", "sym:Return" to "return")) {
                 val key = "<key id=\"c2\" kind=\"function\" label=\"e$pad\" send=\"$send\" shortcut=\"$name\"/>"
-                assertEquals(held, commands(withRow(key)), "$name ${pad.map { it.code.toString(16) }}")
+                assertEquals(commandBoth, commands(withRow(key)), "$name ${pad.map { it.code.toString(16) }}")
             }
         }
         // the boxed and circled capitals and the regional indicators are letters
         for (label in listOf("\uD83C\uDD30", "\uD83C\uDD50", "\uD83C\uDD70", "\uD83C\uDDEA")) {
             val key = "<key id=\"x2\" kind=\"function\" label=\"$label\" send=\"layout:Number\" swipe-up=\"shortcut:clear\" shortcut=\"my-qwerty/x2\"/>"
-            assertEquals(held, commands(withRow(key)), label)
+            assertEquals(commandBoth, commands(withRow(key)), label)
         }
     }
 
@@ -595,26 +578,22 @@ class LayoutCheckTest {
     // parenthesized and squared capitals are letters (SHOULD-2)
     @Test
     fun aMarkBeyondTheBmpIsNotSeenAndEveryEnclosedCapitalIsALetter() {
-        fun loaded(text: String) = when (val p = LayoutReader.layout(text)) {
-            is Parsed.Ok -> LayoutCheck.loaded(p.value, sources, "0.6.1").map { it.key }
-            else -> listOf("unread $p")
-        }
-        fun commands(text: String) = errors(text).filter { it == "command" }.distinct() to loaded(text).filter { it == "command" }.distinct()
-        val held = listOf("command") to listOf("command")
-        fun withRow(keys: String) = qwerty.replace("</keyboard>", "<row>$keys</row>\n</keyboard>")
         fun text(cp: Int) = if (cp < 0x10000) cp.toChar().toString() else charArrayOf(
             (((cp - 0x10000) shr 10) + 0xD800).toChar(), (((cp - 0x10000) and 0x3FF) + 0xDC00).toChar(),
         ).concatToString()
-        fun swiping(label: String) =
-            "<key id=\"x2\" kind=\"function\" label=\"$label\" send=\"layout:Number\" swipe-up=\"shortcut:clear\" shortcut=\"my-qwerty/x2\"/>"
         for (pad in listOf(0x1D165, 0x1D167, 0x1D16E, 0x101FD, 0x1E944, 0x1D159)) {
             val label = "e" + text(pad)
             for ((send, name) in listOf("sym:BackSpace" to "backspace", "sym:Return" to "return")) {
-                assertEquals(held, commands(withRow("<key id=\"c2\" kind=\"function\" label=\"$label\" send=\"$send\" shortcut=\"$name\"/>")), "$name ${pad.toString(16)}")
+                assertEquals(commandBoth, commands(withRow("<key id=\"c2\" kind=\"function\" label=\"$label\" send=\"$send\" shortcut=\"$name\"/>")), "$name ${pad.toString(16)}")
             }
-            assertEquals(held, commands(withRow(swiping(label))), "swipe ${pad.toString(16)}")
+            assertEquals(commandBoth, commands(withRow(swiping(label))), "swipe ${pad.toString(16)}")
         }
-        for (cp in listOf(0x1F110, 0x1F129, 0x1F12B, 0x1F12E)) assertEquals(held, commands(withRow(swiping(text(cp)))), cp.toString(16))
+        for (cp in listOf(0x1F110, 0x1F129, 0x1F12B, 0x1F12E)) assertEquals(commandBoth, commands(withRow(swiping(text(cp)))), cp.toString(16))
+        // D6 (R26 F8210): the tortoise-shelled S between them, the crossed P, the musical dynamics p to z (inside a stretch of
+        // marks), the segmented digits
+        for (cp in listOf(0x1F12A, 0x1F18A, 0x1D18F, 0x1D194, 0x1FBF0, 0x1FBF9)) {
+            assertEquals(commandBoth, commands(withRow(swiping(text(cp)))), cp.toString(16))
+        }
     }
 
     // a key of the app's name writing a long press or swipe of its own: the app's is taken, the file told by line (§19.4, L6)
@@ -672,6 +651,61 @@ class LayoutCheckTest {
         assertTrue(check(k18).warnings.none { it.key == "held-popups" })
     }
 
+    // a key's id and name hold nothing unseen either, as the layout's name (R26 F8347): told by line, shown plain; only told
+    // where taken without the strict check, and not asked of a layout read to be drawn
+    @Test
+    fun aKeysIdAndNameHoldNothingUnseen() {
+        fun row(attrs: String) = withRow("<key $attrs label=\"Z\" send=\"commit:z\"/>")
+        val id = row("id=\"z&#x202E;z\" shortcut=\"my-qwerty/zz\"")
+        val line = id.lines().indexOfFirst { "z&#x202E;z" in it } + 1
+        assertEquals(listOf(LayoutCheck.Finding(line, "hidden-chars", listOf("zz"))), check(id).errors.filter { it.key == "hidden-chars" })
+        assertEquals(listOf("hidden-chars"), check(id, strict = false).warnings.map { it.key }.filter { it == "hidden-chars" })
+        assertEquals(emptyList(), loaded(id).filter { it == "hidden-chars" })
+        val name = row("id=\"zz\" shortcut=\"my-qwerty/z&#x202E;z\"")
+        assertEquals(listOf(listOf("my-qwerty/zz")), check(name).errors.filter { it.key == "hidden-chars" }.map { it.args })
+        assertEquals(emptyList(), check(row("id=\"zz\" shortcut=\"my-qwerty/zz\"")).errors.filter { it.key == "hidden-chars" })
+    }
+
+    // the other places a name is given held the same (R26 F8466): a variant's, the layout's <defaults> (told at line 0), a
+    // row's <defaults> (told at the row's line); each its own layout, all rows compared at once (each told apart by its why)
+    @Test
+    fun aNameGivenElsewhereHoldsNothingUnseenEither() {
+        val hidden = "my-qwerty/z&#x202E;y"
+        val variant = withRow("<key id=\"zz\" label=\"Z\" send=\"commit:z\" shortcut=\"my-qwerty/zz\"><variant when=\"ime=english\" shortcut=\"$hidden\"/></key>")
+        val layoutDefaults = qwerty.replaceFirst("<defaults", "<defaults shortcut=\"$hidden\"")
+        val rowDefaults = withRow("<defaults shortcut=\"$hidden\"/><key id=\"zz\" label=\"Z\" send=\"commit:z\"/>")
+        fun lineOf(text: String, part: String) = text.lines().indexOfFirst { part in it } + 1
+        fun told(line: Int) = listOf(LayoutCheck.Finding(line, "hidden-chars", listOf("my-qwerty/zy")))
+        val rows = mapOf(
+            "a variant's shortcut=, at its key's line" to (variant to told(lineOf(variant, "shortcut=\"my-qwerty/zz\"><variant"))),
+            "the layout's <defaults shortcut=>, at line 0" to (layoutDefaults to told(0)),
+            "a row's <defaults shortcut=>, at the row's line" to (rowDefaults to told(lineOf(rowDefaults, "<row><defaults"))),
+        )
+        assertEquals(
+            rows.mapValues { (_, row) -> row.second },
+            rows.mapValues { (_, row) -> check(row.first).errors.filter { it.key == "hidden-chars" } },
+        )
+    }
+
+    // a grouped layout based on the 26 keys (the layout maker's merge): held to the grouped family's 18 keys (its required
+    // keys, the board drawn where it cannot be), its keys of the app's names looked up from the 26 keys, its own based-on,
+    // as its styles and shortcuts are in the app and on the page (R26 F8117). ⌫ is a name of both boards: the 26 keys'.
+    @Test
+    @Uat("ST-192")
+    fun aGroupedLayoutOnTheTwentySixKeysIsHeldToTheEighteenButToldOfItsOwnBase() {
+        val grouped = own("k18").replace("based-on=\"k18\"", "based-on=\"qwerty\"")
+        assertEquals("k18", LayoutCheck.baseId(LayoutReader.layout(grouped).ok(), sources))
+        val swiped = grouped.replaceFirst("shortcut=\"backspace\"", "shortcut=\"backspace\" swipe-down=\"x\"")
+        val held = check(swiped).warnings.filter { it.key == "held" }.map { it.args }
+        // named as KeyData names a function key: fn/backspace
+        assertTrue(listOf("fn/backspace", "qwerty") in held, held.toString())
+        assertTrue(listOf("fn/backspace", "k18") !in held, held.toString())
+        // its group keys' corners judged by its own family's shape, the 18 keys' (R26 F8437): those 0.6.0's k18 wrote, as
+        // the app draws them there, told of not at all; by qwerty's (the 14 keys') each was
+        val mint = testData("mint-k17/layouts/k18.xml").replace("id=\"k18\"", "id=\"my-k17\" based-on=\"qwerty\"")
+        assertEquals(emptyList(), check(mint).warnings.filter { it.key == "held" })
+    }
+
     // a literal alt= of a key of its own is its long press's first where no swipe-up= is, typed (KeyDefaults): held to
     // what a commit: is (no hidden character, no longer than one) and listed with the texts it types (L6 review M2)
     @Test
@@ -706,7 +740,6 @@ class LayoutCheckTest {
     // the file drawn is not trusted: what needs no scene asked again as it is read to be drawn (L3)
     @Test
     fun aLayoutReadToBeDrawnIsHeldToWhatNeedsNoScene() {
-        fun loaded(text: String) = LayoutCheck.loaded((LayoutReader.layout(text) as Parsed.Ok).value, sources, "0.6.1").map { it.key }
         for (id in listOf("qwerty", "k14", "k18", "nine", "number", "symbols")) assertEquals(emptyList(), loaded(own(id)), id)
         assertEquals(listOf("base"), loaded(qwerty.replace("role=\"backspace\" ", "")).filter { it == "base" })
         assertEquals(listOf("name-no-slash"), loaded(qwerty.replace("shortcut=\"full/q\"", "shortcut=\"mine\"")))

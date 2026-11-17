@@ -185,7 +185,10 @@ class ShuangpinUatTest {
         pick("什么时候")
         type("ufmuh")
         expectFirst("什么时候")
-        // learned under those keys: by initials only it stays where it was
+        // learned under those keys: by initials only it stays where it was. 删光 first, as the case says: typed
+        // on, the engine read ufmuhumuh and the check passed whatever it showed (review F8113)
+        backspace(5)
+        assertTrue("删光: $preedit", preedit.isEmpty())
         type("umuh")
         assertTrue("$page", page.first() != "什么时候")
     }

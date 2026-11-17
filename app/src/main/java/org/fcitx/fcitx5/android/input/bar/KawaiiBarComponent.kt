@@ -694,14 +694,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
             ToolbarButton.Floating -> view.setOn(panelActions.floating)
             ToolbarButton.Habits -> {
-                view.setOn(!panelActions.habitsOn)
+                view.setOn(!panelActions.habitsOn, checkable = false)
                 // named for what a tap does, as the panel's entry
                 view.contentDescription =
                     context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
             }
             ToolbarButton.TradSimp -> {
                 val traditional = tradSimpEntry()?.active == true
-                view.setOn(traditional, BarIcons.tradSimp(traditional))
+                view.setOn(traditional, BarIcons.tradSimp(traditional), checkable = false)
                 view.contentDescription = context.getString(if (traditional) R.string.status_traditional else R.string.status_simplified)
             }
             else -> {}

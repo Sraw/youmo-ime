@@ -131,7 +131,7 @@ class EnglishDecoder(
      * first; [exactFirst], those as long as the keys before any longer (the nine keys', whose words
      * all cost nothing). [touches]: where each key was tapped and the keys around it, a key each
      * (null for none): a key read as one around it costs by how far toward it the tap fell
-     * ([touchCost]), not [TypingCosts.near] alike.
+     * ([tapCost], or [nearTap] by default), not [TypingCosts.near] alike.
      */
     fun suggest(keys: String, context: Long, limit: Int, exactFirst: Boolean = false, touches: Array<Touch?>? = null): List<Suggestion> {
         if (limit <= 0 || keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
@@ -327,9 +327,16 @@ class EnglishDecoder(
                 if (own == 0f || typed !in '2'..'9') {
                     own
                 } else {
-                    val near = touch.near.firstOrNull { it.char in '2'..'9' && meant in letters(it.char) }
-                    val cost = near?.let { -slip.of(touch, it, legal = false) } ?: Float.NaN
-                    if (cost.isNaN()) NEVER else cost
+                    // the cheapest key around with the letter: a user's keys may have it on two (review F8289); a plain
+                    // loop, nothing allocated, as it runs at every touch, key and letter searched (R26 F8495)
+                    var least = Float.NaN
+                    for (i in touch.near.indices) {
+                        val near = touch.near[i]
+                        if (near.char !in '2'..'9' || meant !in letters(near.char)) continue
+                        val cost = -slip.of(touch, near, legal = false)
+                        if (!cost.isNaN() && (least.isNaN() || cost < least)) least = cost
+                    }
+                    if (least.isNaN()) NEVER else least
                 }
             }
         }

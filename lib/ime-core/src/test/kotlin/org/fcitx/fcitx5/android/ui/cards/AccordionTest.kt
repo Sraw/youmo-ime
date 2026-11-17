@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.ui.cards
 
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -61,18 +63,10 @@ class AccordionTest {
         assertNull(Accordion.opening(fixedTitles = false))
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun noCardsIsNoAccordion() {
-        Accordion(0, null)
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun aCardOutOfRangeIsRefused() {
-        Accordion(2, null).tap(2)
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun anOpeningCardOutOfRangeIsRefused() {
-        Accordion(2, 2)
-    }
+    @Test
+    fun whatIsOutOfRangeIsRefused() = assertRows(
+        "no cards is no accordion" to { assertThrows(IllegalArgumentException::class.java) { Accordion(0, null) } },
+        "a card out of range tapped" to { assertThrows(IllegalArgumentException::class.java) { Accordion(2, null).tap(2) } },
+        "an opening card out of range" to { assertThrows(IllegalArgumentException::class.java) { Accordion(2, 2) } },
+    )
 }

@@ -24,7 +24,10 @@ import kotlin.math.roundToInt
  * across and down by lines [GRID_LINE_DP] wide on whole pixels; the pad's edges are its face's own.
  */
 object Pads {
-    /** The handwriting pad's kind of slot (layouts/handwriting.xml). */
+    /**
+     * The handwriting pad's kind of slot: 0.6.0's layouts/handwriting.xml's, gone with that keyboard (handwriting is
+     * written over the letters now); a layout of a user's or a pack's that still has one is drawn as before.
+     */
     const val KIND = "handwriting-pad"
 
     /** The strokes' width not set, dp (HandwritingPadView's of before). */

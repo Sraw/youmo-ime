@@ -270,6 +270,25 @@ class PopupsTest {
         assertEquals("a", s.keys.single { it.label == "a" }.ops(false).filterIsInstance<Op.Text>().single().text)
     }
 
+    // a long label is cut by halving, not a start at a time from the longest (R26 F8295): a label of 64 x's measured a
+    // handful of times, not some fifty; the start kept still the longest that fits
+    @Test
+    fun aLongLabelIsCutInAFewMeasures() {
+        val long = "x".repeat(64)
+        val measured = ArrayList<String>()
+        val counting = TextMeasurer { text, font, weight, size -> FakeMeasurer.measure(text, font, weight, size).also { if ('x' in text) measured += text } }
+        val b = builder(measurer = counting)
+        // a key wide enough for a few x's and the 「…」 (60 is not one x's at the least size)
+        val keys = b.popupKeys(listOf(long), 1, 300.0).ok()
+        measured.clear()
+        val text = b.popup(listOf(long), listOf(listOf(0)), keys, selected = -1).ok().keys.single().ops(false).filterIsInstance<Op.Text>().single().text
+        val kept = text.removeSuffix("…")
+        assertTrue(text.endsWith("…") && kept.isNotEmpty() && long.startsWith(kept), text)
+        assertTrue(measured.size <= 10, "${measured.size} measures: $measured")
+        // one x more was measured, and is not what is drawn: it did not fit
+        assertTrue("x".repeat(kept.length + 1) + "…" in measured, "$measured")
+    }
+
     // cut between characters as seen, never inside a flag, a family, an accent or a keycap
     @Test
     fun aLabelIsCutBetweenCharactersAsSeen() {

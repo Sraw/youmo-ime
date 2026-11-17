@@ -54,6 +54,9 @@ class PinyinSegmenter(
     // the settings' own, shared by the sessions made with them (SettingsMemo)
     private val index = SpellingIndex.of(fuzzy, typos, neighbours)
 
+    /** What a slip read where no touch says its place costs ([SlipCost.fixed]): ime-eval's tune prints it (R26 F8473). */
+    val slipFixed: Float get() = slipCost.fixed
+
     override fun segment(input: String): SyllableGraph = segment(input, null, null)
 
     override fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph {

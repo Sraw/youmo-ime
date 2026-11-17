@@ -106,8 +106,6 @@ class RarePageTest {
                     (0 until layout.size).map { layout.kind(it).name },
                 )
             },
-            "a shut group shows its head alone" to { assertEquals(9, layout.headOf(Level.EXT)) },
-            "a group's cells' rows" to { assertEquals(7..8, layout.cellsOf(Level.OUT)) },
             "a cell's character" to { assertEquals(TestCharLevels.AT_8104, grid.chars[layout.cell(2)]) },
             "a head takes a row, a cell a column" to {
                 assertEquals(3, layout.spanSize(0, 3))
@@ -127,8 +125,6 @@ class RarePageTest {
             "its head at the top is in it too: before its first letter, its first" to { assertEquals(6, layout.positionOf('b', 5)) },
             "a shut group's head at the top, none open after: the first open group's" to { assertEquals(1, layout.positionOf('d', 9)) },
             "before the first, the first" to { assertEquals(1, layout.positionOf('a')) },
-            "a cell's row found from its grid index" to { assertEquals(4, layout.positionOf(at(TestCharLevels.AT_6501))) },
-            "a shut group's cell shows not" to { assertEquals(-1, layout.positionOf(at(ext))) },
             "a row past the end refused" to { assertThrows(IllegalArgumentException::class.java) { layout.kind(10) } },
         )
     }
@@ -140,11 +136,11 @@ class RarePageTest {
         // b, 犇, z, 㑇
         assertRows(
             "letters and cells, no head" to { assertEquals(listOf("LETTER", "CELL", "LETTER", "CELL"), (0 until layout.size).map { layout.kind(it).name }) },
-            "no head row" to { assertEquals(-1, layout.headOf(Level.L3)) },
+            // R26 F8251: headOf, cellsOf and positionOf(cell) gone with no caller; the kinds above show no head row,
+            // the page's own cell() each cell row's character
             "the cells' rows and characters" to {
-                assertEquals(1..3, layout.cellsOf(Level.L3))
                 assertEquals(TestCharLevels.AT_8104, grid.chars[layout.cell(1)])
-                assertEquals(3, layout.positionOf(at(TestCharLevels.AT_6501)))
+                assertEquals(TestCharLevels.AT_6501, grid.chars[layout.cell(3)])
             },
             "a letter a row, a cell a column, the first row 0" to {
                 assertEquals(listOf(4, 1, 4, 1), (0 until layout.size).map { layout.spanSize(it, 4) })
@@ -208,19 +204,24 @@ class RarePageTest {
     @Test
     fun thePagesEditsAreLaidOverTheChoiceAsMade() {
         val read = RareChoice.parse("# youmo-rare-chars 1\non\t1\ngroups\tEXT\n")
-        val edits = RareEdits(grid, levels, read)
+        // each row its own page (R26 F8146: one shared, a row's numbers hung on the rows before it)
+        fun edits() = RareEdits(grid, levels, read)
         assertRows(
             "as read: 扩展 B all held, the others none" to {
+                val edits = edits()
                 assertEquals(RareEdits.Box.ALL, edits.box(Level.EXT))
                 assertEquals(RareEdits.Box.NONE, edits.box(Level.OUT))
                 assertEquals(2, edits.heldCount())
             },
             "a cell toggled: its group partly held" to {
+                val edits = edits()
                 edits.toggle(at(ext))
                 assertEquals(RareEdits.Box.SOME, edits.box(Level.EXT))
                 assertEquals(listOf<Change>(Change.One(ext, false)), edits.changes)
             },
-            "a group held whole: undone, as it was" to {
+            "a group held whole: undone, as it was, the change made before it kept" to {
+                val edits = edits()
+                edits.toggle(at(ext))
                 val undo = edits.setGroup(Level.OUT, true)
                 assertEquals(3, edits.heldCount())
                 edits.undo(undo)
@@ -228,20 +229,27 @@ class RarePageTest {
                 assertEquals(1, edits.changes.size)
             },
             "a drag's cells one undo" to {
+                val edits = edits()
                 val undo = edits.set(listOf(at(out), at(0x9F97)), true)
                 assertEquals(2, edits.heldIn(Level.OUT))
                 edits.undo(undo)
                 assertEquals(0, edits.heldIn(Level.OUT))
             },
             "恢复默认: 扩展 B alone" to {
+                val edits = edits()
+                edits.toggle(at(ext))
+                edits.setGroup(Level.OUT, true)
                 edits.reset()
                 assertEquals(RareEdits.Box.ALL, edits.box(Level.EXT))
+                assertEquals(RareEdits.Box.NONE, edits.box(Level.OUT))
             },
             "off: none counted" to {
+                val edits = edits()
                 edits.setOn(false)
                 assertEquals(0, edits.heldCount())
             },
             "saved: the changes made since kept to save, a step before it no more to take back" to {
+                val edits = edits()
                 val before = edits.toggle(at(out))
                 val sent = edits.changes.size
                 val later = edits.toggle(at(0x9F97))

@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.input.ShownKey
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.uat.PrefsRule
+import org.fcitx.fcitx5.android.uat.TestStyles
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -46,8 +47,6 @@ import java.nio.file.StandardOpenOption
 import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.math.abs
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
-import org.fcitx.fcitx5.android.uat.TestStyles
 
 /**
  * The scene engine's drawing held to the old drawing's record, `src/test/baseline-060` (P2's S0, the

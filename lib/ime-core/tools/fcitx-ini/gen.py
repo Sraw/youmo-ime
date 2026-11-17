@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tarfile
 
-# the app's input methods and what the driver calls their page (androidengine.cpp:347-357)
+# the app's input methods (ime-core's engine/InputMethodCatalog.kt: LISTED, TABLES) and what the driver calls their page
 PAGES = {
     "engine-pinyin": ("-", "pinyin"), "engine-shuangpin": ("-", "shuangpin"),
     "keyboard-us": ("-", "english"),

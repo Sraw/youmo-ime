@@ -109,24 +109,6 @@ class RareLayout(groups: List<Group>) {
         return cellIndex[blockFirstCell[b] + position - blockStart[b] - 1]
     }
 
-    /** The row of the cell of grid index [cell]; -1 where it shows not (its group shut). */
-    fun positionOf(cell: Int): Int {
-        for (b in blockStart.indices) {
-            for (k in 0 until blockCells[b]) if (cellIndex[blockFirstCell[b] + k] == cell) return blockStart[b] + 1 + k
-        }
-        return -1
-    }
-
-    /** The head of [level]'s group; -1 for none. */
-    fun headOf(level: Level): Int = blockStart.indices.firstOrNull { blockKind[it] == Kind.HEAD && blockLevel[it] == level }?.let { blockStart[it] } ?: -1
-
-    /** The row of each cell of [level]'s group that shows. */
-    fun cellsOf(level: Level): IntRange {
-        val bs = blockStart.indices.filter { blockLevel[it] == level && blockKind[it] == Kind.LETTER }
-        if (bs.isEmpty()) return IntRange.EMPTY
-        return (blockStart[bs.first()] + 1)..(blockStart[bs.last()] + blockCells[bs.last()])
-    }
-
     /** A head or a letter takes a row; a cell one of [columns]. */
     fun spanSize(position: Int, columns: Int): Int = if (kind(position) == Kind.CELL) 1 else columns
 

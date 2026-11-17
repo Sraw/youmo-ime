@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.readText
 import org.fcitx.fcitx5.android.scene.recording
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.writeText
@@ -43,7 +44,27 @@ class PackConvertTest {
         // the published values of FNV-1a 32: the JVM and JS give the same id
         assertEquals("811c9dc5", PackLayouts.hash(""))
         assertEquals("e40c292c", PackLayouts.hash("a"))
-        assertEquals(8, PackLayouts.hash("薄荷 17 键").length)
+        // bytes past ASCII, two and three of UTF-8 each (Python's FNV-1a over str.encode() gives the same): a char-by-char
+        // hash or another encoding would differ
+        assertEquals("1e9de8c1", PackLayouts.hash("é"))
+        assertEquals("698bc6f4", PackLayouts.hash("薄荷 17 键"))
+    }
+
+    // an include's when= alternatives with its rows' (every pair of them) bounded (R26 F8348): 17 of each made 289, past
+    // PackLayouts.MAX_ALTERNATIVES, is not taken; 16 of each, 256, is
+    @Test
+    fun anIncludeAndItsRowsOfTooManyAlternativesAreNotTaken() {
+        fun alternatives(n: Int, name: String) = (listOf("landscape", "!landscape") + (1..n - 2).map { "ime=$name$it" }).joinToString(", ")
+        fun of(n: Int): PackLayouts.Converted {
+            val bottom = testData("grouped-bottom.xml").replaceFirst("<row", "<row when=\"${alternatives(n, "a")}\"")
+            val text = k17.replace("<include src=\"grouped-bottom\"/>", "<include src=\"grouped-bottom\" when=\"${alternatives(n, "b")}\"/>")
+            check(text != k17 && "ime=a1" in bottom)
+            return convert(text, fragments = mapOf("grouped-bottom" to bottom))
+        }
+        val not = assertIs<PackLayouts.Converted.Not>(of(17))
+        assertTrue("alternatives" in not.why, not.why)
+        val r = of(16)
+        assertFalse(r is PackLayouts.Converted.Not && "alternatives" in r.why, (r as? PackLayouts.Converted.Not)?.why)
     }
 
     @Test
@@ -212,15 +233,17 @@ class PackConvertTest {
     }
 
     @Test
-    fun onlyTheBoardsListedAndThoseTakenIn060AreMadeOnes() {
-        assertIs<PackLayouts.Converted.Not>(convert(testData("zhuyin.xml"), id = "zhuyin"))
-        assertIs<PackLayouts.Converted.Not>(convert("<keyboard", id = "k18"))
-        // a file of another id is not the pack's board
-        assertIs<PackLayouts.Converted.Not>(convert(k17, id = "k14"))
-        // what the app's must have to be typed on: as 0.6.0 refused it
-        assertIs<PackLayouts.Converted.Not>(convert(k17.replace(Regex("<key id=\"backspace\"[^>]*/>"), ""), id = "k18"))
-        for (id in KeyData.LISTED) done(convert(testData("$id.xml"), id = id))
-    }
+    fun onlyTheBoardsListedAndThoseTakenIn060AreMadeOnes() = assertRows(
+        listOf<Pair<String, () -> Unit>>(
+            "a board not listed, zhuyin" to { assertIs<PackLayouts.Converted.Not>(convert(testData("zhuyin.xml"), id = "zhuyin")) },
+            "a file that does not read" to { assertIs<PackLayouts.Converted.Not>(convert("<keyboard", id = "k18")) },
+            "a file of another id is not the pack's board" to { assertIs<PackLayouts.Converted.Not>(convert(k17, id = "k14")) },
+            "what the app's must have to be typed on missing: as 0.6.0 refused it" to {
+                assertIs<PackLayouts.Converted.Not>(convert(k17.replace(Regex("<key id=\"backspace\"[^>]*/>"), ""), id = "k18"))
+            },
+        ) + KeyData.LISTED.map<String, Pair<String, () -> Unit>> { id -> "the app's $id, listed" to { done(convert(testData("$id.xml"), id = id)) } },
+        { it.first },
+    ) { it.second() }
 
     // §3.2's two strengths (Q16): one 0.6.0 took is made one though the strict check refuses it, with no gap or bottom
     // row warning

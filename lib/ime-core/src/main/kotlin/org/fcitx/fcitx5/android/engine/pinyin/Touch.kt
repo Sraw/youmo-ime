@@ -121,18 +121,21 @@ class KeyBoxes(private val keys: Map<Char, Box>) {
 
     private fun aroundFresh(c: Char): List<Near> {
         val k = keys.getValue(c)
-        val r = rows.indexOfFirst { row -> c in row }
-        val row = rows[r]
-        val out = ArrayList<Near>()
-        row.lastOrNull { keys.getValue(it).cx < k.cx }?.let { out += near(it, k) }
-        row.firstOrNull { keys.getValue(it).cx > k.cx }?.let { out += near(it, k) }
-        for (other in listOfNotNull(rows.getOrNull(r - 1), rows.getOrNull(r + 1))) {
+        // the rows the key is in: more than one for a key over two rows (a layout's rows="2")
+        val inRows = rows.indices.filter { c in rows[it] }
+        val out = LinkedHashMap<Char, Near>()
+        for (r in inRows) {
+            val row = rows[r]
+            row.lastOrNull { keys.getValue(it).cx < k.cx }?.let { out.getOrPut(it) { near(it, k) } }
+            row.firstOrNull { keys.getValue(it).cx > k.cx }?.let { out.getOrPut(it) { near(it, k) } }
+        }
+        for (other in listOfNotNull(rows.getOrNull(inRows.first() - 1), rows.getOrNull(inRows.last() + 1))) {
             for (d in other) {
                 val o = keys.getValue(d)
-                if (minOf(o.right, k.right) - maxOf(o.left, k.left) > OVERLAP * k.w) out += near(d, k)
+                if (d != c && minOf(o.right, k.right) - maxOf(o.left, k.left) > OVERLAP * k.w) out.getOrPut(d) { near(d, k) }
             }
         }
-        return out.toList()
+        return out.values.toList()
     }
 
     private fun near(d: Char, k: Box): Near {
@@ -171,18 +174,34 @@ class KeyBoxes(private val keys: Map<Char, Box>) {
         // keys of rows above and below overlapping by less than this much of the key's width are no neighbours (a corner)
         private const val OVERLAP = 0.01f
 
-        // keys whose centres are within this much of a key's height of each other share a row
+        // a key is in a row whose line goes through it at least this much of the line's key's height inside its edges
         private const val SAME_ROW = 0.25f
 
-        /** The keys in rows, top to bottom, each row left to right. */
+        /**
+         * The keys in rows, top to bottom, each row left to right; a key over more than one row in each of them.
+         * A row is a line across the keyboard through the middle of the key that drew it and the keys it goes
+         * through: drawn by the lowest keys first, a key two rows high (a layout's rows="2") meets the lines of
+         * both its rows. By centres alone it was a row of its own between them, which left it no key beside it
+         * and the two rows none above or below each other (review F8167).
+         */
         private fun rowsOf(keys: Map<Char, Box>): List<List<Char>> {
+            val lines = ArrayList<Pair<Float, Float>>() // where, and the height of the key that drew it
             val rows = ArrayList<MutableList<Char>>()
-            for (c in keys.keys.sortedBy { keys.getValue(it).cy }) {
+            for (c in keys.keys.sortedWith(compareBy({ keys.getValue(it).h }, { keys.getValue(it).cy }))) {
                 val b = keys.getValue(c)
-                val row = rows.lastOrNull()
-                if (row != null && b.cy - keys.getValue(row[0]).cy < SAME_ROW * b.h) row += c else rows += mutableListOf(c)
+                var met = false
+                lines.forEachIndexed { i, (y, h) ->
+                    if (y > b.top + SAME_ROW * h && y < b.bottom - SAME_ROW * h) {
+                        rows[i] += c
+                        met = true
+                    }
+                }
+                if (!met) {
+                    lines += b.cy to b.h
+                    rows += mutableListOf(c)
+                }
             }
-            return rows.map { row -> row.sortedBy { keys.getValue(it).cx } }
+            return rows.indices.sortedBy { lines[it].first }.map { i -> rows[i].sortedBy { keys.getValue(it).cx } }
         }
     }
 }

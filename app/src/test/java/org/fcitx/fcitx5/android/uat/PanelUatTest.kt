@@ -18,8 +18,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.input.keys.UserList
-import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.picker.EmojiSearchUi
@@ -166,7 +164,7 @@ class PanelUatTest {
         assertEquals("「」|", shown())
     }
 
-    // the number keyboard's ( and ) (a dialler's pad) as typed: paired, the closing one stepped over
+    // the number keyboard's ( and ) (a dialler's pad) alone, as typed: a dialler formats the number
     @Test
     @Uat("PAN-32")
     fun inAPhoneNumbersFieldThePadsBracketsAreAlone() {
@@ -183,24 +181,18 @@ class PanelUatTest {
     @Test
     @Uat("PAN-34")
     fun inAnAddressTheKeysClosingOneStepsOverThePanels() {
-        val internal = AppPrefs.getInstance().internal
-        val listsWere = internal.keyLists.getValue()
         // an address field has no comma key: p's long press is `)` here
-        internal.keyLists.setValue(KeyLists.of(mapOf(KeyId("full/p") to UserList(false, listOf(")")))).serialize())
-        try {
-            h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
-            h.tap(h.key("符"))
-            h.tap(textView("ASCII"))
-            h.tap(scrolledTo("("))
-            assertEquals("(|)", shown())
-            val p = h.keys().filterIsInstance<SceneShownKey>()
-                .first { it.node.copy == 0 && it.node.shortcut?.let { s -> KeyId.of(s).name } == "full/p" }
-            h.longPress(p, pick = ")")
-            h.idle()
-            assertEquals("()|", shown())
-        } finally {
-            internal.keyLists.setValue(listsWere)
-        }
+        prefs.setList("full/p", listOf(")"))
+        h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        h.tap(h.key("符"))
+        h.tap(textView("ASCII"))
+        h.tap(scrolledTo("("))
+        assertEquals("(|)", shown())
+        val p = h.keys().filterIsInstance<SceneShownKey>()
+            .first { it.node.copy == 0 && it.node.shortcut?.let { s -> KeyId.of(s).name } == "full/p" }
+        h.longPress(p, pick = ")")
+        h.idle()
+        assertEquals("()|", shown())
     }
 
     // where brackets are not paired (括号成对 off, a password) the panel's goes in alone
@@ -208,14 +200,12 @@ class PanelUatTest {
     @Uat("PAN-33")
     fun offOrInAPasswordThePanelsBracketIsAlone() {
         val keyboard = AppPrefs.getInstance().keyboard
-        keyboard.autoPairs.setValue(false)
-        try {
-            h.start()
-            picked("《")
-            assertEquals("《|", shown())
-        } finally {
-            keyboard.autoPairs.setValue(true)
-        }
+        prefs.set(keyboard.autoPairs, false)
+        h.start()
+        picked("《")
+        assertEquals("《|", shown())
+        // on again: the password alone keeps it single
+        prefs.set(keyboard.autoPairs, true)
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         picked("《")
         assertEquals("《|", shown())

@@ -9,7 +9,7 @@ import tempfile
 import time
 import unicodedata
 
-from uat import Blocked, PKG, case, check, ensure_ime, first, home, pinyin_keyboard, sym_char, in_picker
+from uat import Blocked, PKG, case, check, ensure_ime, first, home, pinyin_keyboard, sym_char, in_picker, to_downloads
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")
 DOWNLOAD = "/sdcard/Download"
@@ -210,9 +210,9 @@ def pick_in_download(d, name):
     """the file picker, open: name in 下载 tapped"""
     # a package the picker has not served yet opens in 最近 (the release build after the debug one
     # had used it): go to 下载 through the roots drawer
-    if d.screen().find(text="近期的文件"):
-        d.tap((77, 148), 1.0)
-        d.tap_text("下载", scroll=False, after=2.0)
+    s = d.screen()
+    if s.find(text="近期的文件"):
+        to_downloads(d, s)
     if name.startswith("."):
         show_hidden(d)
     # the exports of earlier runs pile up in 下载 (a grid of two columns): enough scrolls to pass them

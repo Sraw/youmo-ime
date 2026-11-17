@@ -11,8 +11,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-// one Sources shared by checks on several threads at once (an import's and a migration's): each first read made once,
-// every check's report the one a check alone makes
+// one Sources shared by checks on several threads at once (an import's and a migration's): every check's report the one a
+// check alone makes. How often a first read is made is not seen here (its lazies are pure, any mode passes); a cache of
+// its that is not safe across threads would be (R26 F8306)
 class LayoutCheckThreadsTest {
     private val boards = listOf("k18", "nine", "number", "qwerty", "symbols")
 

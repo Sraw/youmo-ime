@@ -55,13 +55,14 @@ class CommitKeptUatTest {
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         fieldId: Int = 7,
         imeOptions: Int = 0,
+        terminal: Boolean = false,
         prefill: (android.widget.EditText) -> Unit = {},
     ): KeyboardHarness {
         if (ThemeManager.prefs.codeRow.getValue() != style) prefs.set(ThemeManager.prefs.codeRow, style)
         harness?.close()
         return KeyboardHarness(codeRow = style).also {
             harness = it
-            it.start(inputType = inputType, imeOptions = imeOptions, fieldId = fieldId, prefill = prefill)
+            it.start(inputType = inputType, imeOptions = imeOptions, fieldId = fieldId, terminal = terminal, prefill = prefill)
         }
     }
 
@@ -161,6 +162,8 @@ class CommitKeptUatTest {
         val late = text to row()
         h.selectionLags = false
         h.idle()
+        // read before open() below puts another harness in its place (review R26 F8115)
+        val afterReports = row()
         open(CodeRowStyle.InField)
         h.selectionLags = true
         typed("h", "ha", "hao")
@@ -169,7 +172,7 @@ class CommitKeptUatTest {
         assertRows(
             "reported at once" to { assertEquals("你" to "", prompt) },
             "reported late: read back there when the wait is up, no line" to { assertEquals("你好" to "", late) },
-            "the reports in at last: still none" to { assertEquals("", row()) },
+            "the reports in at last: still none" to { assertEquals("", afterReports) },
             "the code in the field, its reports late: none either" to { assertEquals("", lateInField.second); assertEquals(true, lateInField.first.endsWith("好")) },
         )
     }
@@ -202,6 +205,24 @@ class CommitKeptUatTest {
             chosen("a")
             row()
         }
+        // what a field that drops [text] is left keeping, as the code row says it (null: nothing), the field [opened]
+        fun keptIn(text: String, opened: () -> KeyboardHarness): String? = opened().let {
+            it.writesDropped = true
+            typed("h")
+            chosen(text)
+            it.service.keptLine
+        }
+        val unlearned = keptIn("好") { open(CodeRowStyle.Floating, imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) }
+        // a field of no type (TYPE_NULL and IME_NULL, isTypeNull): the harness's terminal tells TYPE_NULL with its
+        // EditText's options, as Termux tells IME_FLAG_NO_FULLSCREEN, so the input is started again with none. A
+        // terminal with options is judged (R26 F8168: read right after the write, used not dropped)
+        val terminal = keptIn("好") {
+            open(CodeRowStyle.Floating, terminal = true).also { it.info.imeOptions = EditorInfo.IME_NULL; it.service.onStartInput(it.info, true) }
+        }
+        // 30 characters: the last 24 shown
+        val long = keptIn("一二三四五六七八九十".repeat(3)) { open(CodeRowStyle.Floating) }
+        // cut where the last 24 begin with the second half of 𠀀 (U+20000, two chars): the whole character left out
+        val split = keptIn("甲乙丙丁戊𠀀" + "己".repeat(23)) { open(CodeRowStyle.Floating) }
         assertRows(
             "the screen turned: the same field, still kept" to { assertEquals(line("好"), turned) },
             "the app starts input anew in the same field (the web view tapped): still kept" to { assertEquals(line("好"), restarted) },
@@ -209,6 +230,10 @@ class CommitKeptUatTest {
             "the keyboard put away: let go" to { assertEquals(null, hidden) },
             "another field: not offered there" to { assertEquals("", another) },
             "a password is not read, nothing of it shown" to { assertEquals("", password) },
+            "a field that asks not to be learned from (隐私): not read, nothing kept" to { assertEquals(null, unlearned) },
+            "a field of no type (TYPE_NULL, IME_NULL): not read, nothing kept" to { assertEquals(null, terminal) },
+            "a long one: its last 24 characters after 「…」" to { assertEquals(line("…" + "一二三四五六七八九十".repeat(3).takeLast(24)), long) },
+            "cut in the middle of a character of two chars: from the next" to { assertEquals(line("…" + "己".repeat(23)), split) },
         )
     }
 

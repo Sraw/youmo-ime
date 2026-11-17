@@ -170,6 +170,11 @@ class FakeEditor(
         return CursorRange(composingStart, composingEnd)
     }
 
+    /**
+     * Runs [rewriter] on the text. Owners are kept by position: this fits a rewriter that only
+     * changes the tail (a field that appends, trims or clears); one that rewrites the middle would
+     * leave the old owners on the new text (R26 F8353).
+     */
     private fun rewrite() {
         val r = rewriter ?: return
         val new = r(buffer.toString())

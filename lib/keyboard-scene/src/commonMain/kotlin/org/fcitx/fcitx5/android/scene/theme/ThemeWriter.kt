@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.xml.Xml
+
 /**
  * A [Theme] as theme-4.xsd's text, canonical: one theme is always the same text, whoever wrote the
  * file it was read from and however, and [ThemeReader] reads it back as the same theme (its
@@ -288,7 +290,8 @@ object ThemeWriter {
                 '\t' -> append("&#9;")
                 '\n' -> append("&#10;")
                 '\r' -> append("&#13;")
-                else -> append(c)
+                // what XML has no character for (a control pasted into a name): left out, as the reader drops it (R26 F8187)
+                else -> if (Xml.allows(c)) append(c)
             }
         }
     }

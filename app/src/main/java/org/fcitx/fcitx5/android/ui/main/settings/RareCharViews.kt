@@ -153,7 +153,10 @@ class LetterScroller(context: Context) : View(context) {
         set(value) {
             field = value
             visibility = if (value.isEmpty()) GONE else VISIBLE
-            sayCurrent()
+            // another group or search: at its top, not at the letter the last one was gone to (said, and stepped
+            // from by a screen reader's swipe: R26 F8325)
+            last = null
+            current = null
             invalidate()
         }
 

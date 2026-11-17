@@ -232,6 +232,17 @@ class EnglishDecoderTest {
         assertEquals(listOf("he", "hello", "help", "hell"), nineTapped("43", arrayOf(null, null)))
     }
 
+    // review F8289: a user's nine keys with l on 9 as well as 5; 6 tapped at its edge by 5, 9 listed first and far
+    // below the floor: the letter costs what 5's slip does, not never
+    @Test
+    fun aLetterOnTwoKeysAroundCostsTheCheaperSlip() {
+        val letters = { d: Char -> if (d == '9') "lwxyz" else NineKeyLetters.STANDARD.letters(d) }
+        val slip = SlipCost(floor = -3f)
+        val touch = Touch(-0.45f, 0f, 88f, 56f, listOf(Near('9', 0f, 1f), Near('5', -1f, 0f)))
+        assertTrue(slip.of(touch, touch.near[0], legal = false).isNaN())
+        assertEquals(-slip.of(touch, touch.near[1], legal = false), EnglishDecoder.nineKeyTap(letters, slip)(touch, '6', 'l'), 1e-4f)
+    }
+
     // as the app's NineKeyWords: a slip 2 dearer where a word of the keys as typed is among the words
     private val nineLegal = EnglishDecoder(
         data, EnglishDecoder.NINE_KEY_COSTS.copy(limit = 3f), EnglishDecoder.nineKeyCost(NineKeyLetters.STANDARD::letters),

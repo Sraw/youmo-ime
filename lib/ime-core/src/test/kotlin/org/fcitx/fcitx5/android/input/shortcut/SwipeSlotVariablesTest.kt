@@ -74,13 +74,40 @@ class SwipeSlotVariablesTest {
         assertEquals("\$minute", KeyShortcut.Text("\$minute").typed(now))
         // run twice, each at its own time
         assertEquals("09:06", s.typed(GregorianCalendar(2026, Calendar.NOVEMBER, 14, 9, 6)))
-        assertEquals(MarkContent.Text("09…", "0…"), SceneMarks.content(s, now))
-        assertNull(SceneMarks.content(KeyShortcut.Text("\$yaer", variables = true), now))
+        assertEquals(MarkContent.Text("09…", "0…"), SceneMarks.content(s) { now })
+        assertNull(SceneMarks.content(KeyShortcut.Text("\$yaer", variables = true)) { now })
+        // R26 F8250: the clock asked of a text of variables alone, not of every mark made
+        var asked = 0
+        val counted = { asked++; now }
+        SceneMarks.content(KeyShortcut.Text("\$minute"), counted)
+        SceneMarks.content(KeyShortcut.Command(KeyCommand.entries.first()), counted)
+        SceneMarks.content(s, counted)
+        assertEquals(1, asked)
         val marks = SceneMarks.settings(
             SwipeSlots.Default.with("full/q", false, vars), KeySwipe.Ways.Both, KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault,
-            charShortcuts = true, names = listOf("full/q"), now = now,
+            charShortcuts = true, names = listOf("full/q"), now = { now },
         )
         assertEquals(MarkContent.Text("09…", "0…"), marks.shortcuts["full/q:down"])
+    }
+
+    // R26 F8457: a board's marks made across a minute's turn show one time, the clock read once, and not at all where no
+    // mark has variables
+    @Test
+    fun aBoardsMarksShowOneTime() {
+        var asked = 0
+        // each read a minute later than the one before
+        val ticking = { GregorianCalendar(2026, Calendar.NOVEMBER, 14, 9, 5 + asked++) }
+        fun marks(slots: SwipeSlots) = SceneMarks.settings(
+            slots, KeySwipe.Ways.Both, KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault,
+            charShortcuts = true, names = listOf("full/q", "full/w"), now = ticking,
+        )
+        val minute = SwipeSlot.Text("\$minute", variables = true)
+        val both = marks(SwipeSlots.Default.with("full/q", false, minute).with("full/w", false, minute))
+        assertEquals(MarkContent.Text(KeyMarkText.of("05"), KeyMarkText.shorter("05")), both.shortcuts["full/q:down"])
+        assertEquals(both.shortcuts["full/q:down"], both.shortcuts["full/w:down"])
+        assertEquals(1, asked)
+        marks(SwipeSlots.Default.with("full/q", false, SwipeSlot.Text("\$minute")))
+        assertEquals("no mark of variables: the clock not read", 1, asked)
     }
 
     // one that fills in nothing is a slot with nothing: a character key's tap

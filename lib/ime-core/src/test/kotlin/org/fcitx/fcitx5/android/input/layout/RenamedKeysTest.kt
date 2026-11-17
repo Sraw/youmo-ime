@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.layout
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
@@ -33,6 +34,17 @@ class RenamedKeysTest {
     }
 
     @Test
+    @Uat("ST-193")
+    fun aLongPressTurnedOffIsCopiedOff() {
+        // R26 F8143: copied through `with` and no default, an off list was taken for no setting and dropped,
+        // and the renamed key's long press came back
+        val text = KeyLists.of(mapOf(KeyId("fn/mine") to UserList.Off)).serialize()
+        val out = KeyLists.parse(RenamedKeys.keyLists(text, renames))!!
+        assertEquals(UserList.Off, out[KeyId("t1234abcd-k18/r1c1")])
+        assertEquals(UserList.Off, out[KeyId("fn/mine")])
+    }
+
+    @Test
     fun aListTheNewNameHasIsTheUsersAndKept() {
         val mine = UserList(false, listOf("x"))
         val text = KeyLists.of(mapOf(KeyId("fn/mine") to UserList.Off, KeyId("t1234abcd-k18/r1c1") to mine)).serialize()
@@ -51,6 +63,7 @@ class RenamedKeysTest {
     }
 
     @Test
+    @Uat("ST-193")
     fun swipesAreCopiedEachWayApart() {
         val up = SwipeSlot.Text("hi")
         val text = SwipeSlots.Default.with("fn/mine", true, up).with("g18/nope", false, SwipeSlot.Empty).serialize()

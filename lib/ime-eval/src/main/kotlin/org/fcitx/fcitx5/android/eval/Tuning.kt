@@ -24,7 +24,11 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
  *
  * [Penalties.neighbour] is chosen apart, as slips onto a neighbouring key are rarer than a
  * steady habit: the point that reads most of the [SlipSet.KEY] samples right while losing no
- * more than [MARGIN] of clean input to reading slips at all.
+ * more than [MARGIN] of clean input to reading slips at all. It is no longer a slip's whole cost
+ * but what is added to the cost by where the key was tapped; the [SlipSet.KEY] samples have no
+ * place, so a slip of theirs costs [SlipCost.fixed][org.fcitx.fcitx5.android.engine.pinyin.SlipCost.fixed]
+ * and this on top (`tune` prints both). The floor and the cost by place are chosen by the
+ * clean gate of `pinyin --touch` instead (061-neighbour-correction).
  *
  * The points of a grid do not depend on one another: [search] and [searchKeys] measure them on
  * [threads] threads, each on data [load]ed for it, with the same results on any number.
@@ -49,7 +53,7 @@ class Tuning(private val load: () -> PinyinData, private val clean: List<Sample>
     private inner class Runner(private val data: PinyinData) {
         private val plain = PinyinSegmenter()
         private val allFuzzy = PinyinSegmenter(Fuzzy.entries.toSet())
-        private val slipping = PinyinSegmenter(neighbours = true)
+        val slipping = PinyinSegmenter(neighbours = true)
 
         fun point(penalties: Penalties, half: String): Point {
             val hits = ArrayList<Int>()
@@ -72,12 +76,15 @@ class Tuning(private val load: () -> PinyinData, private val clean: List<Sample>
 
     private val runner by lazy { Runner(load()) }
 
+    /** What a place-less slip costs on the segmenter [measureKeys] reads with: the tune report's label (R26 F8509). */
+    val slipFixed: Float get() = runner.slipping.slipFixed
+
     fun measure(penalties: Penalties, half: String): Point = runner.point(penalties, half)
 
     /** Top1 of clean input and of input with a key slipped ([KEY_COLUMNS]), slips read or not. */
     fun measureKeys(penalties: Penalties, half: String, read: Boolean): Point = runner.keyPoint(penalties, half, read)
 
-    /** [Penalties.neighbour] at each point of [grid], slips read, in the grid's order. */
+    /** [Penalties.neighbour], on top of a slip's own cost, at each point of [grid], slips read, in the grid's order. */
     fun searchKeys(grid: List<Float> = KEY_GRID, half: String = Halves.TUNE): List<Point> =
         dealt(grid, threads, { Runner(load()) }) { hand -> hand.map { keyPoint(Penalties().copy(neighbour = it), half, read = true) } }
 

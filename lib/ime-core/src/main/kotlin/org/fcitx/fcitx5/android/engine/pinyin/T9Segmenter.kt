@@ -71,7 +71,8 @@ class T9Segmenter(
     // middle, σ 0.15, both halves × seeds 1–3) wrong (061-neighbour-18key-impl-report §5): 注音九键 -2 (over -2.5
     // one with no tones went wrong); 大千 -1.75, with tones or without (over -2 one with no tones, 脚步哦 → 较多, so
     // no slip that also spells as typed is read); the 14 keys -6, as much found as at -8 and two more than at -4;
-    // the 18 keys -4 (a key of one letter's place now weighs the key slipped onto: S1, 0 at -4)
+    // the 18 keys -4 (a key of one letter's place now weighs the key slipped onto: S1, 0 at -4). A layout's own
+    // groups take the 18 keys' -4 too, never measured so (deferred D5, review F8246)
     private val slipCost: SlipCost = when {
         letters == ZhuyinKeys.NINE -> SlipCost(floor = -2f)
         letters == ZhuyinKeys.DACHEN -> SlipCost(floor = -1.75f)
@@ -297,7 +298,10 @@ class T9Segmenter(
      * [against] for the slips of [m], [found] each match's: the key slipped to weighed by where the
      * tap lies on it ([Touch] put onto [Near]: its edge nearest the key hit), in the dimensions the
      * keyboard's own places have (the 14 and 18 keys' across alone, a layout's own across and down); a
-     * tap with no place (a group whose layout has lean="off", a click no touch made) weighs none.
+     * tap with no place (a group whose layout has lean="off", a click no touch made) weighs none. The
+     * key slipped to is weighed by the hit key's lean alone: [Near] carries none of its own, so in a
+     * layout mixing lean="on" and "off" a slip onto a key of "off" is weighed by where the tap fell on
+     * it (deferred D5, review F8246).
      */
     private fun slipAgainst(m: SyllableMatches, found: List<Slip>, typed: String, at: Int, taps: FloatArray): FloatArray? {
         var any = false

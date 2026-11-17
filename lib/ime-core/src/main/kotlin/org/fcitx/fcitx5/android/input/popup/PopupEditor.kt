@@ -96,6 +96,11 @@ class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMa
      * [ItemMark.Variables], [text] is one item ([template]); with [ItemMark.AsIs], those of them [canKeepAsIs] of
      * [keys] marked, the others added as ever (061-no-cn-punct Q3). One there already with no mark takes [mark] as
      * one added would.
+     *
+     * An item is marked [ItemMark.Variables] with a variable in it or not, where a swipe's text is marked only with one
+     * ([org.fcitx.fcitx5.android.input.shortcut.SwipeSlot.Text.of]): an item's mark is the user's, set by the box or
+     * the button ([toggle]), and drawn on it (「变量」), so it stays as set: one item of up to [KeyLists.MAX_TEMPLATE],
+     * typed as it is, not capitalised. A slot draws no mark; its mark follows its text (R26 F8292).
      */
     fun add(text: String, mark: ItemMark? = null, keys: Set<String> = emptySet()): Boolean {
         val wasEmpty = list.isEmpty()

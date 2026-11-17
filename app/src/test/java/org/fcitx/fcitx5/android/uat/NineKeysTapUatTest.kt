@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.ScriptedEngine
 import org.fcitx.fcitx5.android.core.UNICODE
+import org.fcitx.fcitx5.android.core.putPunctuationTable
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
@@ -156,7 +157,7 @@ class NineKeysTapUatTest {
         File(home, "config/" + ModuleConfigs.PUNCTUATION).apply { parentFile!!.mkdirs() }.writeText("HalfWidthPuncAfterLetterOrNumber=True\n")
         val fcitx = startedHost(ScriptedEngine(home))
         try {
-            runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "，", ""), PunctuationMapEntry(".", "。", ""))) }
+            runBlocking { fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "，", ""), PunctuationMapEntry(".", "。", ""))) }
             val h = KeyboardHarness(host = fcitx, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)).also { this.h = it }
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()

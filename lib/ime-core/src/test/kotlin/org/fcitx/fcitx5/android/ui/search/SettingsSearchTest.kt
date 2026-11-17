@@ -6,9 +6,9 @@ package org.fcitx.fcitx5.android.ui.search
 
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Kind
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

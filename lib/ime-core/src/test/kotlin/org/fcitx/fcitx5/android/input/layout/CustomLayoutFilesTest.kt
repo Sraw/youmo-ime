@@ -135,18 +135,31 @@ class CustomLayoutFilesTest {
     }
 
     // a pack imported again records its new stamp in place of the old one (review NIT2: the old ones piled up, and past
-    // the most lines the new one was dropped, the pack converted at each start); a layout written again its new digest
+    // the most lines the new one was dropped, the pack converted at each start); a layout written again its new digest.
+    // The new line goes last, as written (R26 F8170: left where the old stood, it was read as older than lines after it)
     @Test
     fun aRecordKeepsEachPacksAndLayoutsLastLineTheNewestWhereFull() {
-        assertEquals("a@2\nb@1\n", CustomLayoutFiles.mergeConverted("a@1\nb@1\n", "a@2"))
+        assertEquals("b@1\na@2\n", CustomLayoutFiles.mergeConverted("a@1\nb@1\n", "a@2"))
         assertEquals("=t1-k18 k18 d2 a\n", CustomLayoutFiles.mergeConverted("=t1-k18 k18 d1 a", "=t1-k18 k18 d2 a"))
         // a pack's name may hold an @
-        assertEquals("a@b@2\na@1\n", CustomLayoutFiles.mergeConverted("a@b@1\na@1", "a@b@2"))
+        assertEquals("a@1\na@b@2\n", CustomLayoutFiles.mergeConverted("a@b@1\na@1", "a@b@2"))
         val full = (1..CustomLayoutFiles.MAX_CONVERTED_LINES).joinToString("\n") { "p$it@1" }
         val lines = CustomLayoutFiles.convertedLines("${CustomLayoutFiles.CURRENT}\n$full\nnew@1")
         assertEquals(CustomLayoutFiles.MAX_CONVERTED_LINES, lines.size)
         assertEquals(CustomLayoutFiles.CURRENT, lines.first())
         assertEquals("new@1", lines.last())
+        // R26 F8170: p1 imported again is the newest, kept when full; p2, the oldest now, dropped
+        val again = CustomLayoutFiles.convertedLines("$full\np1@2\nnew@1")
+        assertEquals(listOf("p1@2", "new@1"), again.takeLast(2))
+        assertFalse("p2@1" in again)
+    }
+
+    // R26 F8170: pack P made t1-k18; the user's own file put over that id, P imported again made t1-k18-2; both deleted,
+    // P imported again wrote t1-k18. Its last write is t1-k18: an update of P goes there, not to a gone -2
+    @Test
+    fun aLayoutWrittenAgainIsThePacksLastAfterOnesWrittenSince() {
+        val r = CustomLayoutFiles.record("#l7\nP@1\n=t1-k18 k18 d1 P\nP@2\n=t1-k18-2 k18 d2 P\nP@3\n=t1-k18 k18 d3 P")
+        assertEquals(CustomLayoutFiles.Made("t1-k18", "k18", "d3", "P"), r.madeOf("P", "k18"))
     }
 
     @Test
@@ -168,7 +181,8 @@ class CustomLayoutFilesTest {
     @Test
     fun aPackNamedWithAnEqualsSignFirstIsRecordedAsAPack() {
         val r = CustomLayoutFiles.record("#l7\n=mint.theme@5\n=odd one.theme@6\n=t1-k18 k18 d1 =mint.theme\n=mint.theme@7")
-        assertEquals(listOf("=mint.theme@7", "=odd one.theme@6"), r.packs)
+        // in the order last written (R26 F8170): mint's new stamp after odd one's
+        assertEquals(listOf("=odd one.theme@6", "=mint.theme@7"), r.packs)
         assertEquals(setOf("=mint.theme", "=odd one.theme"), r.packNames)
         assertEquals(listOf(CustomLayoutFiles.Made("t1-k18", "k18", "d1", "=mint.theme")), r.made)
     }

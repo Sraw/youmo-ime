@@ -130,9 +130,9 @@
 
 ### EN-30 [P1] 全键盘英文：按偏的键看落点，点在边上改成旁边的键，点在正中不改
 - **前提**：B0-英文。
-- **操作**：在「普通文本」框点 h，再点 `w` 键靠右下边缘（离 `e` 近的那一侧，键宽的五分之一处），再点 l l o，按空格；删光，h w l l o 每个键都点在正中，按空格。
-- **预期**：两次都上屏「hello 」：点在边上的按 `e` 读；点在正中的 `w` 几乎不当按偏，但 `hwllo` 不是词，像拼错一个字母那样照样改。全键盘英文以前按一张固定的相邻键表算按偏，现在看落点。
-- **JVM**：`EnglishTouchTest.whereAKeyWasTappedSaysWhetherItWasTheOneBeside`（`maxCorrection` 收紧时：点在边上改成 hello，点在正中不改，没有落点时照旧按相邻键改）、`EnglishDecoderTest.aTapsPlaceSetsWhatTheKeyBesideItCosts`；设备上照跑（落点要真的点出来）。
+- **操作**：在「普通文本」框打 hi、空格，点一下 Shift，再打 s t e b e，其中 `b` 点在键的左边缘（离 `v` 近的那一侧，从左边量键宽的 5% 处），按空格；删光，照样打 hi、空格、Shift、s t e b e，每个键都点在正中，按空格。
+- **预期**：第一次上屏「hi Steve 」：点在边上的 `b` 按 `v` 读。第二次上屏「hi Stebe 」：自己打了大写的词当名字看，只有按到旁边键时才改，点在正中的 `b` 不算按偏，照打的留着。落点没传到时两次都会改成 Steve，所以两次结果不同才说明落点读到了。全键盘英文以前按一张固定的相邻键表算按偏，现在看落点。
+- **JVM**：`EnglishTouchTest.aNameTypedWithAKeyBesideIsCorrectedByWhereItWasTapped`（本例的步骤：Stebe 的 b 靠 v 点改成 Steve，正中点留 Stebe，没有落点也改成 Steve）、`EnglishTouchTest.whereAKeyWasTappedSaysWhetherItWasTheOneBeside`（`maxCorrection` 收紧时的同一规则：点在边上改成 hello，点在正中不改，没有落点时照旧按相邻键改）、`EnglishDecoderTest.aTapsPlaceSetsWhatTheKeyBesideItCosts`；设备上照跑（落点要真的点出来）。
 
 ### EN-31 [P1] 九键英文：数字键贴着旁边键的边点，也按那个键猜词
 - **前提**：B0-英文；在 **输入法 → 英文** 里把 **键盘** 选成「九键」（九键英文打法是预测），回到「普通文本」框切到英文。

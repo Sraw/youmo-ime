@@ -153,6 +153,10 @@ class KeyDefaultsTest {
         assertEquals(listOf("哈哈"), texts(l))
         assertEquals(Item("哈哈", Commit.AsIs), l.first)
         assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts()))
+        // one that writes `<popup from="none"/>` has none, its swipe-up= or alt= aside (R26 F8345)
+        val none = Popup("none", null, emptyList(), emptyMap())
+        assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(popup = none, layoutFirst = "commit:哈哈")))
+        assertNull(KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, popup = none, layoutFirst = "commit:qq")))
         // an action first names no item of a list: none
         assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(layoutFirst = "sym:BackSpace")))
         // nor a bare word of the vocabulary: an action, never its letters typed (L6 review M1)

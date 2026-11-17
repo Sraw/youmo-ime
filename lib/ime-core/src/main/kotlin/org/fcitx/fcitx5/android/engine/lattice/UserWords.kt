@@ -110,7 +110,7 @@ interface UserWords {
      * The only words read through a 双拼 key alone where it and the next make a syllable (简拼 in the
      * middle): every key there stands for a score of syllables, and with all the dictionary's words
      * behind them a key of full code took twice the time on a phone and the words meant were
-     * crowded out. A count fades with the typing days ([org.fcitx.fcitx5.android.engine.user.LearnState.WINDOW]);
+     * crowded out. A count fades with the typing days ([org.fcitx.fcitx5.android.engine.learn.LearnState.WINDOW]);
      * a choice does not.
      */
     fun typed(word: Int): Boolean = count(word) > 0f || chosen(word)

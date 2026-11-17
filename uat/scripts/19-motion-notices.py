@@ -41,4 +41,4 @@ case("MN-24", needs="jvm:KotlinHostHandwritingTest.theHandwritingNoticeNotSeenIs
 
 case("MN-25", needs="jvm:KotlinHostHandwritingTest.bothHandwritingNoticesAreToldEachOnce")(lambda d: None)
 
-case("MN-26", needs="jvm:ToastTest.shortGoesAfterOneSecond")(lambda d: None)
+case("MN-26", needs="jvm:ToastTest.aToastGoesAfterItsTime")(lambda d: None)

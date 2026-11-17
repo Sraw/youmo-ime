@@ -14,14 +14,19 @@ class VoiceAsk {
     private val said = StringBuilder()
     private var talking = false
 
-    // voice's commits posted through fcitx ([posting]), not in yet
+    // voice's commits posted through fcitx ([posting]), not in yet: the talk's now, [talk]
     private var posted = 0
+
+    // the talk now, numbered: a commit another posted (fcitx busy as the next began, a field left) lands uncounted,
+    // ungathered (R26 F8367: it took one off the next's count, its text handed over before the last of it was in)
+    private var talk = 0
 
     // one of them did not go in (the field changed): the talk's text not all there
     private var dropped = false
 
-    // voice's text going in now ([voice])
+    // voice's text going in now ([voice]), and whether it is the talk's now, to gather
     private var voicePutting = false
+    private var gathering = false
 
     // a window the engine may have open, by the talk that made it: what goes in is reported
     private var window = 0
@@ -34,6 +39,7 @@ class VoiceAsk {
     fun began() {
         said.setLength(0)
         talking = true
+        talk++
         posted = 0
         dropped = false
     }
@@ -44,31 +50,37 @@ class VoiceAsk {
         return whole()
     }
 
-    /** Voice's commit posted through fcitx (CommitAction's), to come in later. */
-    fun posting() {
+    /** Voice's commit posted through fcitx (CommitAction's), to come in later: the talk it is of, for [landed] and [voice]. */
+    fun posting(): Int {
         posted++
+        return talk
     }
 
-    /** That commit in ([inField]) or dropped: the talk's text, if it is over and all of it in. */
-    fun landed(inField: Boolean): String? {
+    /** That commit of [talk] ([posting]'s) in ([inField]) or dropped: the talk's text, if it is over and all of it in. */
+    fun landed(talk: Int, inField: Boolean): String? {
+        if (talk != this.talk) return null
         if (posted > 0) posted--
         if (!inField) dropped = true
         return whole()
     }
 
-    /** [block] puts voice's text in: gathered, not reported. */
-    inline fun <T> voice(block: () -> T): T {
-        voicing(true)
+    /** [block] puts voice's text of [talk] ([posting]'s) in: gathered if that talk is the one now, never reported. */
+    inline fun <T> voice(talk: Int, block: () -> T): T {
+        voicing(true, talk)
         try {
             return block()
         } finally {
-            voicing(false)
+            voicing(false, talk)
         }
     }
 
+    /** The talk now: its text put in at once, not posted ([voice]). */
+    val talkNow: Int get() = talk
+
     @PublishedApi
-    internal fun voicing(on: Boolean) {
+    internal fun voicing(on: Boolean, talk: Int) {
         voicePutting = on
+        gathering = on && talk == this.talk
     }
 
     /** What to do with text that went in ([putIn]). */
@@ -86,7 +98,7 @@ class VoiceAsk {
     /** [text] into the field: voice's gathered; else reported while a window is open, the window shut if a talk goes on. */
     fun putIn(text: String): Put {
         if (voicePutting) {
-            said.append(text)
+            if (gathering) said.append(text)
             return Put.NONE
         }
         if (!open) return Put.NONE
@@ -114,6 +126,7 @@ class VoiceAsk {
     fun reset() {
         said.setLength(0)
         talking = false
+        talk++
         posted = 0
         dropped = false
         open = false

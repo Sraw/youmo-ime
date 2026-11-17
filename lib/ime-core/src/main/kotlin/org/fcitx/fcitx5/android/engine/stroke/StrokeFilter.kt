@@ -21,7 +21,9 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
  * the next stroke is that character's next. A candidate whose first character is no letter (an
  * emoji, a mark) goes as the one before it went: 🐑 stays after 羊. A Latin word, a character the
  * strokes do not know, goes. The first [lookAhead] of [session]'s candidates are looked through,
- * as far as a page asks.
+ * as far as a page asks, and the first page as far as its [singles] characters are found: strokes that
+ * keep many words and few characters alone look through all [lookAhead] for it, [session] asked a
+ * CHUNK at a time (review F8290; cheap beside the decode, and a character found late still comes up).
  *
  * Kept, the first stays first, and the first [singles] characters alone (one ideograph, 〇 too) after it come right
  * after it, wherever they were among those looked through, each with the emoji and marks that went with it; the

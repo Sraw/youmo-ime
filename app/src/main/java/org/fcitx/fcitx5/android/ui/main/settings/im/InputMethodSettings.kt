@@ -775,6 +775,13 @@ object InputMethodSettings {
             }
         }
 
+    /**
+     * Whether a table's page shows its keyboard's choice ([TableKeyboard]): while a layout of the user's has the keys the
+     * tables type, or one is chosen. Reads the layouts: off the main thread where it may read many (the search's index).
+     */
+    fun tableKeyboardShown(context: Context): Boolean =
+        customEntries(context, InputMethodCatalog.TABLES.keys.first(), EngineState.shuangpinScheme).entries.isNotEmpty()
+
     // a table's keyboard: the full one or a layout of the user's; there while there is one to choose, or one is chosen
     private fun tableKeyboard(context: Context, item: TableKeyboard, refreshers: MutableList<() -> Unit>) =
         ListPreference(context).apply {
@@ -811,7 +818,8 @@ object InputMethodSettings {
     /**
      * The layouts of the user's [im] may be typed on under [scheme] (ImKeyboards.customs), 「17 键（自定义）」 each; the one
      * it chose too where it is not among them (§4.4: its file refused as it was read, or one that does not read at all,
-     * 「17 键（读不出，暂用 18 键）」, what is drawn in its place said).
+     * 「17 键（读不出，暂用 18 键）」; one that reads and is not of [im] under [scheme], 「17 键（这里用不了，暂用 18 键）」;
+     * what is drawn in its place said).
      */
     private fun customEntries(context: Context, im: String, scheme: ShuangpinScheme): CustomEntries {
         val usable = ImKeyboards.customs(im, scheme, CustomKeyboards.all())
@@ -822,7 +830,14 @@ object InputMethodSettings {
             val layout = chosen.customOf(im)
             val base = ImKeyboards.effective(im, ImKeyboard.CUSTOM, scheme, layout)
             val name = layout ?: CustomChoice(id, id, "", null, drawn = false)
-            entries += CUSTOM_VALUE + id to KeyboardLabels.custom(context, name.copy(drawn = false), KeyboardLabels.builtInName(context, im, base))
+            val instead = KeyboardLabels.builtInName(context, im, base)
+            // one read and drawn, not of this input method now (a grouped one chosen for English, its file since replaced by
+            // one of the same id): said so, not that its file does not read (R26 F8379, F8420)
+            entries += CUSTOM_VALUE + id to if (layout?.drawn == true) {
+                context.getString(R.string.keyboard_custom_unusable, KeyboardLabels.shortName(layout.name), instead)
+            } else {
+                KeyboardLabels.custom(context, name.copy(drawn = false), instead)
+            }
         }
         return CustomEntries(entries, CUSTOM_VALUE + id)
     }

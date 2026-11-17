@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.content.res.Configuration
 import android.view.View
 import android.view.inputmethod.BaseInputConnection
 import android.widget.TextView
@@ -21,15 +20,16 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.inLandscape
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -46,6 +46,11 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class StuckBarUatTest {
+
+    // what a case and the host change in the store put back, whatever fails: startedHost's firstRun, the keyboard, the
+    // style (D7: this class's flake at SDK 29 never reproduced; these were what it left behind for the next test)
+    @get:Rule
+    val prefs = PrefsRule()
 
     private lateinit var home: File
     private lateinit var fcitx: KotlinHost
@@ -67,8 +72,6 @@ class StuckBarUatTest {
         if (::h.isInitialized) h.close()
         if (::fcitx.isInitialized) fcitx.stop()
         if (::home.isInitialized) home.deleteRecursively()
-        keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
-        TestStyles.clear()
         ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
     }
 
@@ -112,10 +115,10 @@ class StuckBarUatTest {
         ni()
         engine.events.clear()
         // the setting that swaps pinyin's keyboard: the input view made anew
-        keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
+        prefs.set(keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         h.idle()
         nothingLeft()
-        keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Full)
+        prefs.set(keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         h.idle()
         h.relayout()
         haoFollows()
@@ -180,7 +183,7 @@ class StuckBarUatTest {
         engine.events.clear()
         for (floating in listOf(true, false)) {
             // the handle dragged off the bottom, then back: the keyboard made anew, nothing typed ended
-            if (floating) TestStyles.set(KeyboardStyle.FLOATING) else TestStyles.clear()
+            if (floating) prefs.setStyle(KeyboardStyle.FLOATING) else prefs.setStyleDefault()
             h.idle()
             h.relayout()
             until("ni kept ${if (floating) "floating" else "docked"}", ::state) { shown("ni") != null && shown("你好") != null }
@@ -211,17 +214,7 @@ class StuckBarUatTest {
         start()
         ni()
         engine.events.clear()
-        try {
-            RuntimeEnvironment.setQualifiers("+land")
-            h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
-            h.idle()
-            nothingLeft()
-        } finally {
-            RuntimeEnvironment.setQualifiers("+port")
-            h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
-            h.idle()
-            h.relayout()
-        }
+        h.inLandscape(relayout = true) { nothingLeft() }
         haoFollows()
     }
 }

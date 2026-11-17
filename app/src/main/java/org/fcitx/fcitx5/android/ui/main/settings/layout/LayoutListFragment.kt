@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.Keep
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,6 +32,7 @@ import com.google.android.material.snackbar.Snackbar
 import java.io.IOException
 import kotlin.math.max
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -115,6 +117,13 @@ class LayoutListFragment : Fragment() {
 
     private val adapter = Adapter()
 
+    /** The cards and headers listed now, as the page shows them. */
+    @get:VisibleForTesting
+    internal val shownItems: List<Item> get() = adapter.items
+
+    // the list of the view now, let go of with it
+    private var grid: RecyclerView? = null
+
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
         lifecycleScope.launch { adapter.notifyItemRangeChanged(0, adapter.itemCount) }
@@ -153,6 +162,7 @@ class LayoutListFragment : Fragment() {
             clipToPadding = false
             applyNavBarInsetsBottomPadding()
         }
+        grid = list
         val fab = FloatingActionButton(ctx).apply {
             setImageDrawable(ctx.getDrawable(R.drawable.ic_baseline_plus_24))
             contentDescription = ctx.getString(R.string.layout_add)
@@ -177,6 +187,9 @@ class LayoutListFragment : Fragment() {
 
     override fun onDestroyView() {
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        // the adapter outlives the view (外观 kept on the back stack): the old list no observer of it, held and told of each reload
+        grid?.adapter = null
+        grid = null
         super.onDestroyView()
     }
 
@@ -186,7 +199,7 @@ class LayoutListFragment : Fragment() {
         val ctx = requireContext().applicationContext
         reloading?.cancel()
         reloading = lifecycleScope.launch {
-            val items = withContext(Dispatchers.IO) { items(ctx) }
+            val items = withContext(Hooks.cardsRead) { items(ctx) }
             adapter.items = items
             adapter.notifyDataSetChanged()
         }
@@ -200,7 +213,7 @@ class LayoutListFragment : Fragment() {
         val panels = prefs.panelLayouts()
         val chosen = prefs.imKeyboards()
         val own = CustomLayouts.list(context = ctx).map { e ->
-            val scene = e.layout?.let { scene(e.id, it, e.fragments) }
+            val scene = e.layout?.let { scene(ctx, e.id, it, e.fragments) }
             val panel = PanelLayouts.listedUnder(e.family, e.id, panels)
             val used = panel != null && panels[panel] == e.id
             val unread = panel != null && used && PanelLayouts.unread(panel, e.id, CustomKeyboards.choice(e.id))
@@ -232,15 +245,22 @@ class LayoutListFragment : Fragment() {
     }
 
     // a layout of one's own as the keyboard will draw it: the app's keys' long press and swipes on the app's names
-    // (KeyData.Own), its base of its own family's (CustomLayoutSource.base)
-    private fun scene(id: String, layout: Layout, fragments: Map<String, org.fcitx.fcitx5.android.scene.layout.Fragment>): SceneLayout {
-        val base = runCatching { CustomKeyboards.baseOf(layout) }.getOrNull()
-        val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, base) }.getOrNull()
+    // (KeyData.Own), its keys' data and styles of its own based-on, the app's board drawn in its place of its own family
+    // (CustomLayoutSource.fallback; R26 F8117, as SceneLayouts reads it). Made on IO: [context] given, never the
+    // fragment's, which the page may have left by then (R26 F8135: requireContext there threw)
+    private fun scene(context: Context, id: String, layout: Layout, fragments: Map<String, org.fcitx.fcitx5.android.scene.layout.Fragment>): SceneLayout {
+        val basedOn = layout.basedOn
+        val fallback = runCatching { CustomKeyboards.baseOf(layout) }.getOrNull() ?: id
+        val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, basedOn, shape = fallback) }.getOrNull()
         // its keys of the app's names the app's keys, as the keyboard has them, should a preview read them: made off the
         // main thread (the list is read on IO), so read anew, not through the keyboards' main-thread cache
-        val ctx = requireContext().applicationContext
+        val ctx = context.applicationContext
         val app: (String) -> SceneLayout? = { b -> SceneLayouts.parseBuiltIn(ctx, b) }
-        return if (held != null) SceneLayout(id, held.layout, held.fragments, base ?: id, app) else SceneLayout(id, layout, fragments, base ?: id, app)
+        return if (held != null) {
+            SceneLayout(id, held.layout, held.fragments, basedOn ?: id, app, fallback)
+        } else {
+            SceneLayout(id, layout, fragments, basedOn ?: id, app, fallback)
+        }
     }
 
     private fun addLayout() {
@@ -279,7 +299,7 @@ class LayoutListFragment : Fragment() {
                         // its fragments read and its keys' data held off the main thread
                         val layout = v.layout
                         val preview = withContext(Dispatchers.IO) {
-                            runCatching { CustomLayouts.fragments(layout, ctx)?.let { scene(layout.id, layout, it) } }.getOrNull()
+                            runCatching { CustomLayouts.fragments(layout, ctx)?.let { scene(ctx, layout.id, layout, it) } }.getOrNull()
                         }
                         confirm(ctx, opened.text, v, preview)
                     }
@@ -639,6 +659,12 @@ class LayoutListFragment : Fragment() {
                 }
             }
         }
+    }
+
+    /** Where the cards are read: IO, a test's own to run them to their end (R26 F8490). */
+    @VisibleForTesting
+    internal object Hooks {
+        var cardsRead: CoroutineDispatcher = Dispatchers.IO
     }
 
     private companion object {

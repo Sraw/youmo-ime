@@ -294,7 +294,8 @@ class AssetPacksPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         val root = target.rootProject.layout.projectDirectory
         val keysDir = target.layout.projectDirectory.dir("pack-keys")
-        fun prop(name: String) = packsProperty(target, name)
+        val packsProps = packsProperties(target)
+        fun prop(name: String) = packsProperty(packsProps, name)
 
         val local = target.providers.fileContents(root.file("local.properties")).asText.map { text ->
             Properties().apply { load(text.reader()) }.getProperty(PROPERTY_KEY).orEmpty()

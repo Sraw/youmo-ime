@@ -32,6 +32,7 @@ import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
+import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -45,6 +46,14 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Item
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Section
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Toggle
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
+import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.utils.appContext
+import java.nio.file.Files
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -422,6 +431,40 @@ class InputMethodSettingsScreenTest {
             assertEquals(ShuangpinKeyboard.Keys18.name, page.findPreference<ListPreference>(AppPrefs.SHUANGPIN_KEYBOARD)!!.value)
         } finally {
             keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.Full)
+        }
+    }
+
+    // R26 F8379: a layout of the user's that reads and draws, chosen for an input method it is not of now (a grouped one for
+    // English): its row says it cannot be used here, not that its file does not read
+    @Test
+    @Uat("ST-191")
+    fun aLayoutThatReadsButIsNotOfThisInputMethodIsSaidSo() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        val dirWas = CustomKeyboards.dir
+        val dir = Files.createTempDirectory("layouts").toFile()
+        try {
+            CustomKeyboards.dir = { dir }
+            val k18 = BuiltInLayouts(appContext).text("k18")!!
+            CustomLayouts.save("mine", k18.replace("name=\"18 键\"", "name=\"我的\"").replaceFirst("id=\"k18\"", "id=\"mine\" based-on=\"k18\""), dir)
+            assertTrue("read and drawn", CustomKeyboards.choice("mine")!!.drawn)
+            keyboard.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, "mine")
+            val row = screen(InputMethodCatalog.ENGLISH).findPreference<ListPreference>(AppPrefs.ENGLISH_KEYBOARD)!!
+            val labels = row.entries.map { it.toString() }
+            assertTrue(labels.toString(), placeholder(R.string.keyboard_custom_unusable) in labels)
+            assertFalse(labels.toString(), placeholder(R.string.keyboard_custom_unread) in labels)
+            // chosen still, said by its name and the keyboard typed instead: the full one, English's own
+            assertEquals("Custom:mine", row.value)
+            val real = InputMethodSettings.create(PreferenceManager(appContext), InputMethodSettings.of(InputMethodCatalog.ENGLISH)!!, mutableMapOf(), {}, open = {})
+                .findPreference<ListPreference>(AppPrefs.ENGLISH_KEYBOARD)!!
+            val said = appContext.getString(R.string.keyboard_custom_unusable, "我的", appContext.getString(R.string.pinyin_keyboard_full))
+            assertTrue(real.entries.toList().toString(), real.entries.any { it.toString() == said })
+            assertEquals(ImKeyboard.FULL, ImKeyboards.effective(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, EngineState.shuangpinScheme, CustomKeyboards.choice("mine")))
+        } finally {
+            keyboard.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.FULL)
+            keyboard.englishKeyboardLayout.setValue(keyboard.englishKeyboardLayout.defaultValue)
+            forgetTheTestsLayouts(dirWas)
+            CustomLayouts.forgetAll()
+            dir.deleteRecursively()
         }
     }
 }

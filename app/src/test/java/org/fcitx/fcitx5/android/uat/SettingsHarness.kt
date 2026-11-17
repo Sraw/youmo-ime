@@ -40,7 +40,7 @@ import org.robolectric.Shadows.shadowOf
 /**
  * The settings app on a [FakeHostApi], as [SettingsUatTest] has it: pages opened by their route,
  * read through their preferences. Engine config a page builds from is put in [api] first
- * (`setImOptions`, `setPunctuationMap`); [intent], what it is opened with. [close] at the end: the daemon seam is global.
+ * (`setImOptions`); [intent], what it is opened with. [close] at the end: the daemon seam is global.
  */
 class SettingsHarness(
     val api: FakeHostApi = FakeHostApi(),

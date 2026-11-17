@@ -75,6 +75,7 @@ class TextVariablesTest {
     }
 
     // the help's table names each of them, in the editor's order (061-text-variables §5)
+    // contract: docs/words.md's table of the variables (its 变量 column) against TextVariables.NAMES
     @Test
     fun theHelpTablesEveryVariable() {
         val lines = File("../../docs/words.md").readLines().dropWhile { !it.startsWith("| 变量 |") }.takeWhile { it.startsWith("|") }

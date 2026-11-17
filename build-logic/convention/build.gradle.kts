@@ -62,3 +62,18 @@ gradlePlugin {
         }
     }
 }
+
+// read from the repository by a path of their own, not the classpath: each an input, or an edit to one alone leaves
+// the tests up to date and what it would fail unseen (R26 F8163; the app's and the libraries' since 2da698df0).
+// VoiceDataPluginTest: the packs' versions, the voice pack's listings and notices; AssetPacksPluginTest: the pack keys;
+// AssetPacksBundleTest: the app's PackKind paths (R26 F8500)
+tasks.named<Test>("test") {
+    val repo = rootDir.parentFile
+    inputs.files(
+        repo.resolve("app/packs.properties"),
+        repo.resolve("lib/ime-core/src/main/kotlin/org/fcitx/fcitx5/android/pack/PackManifest.kt"),
+        fileTree(repo.resolve("gradle")) { include("voice-pack-v*.sha256") },
+        fileTree(repo.resolve("app/voice-pack")),
+        fileTree(repo.resolve("app/pack-keys")),
+    ).withPropertyName("repoFiles").withPathSensitivity(PathSensitivity.RELATIVE)
+}

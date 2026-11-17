@@ -241,10 +241,10 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         }
     }
 
-    // a key's pick: told as one ([Snapshot.picked]), never a key to type again (KeyRouter's log)
     // the input ended keeps what is written on the keys (InkOver, outermost of the session); a drop does not
     private fun reset(arg: Int) = (session as? InkOver)?.takeIf { arg != EngineEvent.RESET_DROP }?.endInput() ?: session.apply(Action.Reset)
 
+    // a key's pick: told as one ([Snapshot.picked]), never a key to type again (KeyRouter's log)
     private fun select(index: Int) = session.apply(Action.Select(index)).copy(picked = true)
 
     // the app types the key after what the session committed; but one that left something composing

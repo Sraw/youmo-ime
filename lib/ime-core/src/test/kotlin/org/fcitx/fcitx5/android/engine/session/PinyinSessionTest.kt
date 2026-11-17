@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -594,7 +595,7 @@ class PinyinSessionTest {
         assertTrue(typed.handled)
         assertEquals("x;", typed.preedit)
         val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
-        user.own(UserModel.Entry("先", intArrayOf(org.fcitx.fcitx5.android.engine.pinyin.Syllables.id("xian"))))
+        user.own(UserModel.Entry("先", intArrayOf(Syllables.id("xian"))))
         assertEquals("x ;", PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true, user = user).type("x;").preedit)
     }
 

@@ -600,6 +600,10 @@ class CandidateMenuUatTest {
         h.idle()
         h.relayout()
         assertEquals((head() as WordCardView).head, h.inputView.cardFocused)
+        // closed, the menu's views are not held on to
+        menu!!.dismiss()
+        h.idle()
+        assertEquals(null, h.inputView.cardFocused)
     }
 
     @Test

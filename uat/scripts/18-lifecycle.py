@@ -313,13 +313,22 @@ def lc21(d):
 @case("LC-22", mutates=True)
 def lc22(d):
     testbed_in_field(d, "ime", "preselected")
-    # the tap put the cursor where it landed: two letters selected again with shift and the left arrow
-    for _ in range(2):
-        d.sh("input keycombination KEYCODE_SHIFT_LEFT KEYCODE_DPAD_LEFT")
-        time.sleep(0.4)
+    # the tap put the cursor where it landed: two letters selected again with shift and the left arrow; `input
+    # keycombination` is Android 12's (API 31), so before it (youmo29) a long press selects a word instead
+    sdk = int(d.sh("getprop ro.build.version.sdk").strip() or 0)
+    if sdk >= 31:
+        for _ in range(2):
+            d.sh("input keycombination KEYCODE_SHIFT_LEFT KEYCODE_DPAD_LEFT")
+            time.sleep(0.4)
+    else:
+        n = next((x for x in d.screen().app() if x.rid == "preselected" and x.pkg == TESTBED), None)
+        if n:
+            d.sh("input swipe %d %d %d %d 900" % (*n.c, *n.c))
+            time.sleep(0.8)
     st = tb(d, "preselected")
     if st.get("selStart") == st.get("selEnd"):
-        raise Blocked(f"框里选不出一段（选区 {st.get('selStart')}–{st.get('selEnd')}）")
+        how = "Shift+←" if sdk >= 31 else "长按"
+        raise Blocked(f"框里选不出一段（API {sdk}，用{how}选；选区 {st.get('selStart')}–{st.get('selEnd')}）")
     text0, sel0 = st.get("text"), (st.get("selStart"), st.get("selEnd"))
     d.type("ni")
     d.cands()
@@ -421,7 +430,16 @@ def lc24(d):
     return f"最后「{t}」" + ("（框丢了焦点，留在键盘上，点那一行写进去的）" if kept else "")
 
 
-case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame、CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports、CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart")(lambda d: None)
+case("LC-36", needs="jvm:CommitKeptUatTest.withTheCodeOnTheStripOrInTheBarWhatADeafFieldDroppedIsKeptTheSame、"
+                     "CommitKeptUatTest.aFieldThatTakesTheTextIsNeverSaidToHaveDroppedItHoweverLateItReports、"
+                     "CommitKeptUatTest.whatIsKeptGoesWithTheKeyboardAnotherFieldOrSomethingElseTypedAndStaysThroughATurnAndARestart、"
+                     "CommitKeptUatTest.aCommitMadeJustBeforeTheWaitForAnEarlierOneIsUpWaitsItsOwnTime、"
+                     "CommitKeptUatTest.aCommitFollowedByADeletionASendOrInputStartedAnewIsNotSaidToBeLostInAFieldThatReportsLate、"
+                     "CommitKeptUatTest.theKeptLineTappedWhileAnotherCommitWaitsWritesBothInTheOrderTyped、"
+                     "CommitKeptUatTest.theKeptLineTappedWhileACommitWaitsThatThenReportsIsStillWritten、"
+                     "CommitKeptUatTest.theKeptLineAskedForIsWrittenWhenTheWaitEndsHoweverItEnds、"
+                     "CommitKeptUatTest.theKeptLineGoesBeforeAuxBelowWhichKeepsItsFormatting、"
+                     "CommitCheckTest.a field that uses the text and puts its buffer back is not said to have dropped it")(lambda d: None)
 
 
 @case("LC-37", mutates=True)

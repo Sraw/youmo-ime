@@ -91,8 +91,11 @@ object LayoutCheck {
     /** The families a layout of its own may be (0.6.1). */
     val FAMILIES = listOf("letters", "grouped", "nine", "number", "symbols")
 
-    /** The app's boards one may be made from. */
-    val BASES = listOf("qwerty", "k14", "k18", "nine", "number", "symbols")
+    /**
+     * The app's boards one may be made from: those a .theme's layouts are converted of (KeyData.LISTED), in its order, so
+     * the layout page offers what the app's import converts (L8a review N7; one list, R26 F8358).
+     */
+    val BASES = KeyData.LISTED.toList()
 
     /** The base a family's needs are held to where `based-on=` is of another family (§2.2: 26 keys made grouped). */
     val FAMILY_BASE = mapOf("letters" to "qwerty", "grouped" to "k18", "nine" to "nine", "number" to "number", "symbols" to "symbols")
@@ -159,6 +162,7 @@ object LayoutCheck {
         targets(layout).forEach(newRule)
         val base = held(layout, fragments, sources, strict, errors)
         names(layout, sources).forEach(newRule)
+        hiddenNames(layout).forEach(newRule)
         family(layout, fragments).forEach(newRule)
         typedHidden(layout).forEach(newRule)
         base?.let { b -> commands(layout, b, baseFragments(b, sources), sources).forEach(newRule) }
@@ -168,7 +172,9 @@ object LayoutCheck {
         val commits = newCommits(layout, base, base?.let { baseFragments(it, sources) }.orEmpty(), sources.names)
         warnings += told(layout, fragments, commits, theme)
         base?.let { b -> unnamed(layout, b, baseFragments(b, sources)).forEach { warnings += it } }
-        warnings += heldData(layout, fragments, sources, baseId(layout, sources))
+        // a name looked up as KeyData looks it up for this layout: from its own based-on, as its styles are (R26 F8117);
+        // one writing none (a theme's board, checked loosely) from the board it is held to
+        warnings += heldData(layout, fragments, sources, layout.basedOn ?: baseId(layout, sources))
         shown.padLacks.forEach { warnings += it }
         warnings += ScaledRows.find(layout, fragments, scenes(layout, ims, pads))
         if (strict) {
@@ -195,7 +201,8 @@ object LayoutCheck {
 
     /**
      * The app's board [layout] is held to, and drawn as where it cannot be: the one it is made from, or its family's where
-     * that is of another family (a `based-on` of another family's board is let in) or none.
+     * that is of another family (a `based-on` of another family's board is let in) or none. Only that: its keys' data,
+     * the theme's styles and its default shortcuts are its own `based-on`'s, whatever family that is (R26 F8117).
      */
     fun baseId(layout: Layout, sources: Sources): String? =
         layout.basedOn?.let { b -> if (sources.layout(b)?.family == layout.family) b else FAMILY_BASE[layout.family] }
@@ -466,7 +473,7 @@ object LayoutCheck {
         // a `code:U+202E` decoded, verifier R-M1) held to what a commit: is
         fun typed(alt: String) = firstTyped(alt)?.let { "commit:$it" }
         val keys = ownCells(layout).filterIsInstance<Key>().flatMap { k ->
-            (actions(k) + alts(k).mapNotNull(::typed)).filter(::hides).distinct().map { Finding(k.line, "hidden-chars", listOf(k.id)) }
+            (actions(k) + alts(k).mapNotNull(::typed)).filter(::hides).distinct().map { Finding(k.line, "hidden-chars", listOf(plain(k.id))) }
         }
         return keys + (defaultsActions(layout) + defaultsAlts(layout).mapNotNull { (alt, line) -> typed(alt)?.let { it to line } }).filter { hides(it.first) }
             .map { Finding(it.second, "hidden-chars", listOf("defaults")) }
@@ -583,11 +590,9 @@ object LayoutCheck {
     private fun isCommand(a: String): Boolean =
         a.startsWith("shortcut:") || a in COMMANDS || (a.startsWith("sym:") && !types(a))
 
-    // the bare words of the vocabulary (LayoutReader's) that do something to the text or the keyboard, Shift aside
-    private val COMMANDS = setOf(
-        "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock", "space-long-press", "begin-selection-swipe",
-        "delete-selection", "move-selection", "lookup",
-    )
+    // the bare words of the vocabulary that do something to the text or the keyboard, Shift aside: every one of
+    // LayoutReader's, so a word added there is a command here too (R26 F8256)
+    private val COMMANDS = LayoutReader.WORDS.toSet()
 
     // what an app that cannot read it or build it, or a board too big to look through, says is enough: the rest told once it can
     private val STOPS = setOf("newer", "include", "too-many-keys")
@@ -804,7 +809,8 @@ object LayoutCheck {
             }
             val pad = scene.env.input.pad
             if (pad != null && padsChecked.add(pad)) padLacks(pad, keys).forEach { (error, f) -> if (error) errors[f.line to f.toString()] = f else padLacks += f }
-            // null: not looked at yet (the first scene's bottom row decides; a finding, once it is, stays)
+            // null: none found yet; each scene's bottom row asked until one is found (another pad's rows may be what it
+            // lacks in), which then stays
             if (bottomLeft == null && (layout.family == "number" || layout.family == "symbols")) bottomLeft = bottomLeft(layout.family, rows.lastOrNull()?.items.orEmpty())
         }
         return Shown(errors.values.toList(), padLacks, bottomLeft)
@@ -935,7 +941,7 @@ private object Sight {
     // draws nothing (Default_Ignorable_Code_Point: a zero-width space, a tag, a 한글 filler), the braille blank and the
     // null notehead, marks over a letter (e + ´, e + 𝅥: beyond the BMP by [ASTRAL_MARKS])
     private fun seen(text: String): List<Char> = codePoints(text).filterNot { cp ->
-        cp in BLANKS || IGNORABLE.holds(cp) || ASTRAL_MARKS.holds(cp) ||
+        cp in BLANKS || IGNORABLE.holds(cp) || ASTRAL_MARKS.holds(cp) && !ASTRAL_LETTERS.holds(cp) ||
             (cp < 0x10000 && cp.toChar().let { it.isWhitespace() || it.category in UNSEEN })
     }.map(::sign)
 
@@ -954,12 +960,13 @@ private object Sight {
 
     // L a letter, D a digit, ; itself, ? anything else. Fullwidth forms are their ASCII's (common code has no NFKC); a
     // letter or number of 汉字, 注音, kana or 한글 is no letter; beyond the BMP only the mathematical letters and digits
-    // (𝐞), the boxed and circled capitals (🄰) and the regional indicators (🇪) are. The tone marks ˉ ˊ ˇ ˋ are letters
+    // (𝐞), the segmented digits, the boxed and circled capitals (🄰), the musical dynamics' letters and the regional
+    // indicators (🇪) are. The tone marks ˉ ˊ ˇ ˋ are letters
     // (Lm) on purpose: a tone key types anyway
     private fun sign(cp: Int): Char {
         if (cp >= 0x10000) {
             return when {
-                cp in 0x1D7CE..0x1D7FF -> 'D'
+                cp in 0x1D7CE..0x1D7FF || cp in 0x1FBF0..0x1FBF9 -> 'D'
                 cp in 0x1D400..0x1D7CD || ASTRAL_LETTERS.holds(cp) -> 'L'
                 else -> '?'
             }
@@ -997,9 +1004,11 @@ private object Sight {
         0xE0100, 0xE01EF,
     )
 
-    // the parenthesized, squared, circled and negative squared capitals (🄐 🄰 🅐 🅰) and the regional indicators
+    // the musical dynamics drawn as letters (𝆏 p to 𝆔 z: within [ASTRAL_MARKS]' stretch, seen all the same), the
+    // parenthesized, tortoise-shelled, squared, circled, negative squared and crossed capitals (🄐 🄪 🄰 🅐 🅰 🆊) and
+    // the regional indicators
     private val ASTRAL_LETTERS = intArrayOf(
-        0x1F110, 0x1F129, 0x1F12B, 0x1F12E, 0x1F130, 0x1F149, 0x1F150, 0x1F169, 0x1F170, 0x1F189, 0x1F1E6, 0x1F1FF,
+        0x1D18F, 0x1D194, 0x1F110, 0x1F12E, 0x1F130, 0x1F149, 0x1F150, 0x1F169, 0x1F170, 0x1F18A, 0x1F1E6, 0x1F1FF,
     )
 
     private val UNSEEN = setOf(CharCategory.FORMAT, CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK)
@@ -1024,7 +1033,9 @@ private object Sight {
  */
 // outside LayoutCheck, as its size allows (detekt's LargeClass)
 private fun heldData(layout: Layout, fragments: Map<String, Fragment>, sources: LayoutCheck.Sources, base: String?): List<LayoutCheck.Finding> {
-    val ignored = KeyData.of(layout.id, layout, fragments, KeyData.Mode.Own, base).ignored.filter { it.file == layout.id }
+    // a group key's corner judged by its own family's board's shape, whatever its based-on (R26 F8437)
+    val shape = LayoutCheck.baseId(layout, sources) ?: base ?: layout.id
+    val ignored = KeyData.of(layout.id, layout, fragments, KeyData.Mode.Own, base, shape = shape).ignored.filter { it.file == layout.id }
     val told = ignored.filter { it.line > 0 }.map { Triple(it.line, "held", it.key) }.toMutableSet()
     val app = appKeys(sources, base)
     // letters of its own on a key of the app's name: told apart, a name of its own being the way (verifier R-N1); a key
@@ -1036,6 +1047,21 @@ private fun heldData(layout: Layout, fragments: Map<String, Fragment>, sources: 
     }
     val held = told.sortedWith(compareBy({ it.first }, { it.second })).map { (line, what, key) -> LayoutCheck.Finding(line, what, listOf(key, (DefaultMarks.appBoard(key, base) ?: base).orEmpty())) }
     return held + listOfNotNull(base?.takeIf { ignored.any { it.what == "popups" } }?.let { LayoutCheck.Finding(0, "held-popups", listOf(it)) })
+}
+
+/**
+ * A key's id or name, or one its row's or the layout's `<defaults>` give, holding a [LayoutCheck.hidden] character (R26
+ * F8347): the import's findings print an id and the key page shows a name, as they do a layout's name, so the same
+ * rule; told by line, shown [LayoutCheck.plain]. Not asked of a layout read to be drawn (LayoutCheck.loaded): nothing
+ * of them is drawn on a key or typed.
+ */
+private fun hiddenNames(layout: Layout): List<LayoutCheck.Finding> {
+    val rows = layout.parts.filterIsInstance<Row>()
+    val keys = rows.flatMap { it.cells }.filterIsInstance<Key>()
+        .flatMap { k -> (listOf(k.id) + (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNull { it.shortcut }).map { k.line to it } }
+    val defaults = listOfNotNull(layout.defaults.shortcut?.let { 0 to it }) + rows.mapNotNull { r -> r.defaults.shortcut?.let { r.line to it } }
+    return (defaults + keys).filter { (_, name) -> name.any(LayoutCheck::hidden) }.distinct()
+        .map { (line, name) -> LayoutCheck.Finding(line, "hidden-chars", listOf(LayoutCheck.plain(name))) }
 }
 
 /**

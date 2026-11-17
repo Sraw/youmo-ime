@@ -73,6 +73,8 @@ class EngineEvalRunner {
         nine = args.getString("evalNine") == "true"
         english = ime == InputMethodCatalog.ENGLISH
         grouped = args.getString("evalGrouped")?.also { require(it in GROUPED) { "evalGrouped $it: one of $GROUPED" } }
+        // the two would measure the nine keys alone, the output named as if grouped were too
+        require(!(nine && grouped != null)) { "evalNine and evalGrouped: one at a time" }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val samples = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->

@@ -281,7 +281,8 @@
     const p = theme && theme.info(env.dark).picture;
     if (!p) return null;
     const cuts = p.cuts || {};
-    const file = cuts[env.landscape ? 'landscape' : 'portrait'] || cuts.portrait || cuts.landscape;
+    // the window's 横屏 (a tablet upright is), as the app picks the cut: not the device turned alone
+    const file = cuts[M.shape(E, env).landscape ? 'landscape' : 'portrait'] || cuts.portrait || cuts.landscape;
     const bmp = file && assets.cuts[file];
     if (!bmp || !scene) return null;
     // made once for a bitmap, a size and a blur and brightness: not blurred again on every preview (each tap)
@@ -352,8 +353,8 @@
   const PREEDIT_DP = 24;
   function barOf(m) {
     if (!env.bar || !theme) return null;
-    const r = E.buildBar(theme, M.envJson(env), m);
-    const l = E.looks(theme, M.envJson(env));
+    const r = E.buildBar(theme, M.envJson(E, env), m);
+    const l = E.looks(theme, M.envJson(E, env));
     if (!r.ok || !l.ok) return null;
     const pre = env.bar === 'typing' ? Math.round(PREEDIT_DP * env.density) : 0;
     return { scene: r.scene, looks: l.looks, pre, height: pre + r.scene.height };
@@ -478,7 +479,7 @@
     if (env.show === 'preview') req = { kind: 'preview', text: label, keyWidth: r - l };
     else if (env.show === 'keys') req = { kind: 'keys', labels: ['à', 'á', 'â', 'ä', 'ā'], rows: [[0, 1, 2, 3, 4]], columns: 5, selected: 1 };
     else req = { kind: 'menu', cells: [{ label: '剪贴板' }, { label: '表情' }, { label: '编辑' }, { label: '设置' }], order: [0, 1, 2, 3], selected: 0 };
-    const got = E.buildPopup(theme, M.envJson(env), req, m);
+    const got = E.buildPopup(theme, M.envJson(E, env), req, m);
     if (!got.ok) return null;
     const p = got.scene;
     const cx = (l + r) / 2;
@@ -500,7 +501,7 @@
   // a number board of the user's as the app shows it from 123 (a pad named, as exportCheck does for the app's): not the
   // engine's warning of a pad not given
   function ownEnv(board) {
-    const e = M.envJson(env);
+    const e = M.envJson(E, env);
     if (typeof board === 'object' && board.family === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
     return e;
   }
@@ -537,7 +538,7 @@
     if (bar) drawBar(ctx, bar, Object.assign({}, state, { pressed: null, picture: pictureAt(picture, 0, 0, scene.width, bar.height) }), fonts);
     ctx.save();
     ctx.translate(0, barH);
-    const looks = env.panel && theme ? E.looks(theme, M.envJson(env)) : null;
+    const looks = env.panel && theme ? E.looks(theme, M.envJson(E, env)) : null;
     if (looks && looks.ok) {
       E.paint(scene, ctx, Object.assign({}, state, { pressed: null }));
       drawPanel(ctx, looks.looks, scene.width, scene.height);
@@ -611,7 +612,7 @@
       E.paint(scene, o.getContext('2d'), Object.assign({}, state, { pressed: pressedKey }));
       return o;
     };
-    const got = E.buildPopup(theme, M.envJson(env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
+    const got = E.buildPopup(theme, M.envJson(E, env), { kind: 'preview', text: k.label || 'a', keyWidth: k.bounds[2] - k.bounds[0] }, null);
     const cache = { keys: layer(null), pressed: layer(k.id), bounds: k.bounds, bubble: got.ok ? got.scene : null, state };
     const canvas = $('preview');
     const ctx = canvas.getContext('2d');
@@ -707,6 +708,8 @@
     fillEnvForm();
     keep();
     if (history) { preview(); showTab(); }
+    // a file of the layout maker before L8 is drawn, but the app's import still refuses it as it is
+    if (own.oldFaces) toast(own.oldFaces + ' 个分组键显示的字是旧版布局制作页写的 {group:…}（超过两个字母，App 读不了），这里按大写字母画；在布局制作页打开再保存一次，App 才能导入');
   }
 
   async function openFile() {
@@ -785,7 +788,7 @@
         const side = Math.min(M.PICTURE_SAVE.longSide, FORMAT.limits.pictureSide);
         const cuts = {};
         for (const o of ['portrait', 'landscape']) {
-          const rect = F.cropRect(size[0], size[1], bg.ratio(Object.assign({}, env, { landscape: o === 'landscape' })));
+          const rect = F.cropRect(size[0], size[1], bg.ratio(E, Object.assign({}, env, { landscape: o === 'landscape' })));
           const c = await encodePicture(bmp, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect.map((v) => v * scale), jpg);
           cuts[o] = { bytes: c.bytes, type: c.type, rect };
         }
@@ -845,7 +848,7 @@
     engine: E,
     doc: () => history.current,
     env: () => env,
-    envJson: (e = env) => M.envJson(e),
+    envJson: (e = env) => M.envJson(E, e),
     theme: () => theme,
     picked: () => picked,
     // an op that throws (a document it cannot change: no <theme>) says so instead of failing silently
@@ -949,7 +952,7 @@
   async function save() {
     if (!history) return;
     const d = history.current;
-    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(env));
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, env));
     if (errors.length) {
       showProblems([...errors, ...warnings]);
       $('problems-area').scrollIntoView({ block: 'nearest' });
@@ -1161,9 +1164,15 @@
       const answer = await new Promise((ok) => $('restore-panel').addEventListener('close', () => ok($('restore-panel').returnValue), { once: true }));
       if (answer === 'restore') {
         try {
-          if (kept.env) env = Object.assign({}, M.ENV, kept.env);
-          // a layout opened is not kept: its board the default's
-          if (env.board === OWN) env.board = M.ENV.board;
+          // only what the form offers now (a board since gone: nothing drawn, an empty select); a layout opened is
+          // not kept (OWN, OPEN_LAYOUT not offered): its board the default's
+          const offered = (id) => [...$(id).options].map((o) => o.value).filter((v) => v !== OWN && v !== OPEN_LAYOUT);
+          if (kept.env) {
+            env = M.restoreEnv(kept.env, {
+              device: offered('env-device'), board: offered('env-board'), form: offered('env-form-kind'), shift: offered('env-shift'),
+              field: offered('env-field'), ime: offered('env-ime'), show: offered('env-show'), bar: offered('env-bar'), panel: offered('env-sheet'),
+            });
+          }
           fillEnvForm();
           history = new M.History(kept.doc);
           await changed(true);

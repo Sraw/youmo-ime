@@ -111,8 +111,8 @@
 
 ### PY-137 [P0] 按偏的键按落点读：点在边上纠，点在正中不改
 - **前提**：B0。
-- **操作**：在「普通文本」框点 n i h，再点 `s` 键靠左边缘（离 `a` 近的那一侧，键宽的五分之一处），再点 o，看候选和编码行，删光；点 s h i，三个键都点在正中，看候选。
-- **预期**：第一次首选是「你好」，编码行是 `ni hao`（纠正后的拼写）；第二次首选是「是」之类 shi 的字，候选里没有把 `s` 读成 `a` 的词。
+- **操作**：在「普通文本」框点 n i h，再点 `s` 键靠左边缘（离 `a` 近的那一侧，从左边量键宽的 20% 处），再点 o，看候选和编码行，删光；再打一遍 n i h s o，五个键都点在正中，看候选和编码行。
+- **预期**：第一次首选是「你好」，编码行是 `ni hao`（纠正后的拼写）；第二次编码行里没有 `hao`（如 `ni h so`，hso 怎么切由引擎定），首选不是「你好」（如「你护送」），点在正中的 `s` 不当按偏。落点没传到时两次都会读成「你好」，所以两次结果不同才说明落点读到了。
 - **JVM**：`NeighbourSlipTest.fullPinyinReadsAKeyAsTheOneItWasTappedTowards`、`aLegalSlipIsReadOnlyNearTheKeyMeant`，`PinyinSessionSlipTest.aWordReadThroughASlipIsLearnedUnderTheKeyMeant`（编码行 `ni hao`），`NeighbourTouchTest.theHostHandsTheTouchToTheEngineWithTheKey`（键盘把落点交给引擎）；设备上照跑（落点要真的点出来）。
 
 ### PY-138 [P1] 一串声母点在正中，不读成按偏
@@ -373,7 +373,7 @@
 ### PY-153 [P1] 导入的 17 键（H 和 JK 并成一键）用在拼音上，按自己的分组打字
 - **前提**：B0；没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-k17-1.0.layout`（App 的 18 键把第 2 行的 H 和 JK 并成一个 HJK 键）。
 - **操作**：**设置 → 外观 → 布局 → + → 导入布局文件** 选它，点 **导入**；问「现在就用在 拼音 上吗？」时点 **用**；回测试页点「普通文本」框，依次点 BN、IO、HJK、A、IO，每个键点在要打的那个字母那边（BN 点右半 N、IO 先点左半 I、HJK 点最左的 H、A 点中间、IO 再点右半 O），看候选，点「你好」；再到 **按键 → 按键字符和快捷键** 点「UAT 17 键」，点 HJK 看长按菜单。
-- **预期**：确认框里没有「……是18 键的键……」的提醒（HJK 用的是自己的键名 `uat-k17/hjk`）。只有拼音能用自己分组的键盘，所以只问拼音。键盘是导入的 17 键：第 2 行是 A、SD、FG、HJK、L 五个键，没有单独的 H、JK 键。首选是「你好」（两个以上字母的键按点在哪边加权，和 App 的 18 键一样），点了框里是「你好」。HJK 的长按菜单里有 h、j、k。
+- **预期**：确认框里没有「……是 18 键的键……」的提醒（HJK 用的是自己的键名 `uat-k17/hjk`）。只有拼音能用自己分组的键盘，所以只问拼音。键盘是导入的 17 键：第 2 行是 A、SD、FG、HJK、L 五个键，没有单独的 H、JK 键。首选是「你好」（两个以上字母的键按点在哪边加权，和 App 的 18 键一样），点了框里是「你好」。HJK 的长按菜单里有 h、j、k。
 - **JVM**：ime-eval `CustomGroupsUatTest.theSeventeenKeysTypeNihaoByTheirOwnCodes`（真数据）、ime-core `LayoutImportGroupedTest.theUatsGroupedLayoutsAreTheSeventeenKeysAndTheEighteenRearranged`、`KeyboardCustomTest.theSeventeenKeysSegmentAndOfferWhatIsTyped`；设备上留作冒烟（导入、画出来、码送到引擎）。
 
 ### PY-154 [P1] 重排的 18 键用在拼音上：按它自己的位置画，打字和学的词跟 App 的 18 键一样
@@ -386,7 +386,13 @@
 - **前提**：B0；导入了两个自己分组的布局（比如 17 键和另一种 17 键），拼音用其中一个。
 - **操作**：在第一个键盘上打 nih（不选候选）；打字时从工具栏 **⋯ → 键盘** 换成另一个；先点一下退格，再点新键盘上的一个字母键。
 - **预期**：退格删的是刚才打的最后一个键（还在编码里，没有上屏）；点新键盘的字母键时，刚才打的先照回车的样子上屏，再从新键盘的这个键开始打。不会丢掉打了一半的拼音，也不会退格删掉已经上屏的字。
-- **JVM**：ime-core `OwnKeysTurnTest`（什么键等、什么键换）；app `OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey`（两个自己分组的键盘各自显示、点键，经真的 KotlinHost 到真引擎：退格、上屏、新键盘接着打）、`KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode`、`aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped`、`otherGroupsLeaveTheFieldsComposingTextAlone`、`EngineBridgeTest.theConfigReadAgainKeepsTheGroupsTypedOnTillTheOthersFirstCode`（换了还没打时改设置也不丢）；设备上暂不跑（要导入两个自己分组的布局再在 ⋯ → 键盘 里换，L8 补）。
+- **JVM**：ime-core `OwnKeysTurnTest`（什么键等、什么键换）；app `OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey`（两个自己分组的键盘各自显示、点键，经真的 KotlinHost 到真引擎：退格、上屏、新键盘接着打）、`KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode`、`aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped`、`otherGroupsLeaveTheFieldsComposingTextAlone`、`EngineBridgeTest.theConfigReadAgainKeepsTheGroupsTypedOnTillTheOthersFirstCode`（换了还没打时改设置也不丢）；设备上不跑：要导入两个自己分组的布局再在 ⋯ → 键盘 里换，脚本没在 0.6.1 写，留到 0.6.1 之后。
+
+### PY-156 [P2] 跨两行的字母键：上下两半都和旁边的键算挨着，点在边上纠，点在正中不改
+- **前提**：B0；没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-k17-tall-1.0.layout`（UAT 17 键的 HJK 往下跨两行（`rows="2"`），在第 2、3 行中间：上半在第 2 行挨着 FG，下半在第 3 行挨着 BN 和 M）；导入它并用在拼音上（同 PY-153）。**纠正错拼和按偏的键** 开着（默认）。
+- **操作**：在「普通文本」框点 FG 键靠右边缘（离 HJK 近的那一侧，从左边量键宽的 90% 处），再点 A，看候选，删光；FG 点在正中再点 A，看候选，删光；第 3 行的 BN 键靠右边缘（贴着 HJK 的下半）点，再点 A，看候选，删光；BN 点在正中再点 A，看候选。
+- **预期**：FG 点在靠 HJK 的边上时候选里有 ha 的字（如「哈」），FG 正中点时没有，只有 fa、ga 的字（如「发」「嘎」）。BN 点在靠 HJK 下半的边上时候选里也有「哈」：HJK 跨到第 3 行，和 BN 左右挨着（以前只按键的中心算，它只算第 2 行的键，BN 点到它边上也不读成 h）；BN 正中点时只有 ba、na 的字。
+- **JVM**：ime-core `NeighbourSlipTest.theKeysAroundAKeyAreThoseBesideItAndThoseAboveAndBelowOverlappingIt`（跨两行的键在两行里都和旁边的键挨着；只查几何，不查候选）；候选在设备上手工看（`manual:`）。
 
 ## 学习的规则
 
@@ -609,7 +615,7 @@
 ### PY-135 [P1] 画一笔后，首选后面跟两个单字
 - **前提**：B0，另外笔画筛选；**通用输入** 的 **首页至少几个单字** 是 2（默认）。
 - **操作**：打 keyi，划一横，看前几个候选；点第二个候选；再把 **首页至少几个单字** 改成「关」，打 keyi，划一横，看前几个候选。
-- **预期**：首选还是「可以」；紧跟在它后面的是两个一横起笔的单字（按 ke 读的字，如「可」「科」，以候选里的实际字为准），原来排在它们前面的词挪到这两个字后面，次序不变，没有多出或少了候选。点第二个候选上屏那个字，编码行剩 yi 和笔画后面的部分。改成「关」后，候选的顺序和 0.6.0 一样：只按读音筛，不提单字。首选本身是单字时不算在两个里；前面本来就有单字也一样提（把首选后面两格给单字）。
+- **预期**：首选还是「可以」；紧跟在它后面的是两个一横起笔的单字（按 ke 读的字，如「可」「珂」，以候选里的实际字为准），原来排在它们前面的词挪到这两个字后面，次序不变，没有多出或少了候选。点第二个候选上屏那个字，编码行剩 yi 和笔画后面的部分。改成「关」后，候选的顺序和 0.6.0 一样：只按读音筛，不提单字。首选本身是单字时不算在两个里；前面本来就有单字也一样提（把首选后面两格给单字）。
 - **JVM**：`StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst`（uatTest，真数据：「可以」第一，接着是筛完后最前面的两个单字，其余次序不变，「关」时不挪；全拼、九键、双拼各一行）、`StrokeFilterTest`（ime-core：X 为 0、1、2、5，首选是单字，单字不够，已在前面，带表情，排在 20 位以后的单字）；设备上不跑。
 
 ### PY-136 [P1] 提上来的单字照样能长按、置顶、屏蔽
@@ -623,25 +629,25 @@
 - **操作**：打 shi，点 ⌄ 展开候选；在候选区中间往下划一竖（约 1 cm）；再在别的候选上划一横、一撇；然后手指从下往上拖过半页；点右边的 ↓、↑。
 - **预期**：每一笔编码行后面多一个笔画（`shi 丨一丿`），候选按笔画筛，这一页一直开着、留在第一页，划的时候候选区上画出线（和键上的一样颜色）；没有选上任何候选。往上拖不翻页、不发笔画也不选；↓ ↑ 照常翻页。
 - **再试**：**输入法 → 拼音 → 键盘** 依次换成 14 键、18 键、九键，各打 shi 展开候选划一竖：和全键盘一样筛、页留着；换成注音键盘（它的键上本来就不画笔画），展开候选往下划是照常拖着翻页，不发笔画。
-- **JVM**：`StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot`、`thePageDrawsOverEachKeyboardAsItsKeysDo`（全键盘、14、18、九键画，注音不画，和键上一致）；手势的规则 ime-core `PageStrokeTouchTest`（`Draws` 各键盘的输入法、键和页同一条规则）；设备上看一遍线和翻页。
+- **JVM**：`StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot`、`thePageDrawsOverEachKeyboardAsItsKeysDo`（全键盘、14、18、九键画，注音不画，和键上一致）；手势的规则 ime-core `PageStrokeTouchTest`（`Draws` 各键盘的输入法、键和页同一条规则）；设备上不跑（线的样子和拖动翻页由这几条 JVM 测试查，没有设备脚本，也不在手工列表里）。
 
 ### PY-146 [P1] 展开候选上：点照旧选、长按照旧弹菜单；划一点或划短了什么也不发生
 - **前提**：同 PY-145；长按那几步 **长按延迟** 依次试三档。
 - **操作**：打 shi 展开候选，点一个候选；再打 shi 展开，按住一个候选稍微挪一点（约 1.5 mm）抬起；再按住一个候选往下划约 3 mm（不到灵敏度「中」的 4 mm）抬起；**笔画筛选灵敏度** 改成「高」再划同样的 3 mm。然后按住一个候选不动到菜单弹出，再往下划一点抬起；再快速往下划一竖（长按时间到之前划出 2 mm）。
 - **预期**：点的那个候选上屏。挪一点和划短了都什么也不发生：不选候选、不发笔画，这一页还开着。灵敏度「高」时 3 mm 算一笔。按住不动时，长按延迟到了就弹出这个候选的菜单（读音行、置顶等），之后再划不发笔画；快速划的是一笔，不弹菜单。三档延迟都一样。
-- **JVM**：`StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing`、`aLongPressStillOpensTheCandidatesMenu`；ime-core `PageStrokeTouchTest.theLongPressComingFirstIsTheCellsFromThenOn`；设备上手指再试一遍。
+- **JVM**：`StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing`、`aLongPressStillOpensTheCandidatesMenu`；ime-core `PageStrokeTouchTest.theLongPressComingFirstIsTheCellsFromThenOn`；设备上不跑。
 
 ### PY-147 [P1] 展开候选的翻页提示：头 3 次出，2 秒消失，不挡手指
 - **前提**：B0（清过数据：提示还没出过），另外笔画筛选。
 - **操作**：在键上划先选滑行输入，打 shi 展开候选；收起，在键上划改回笔画筛选，打 shi 展开（第 1 次）；趁提示还在，从提示那一行往下划一竖；收起再展开两次（第 2、3 次）；再收起展开（第 4 次）。
 - **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，候选区顶上出一行「这里划的是笔画，翻页用右边 ↑↓」，约 2 秒后淡出，不管手指在做什么；从提示上划的竖照常发出去（编码行多一个 丨）。第 4 次起不再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
-- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、2 秒、不挡触摸）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上看一遍样子。
+- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、2 秒、不挡触摸）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上不跑。
 
 ### PY-148 [P1] 键上不画笔画的时候，展开候选照旧拖着翻
 - **前提**：B0。
 - **操作**：分别在：**在键上划** 关、选滑行输入；笔画筛选但没打拼音（联想时展开）；笔画筛选、工具栏手写开着；快速输入里——展开候选，上下拖。再在笔画筛选、打着拼音时用鼠标拖、触控板双指滑、鼠标滚轮。
 - **预期**：前几种都和以前一样，拖着翻页，不发笔画。鼠标拖、触控板双指滑、滚轮也照旧翻页。
-- **JVM**：`StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore`、`aMouseDragOrATrackpadSwipeDrawsNone`（鼠标、触控板往下拖不发竖；触控板那行只在 SDK 34 以上跑）；鼠标、触控板设备上手工。
+- **JVM**：`StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore`、`aMouseDragOrATrackpadSwipeDrawsNone`（鼠标、触控板往下拖不发竖；触控板那行只在 SDK 34 以上跑）；设备上不跑。
 
 ### PY-149 [P1] 展开候选上筛得一个不剩：这一页留着，⌫ 撤回
 - **前提**：同 PY-145。

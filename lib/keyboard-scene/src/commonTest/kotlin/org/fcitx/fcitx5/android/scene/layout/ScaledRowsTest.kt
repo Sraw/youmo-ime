@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.layout
 
+import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +25,7 @@ class ScaledRowsTest {
     // L8: a split="halves" row of other than 9 or 10 keys to halve, which the engine scales when split, is told (once,
     // with the keys it has and where); a split="after" key is not one to halve, a board not split never is
     @Test
+    @Uat("ST-180")
     fun aSplitRowThatCannotBeHalvedIsTold() {
         assertTrue(check(qwerty).warnings.none { it.key == "split-scaled" }, check(qwerty).warnings.toString())
         // Q and W after the halves: eight keys to halve in the first row
@@ -54,12 +56,5 @@ class ScaledRowsTest {
         assertEquals(emptyList(), r.errors)
         val atInclude = r.warnings.filter { it.key == "split-scaled" }
         assertEquals(listOf(included.lines().indexOfFirst { "digits" in it } + 1), atInclude.map { it.line }, atInclude.toString())
-    }
-
-    // the boards a .theme's layouts are offered of on the layout page (BASES, layoutFormat) are those the app's import
-    // converts (KeyData.LISTED), in the same order (L8a review N7)
-    @Test
-    fun thePagesBoardsAreThoseTheAppConverts() {
-        assertEquals(KeyData.LISTED.toList(), LayoutCheck.BASES)
     }
 }

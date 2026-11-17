@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -226,7 +227,7 @@ class SettingsUatTest {
             val dialogs = ShadowDialog.getShownDialogs().size
             if (row.callChangeListener(CodeRowStyle.Embedded.name)) row.value = CodeRowStyle.Embedded.name
             idle()
-            org.fcitx.fcitx5.android.assertRows(
+            assertRows(
                 "three places, in the keyboard, over it, in the field" to {
                     assertEquals(listOf(R.string.code_row_embedded, R.string.code_row_floating, R.string.code_row_in_field).map(::s), entries)
                 },

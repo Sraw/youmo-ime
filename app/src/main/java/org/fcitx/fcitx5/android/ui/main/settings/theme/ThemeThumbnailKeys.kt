@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import org.fcitx.fcitx5.android.input.layout.LayoutThumbnail
@@ -42,30 +43,39 @@ class ThemeThumbnailKeys(
         listOf(KeyKind.Function to 1.5f, KeyKind.Letter to 1f, KeyKind.Space to 5f, KeyKind.Letter to 1f, KeyKind.Enter to 1.5f),
     )
 
+    // each key's face and where it goes, worked out as the bounds are set, not each frame a list of cards scrolls
+    // (a layout's up to 150 keys: R26 F8381)
+    private class Placed(val face: KeyFace, val kind: KeyKind, val x: Float, val y: Float)
+
+    private var placed: List<Placed> = emptyList()
+
+    override fun onBoundsChange(bounds: Rect) {
+        placed = place(bounds)
+    }
+
     override fun draw(canvas: Canvas) {
-        val b = bounds
+        for (p in placed) draw(canvas, p.face, p.kind, p.x, p.y)
+    }
+
+    private fun place(b: Rect): List<Placed> {
         val top = b.top + barPx
-        val rowHeight = (b.bottom - top) / rows.size
-        val unit = b.width() / 10f
         // the shape at a little of its size: the gaps and corners as they look beside the little keys
         val d = density * SCALE
         if (cells != null) {
             val w = b.width().toFloat()
             val h = b.bottom - top
-            for (c in cells) {
-                val face = KeyFaceGeometry.of((c.right - c.left) * w, (c.bottom - c.top) * h, c.kind, look.keys, false, d)
-                draw(canvas, face, c.kind, b.left + c.left * w, top + c.top * h)
+            return cells.map { c ->
+                Placed(KeyFaceGeometry.of((c.right - c.left) * w, (c.bottom - c.top) * h, c.kind, look.keys, false, d), c.kind, b.left + c.left * w, top + c.top * h)
             }
-            return
         }
-        rows.forEachIndexed { r, row ->
+        val rowHeight = (b.bottom - top) / rows.size
+        val unit = b.width() / 10f
+        return rows.flatMapIndexed { r, row ->
             val width = row.sumOf { it.second.toDouble() }.toFloat() * unit
             var x = b.left + (b.width() - width) / 2
             val y = top + r * rowHeight
-            for ((kind, w) in row) {
-                val face = KeyFaceGeometry.of(w * unit, rowHeight, kind, look.keys, false, d)
-                draw(canvas, face, kind, x, y)
-                x += w * unit
+            row.map { (kind, w) ->
+                Placed(KeyFaceGeometry.of(w * unit, rowHeight, kind, look.keys, false, d), kind, x, y).also { x += w * unit }
             }
         }
     }

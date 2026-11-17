@@ -42,7 +42,9 @@ class PinyinDecoderStartOnlyTest {
 
     // nothing of the dictionary starts the input, a word only imported does: the input is kept as typed
     // beside it, also where the decoder goes on from a decode in which a word did start it. That word,
-    // kept from the last decode, once passed for a word that paths go on from, and the letters were lost
+    // kept from the last decode, once passed for a word that paths go on from, and the letters were lost: the
+    // bug collectOn had (3cb60f9db), found by PinyinDecoderTest.buildingOnTheLastDecodeChangesNothingInLetters and
+    // fixed in c97cceb75 (review F8172)
     @Test
     fun goingOnKeepsTheInputAsTypedWhereOnlyAnImportedWordStartsIt() {
         val user = UserModel(data.dictionary, data.vocabulary)

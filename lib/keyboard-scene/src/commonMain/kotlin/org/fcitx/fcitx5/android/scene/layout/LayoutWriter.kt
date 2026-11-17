@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.xml.Xml
 import kotlin.math.floor
 
 /**
@@ -199,7 +200,8 @@ object LayoutWriter {
                 '\t' -> append("&#9;")
                 '\n' -> append("&#10;")
                 '\r' -> append("&#13;")
-                else -> append(c)
+                // what XML has no character for (a control pasted into a name): left out, as the reader drops it (R26 F8187)
+                else -> if (Xml.allows(c)) append(c)
             }
         }
     }

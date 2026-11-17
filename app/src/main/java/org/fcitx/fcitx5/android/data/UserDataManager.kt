@@ -430,8 +430,8 @@ object UserDataManager {
 
     internal fun import(src: InputStream, dirs: Dirs) = runCatching {
         if (!dirs.settled) errorRuntime(R.string.user_data_not_settled)
-        // the start's listing of the packs ended first (ThemeLayoutsToList.atStart), and its switch, not yet made, dropped:
-        // made on the main thread after the settings copied in, it would write the phone's over the backup's
+        // the start's listing of the packs ended first (ThemeLayoutsToList.atStart); its switch dropped below, once the
+        // backup passed its checks
         ThemeLayoutsToList.awaitStart(restoring = true)
         withTempDir { tempDir ->
             // closed before anything is copied: nothing may fail the import once the engine's is in
@@ -462,6 +462,9 @@ object UserDataManager {
             // the address bar's book the phone's, where the learning the zip brings carries the zip's: merged into it at
             // the next start, as a restore of a learning backup is, and the phone's kept for 退回恢复前
             keepAddressBook(tempDir)
+            // the start's switch, not yet made, dropped: made on the main thread after the settings copied in, it would
+            // write the phone's over the backup's. Not before the checks: a refused restore copies none in (R26 F8134)
+            ThemeLayoutsToList.dropStart()
             copyDir(File(tempDir, "shared_prefs"), dirs.sharedPrefs)
             val databases = File(tempDir, "databases")
             // only an import's own copy marks the clipboard's file the backup's: not a marker the backup brings, which
@@ -619,7 +622,8 @@ object UserDataManager {
     private const val FIRST_WITH_THE_RECORD = 2130L
 
     // 0.6.1's code, an ABI's (Versions.calculateVersionCode: 5130 + the ABI's 1-4): the first whose packs were given 分词
-    private const val FIRST_WITH_SEPARATOR = 5130L
+    @VisibleForTesting
+    internal const val FIRST_WITH_SEPARATOR = 5130L
 
     // an older build's log of learning (pinyin's, a table's, English's) or 0.4's mark beside a table's,
     // at the engine directory's top

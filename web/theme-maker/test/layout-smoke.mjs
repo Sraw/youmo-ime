@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '../dev/serve.mjs';
-import { browser, chromium } from './pixel-smoke.mjs';
+import { browser, chromium } from './cdp.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -27,7 +27,7 @@ async function main() {
   let b = null;
   try {
     server = await serve(0);
-    b = await browser(shell);
+    b = await browser(shell, 'layout-smoke');
   } catch (e) {
     if (b) await b.close();
     if (server) server.close();
@@ -74,8 +74,18 @@ async function main() {
     await make('k18', 'grouped-bottom');
     const fragment = await js(`[document.getElementById('new-panel').open, document.getElementById('new-problem').textContent]`);
     check(fragment[0] && /grouped-bottom/.test(fragment[1]), '新建 refuses a fragment\'s id: ' + fragment[1]);
-    await make('k18', 'my-k18');
-    await until(`!document.getElementById('new-panel').open`, '新建 did not close');
+    // Enter in the id: 新建 (the form's default button), held to the same checks; not 取消 (review R26 F8128)
+    const enter = async (id) => {
+      await js(`(() => { const i = document.getElementById('new-id'); i.value = ${JSON.stringify(id)}; i.focus(); })()`);
+      await b.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+      await b.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      await wait(300);
+    };
+    await enter('k18');
+    const enterRefused = await js(`[document.getElementById('new-panel').open, document.getElementById('new-problem').textContent]`);
+    check(enterRefused[0] && /App 自带的键盘或片段叫 k18/.test(enterRefused[1]), 'Enter with an id of the app\'s: refused, the dialog open: ' + enterRefused);
+    await enter('my-k18');
+    await until(`!document.getElementById('new-panel').open`, '新建 did not close on Enter');
     const made = await source();
     check(/id="my-k18"/.test(made) && /name="我的18 键"/.test(made) && /based-on="k18"/.test(made), 'a new layout from 18 键 under its id, name and based-on');
     check((await js(`document.getElementById('name').textContent`)) === '我的18 键', 'its name in the top bar');
@@ -145,7 +155,7 @@ async function main() {
     const blank = await js(`(() => { const c = document.getElementById('preview'); const e = document.createElement('canvas'); e.width = c.width; e.height = c.height; return c.toDataURL() === e.toDataURL(); })()`);
     check(big.length === 1 && /超过 64 KB/.test(big[0]) && blank, 'past 64 KB: one error, nothing drawn: ' + JSON.stringify(big).slice(0, 120));
     const keptAfter = await js(`window.YoumoMaker.draft(window.YoumoMaker.idbStore(indexedDB, 'youmo-layout-maker')).then((d) => d && d.doc.xml)`);
-    check(keptAfter === keptBefore && keptAfter.length < 65536, 'past 64 KB: the draft not replaced');
+    check(keptAfter !== null && keptAfter === keptBefore && keptAfter.length < 65536, 'past 64 KB: the draft not replaced');
     await js(`document.getElementById('undo').click()`);
 
     // the draft: offered back on the next visit, the environment it was drawn in too (the phone pad chosen above)
@@ -181,7 +191,7 @@ async function main() {
       const r = LM.check(E, t, LM.ENV, E.readTheme(E.themeSource('material'), null, null).theme, E.fixedMeasurer(), E.layoutFormat().version);
       const k = r.scene.json().keys.find((x) => x.id === ${JSON.stringify(id)});
       const c = document.getElementById('preview'), rc = c.getBoundingClientRect(), s = rc.width / c.width;
-      return { x: rc.left + (k.bounds[0] + (k.bounds[2] - k.bounds[0]) * ${dx}) * s, y: rc.top + (k.bounds[1] + k.bounds[3]) / 2 * s, cx: k.bounds[0] + 4, cy: (k.bounds[1] + k.bounds[3]) / 2 };
+      return { x: rc.left + (k.bounds[0] + (k.bounds[2] - k.bounds[0]) * ${dx}) * s, y: rc.top + (k.bounds[1] + k.bounds[3]) / 2 * s, b: k.bounds };
     })()`);
     const mouse = async (type, p, modifiers = 0) => b.send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, modifiers });
     const click = async (id, modifiers = 0) => { const p = await at(id); await mouse('mousePressed', p, modifiers); await mouse('mouseReleased', p, modifiers); await wait(150); };
@@ -197,9 +207,13 @@ async function main() {
 
     await click('q');
     check(/键 q/.test(await keyTab()), 'a click on Q selects it: its panel');
-    const q = await at('q');
-    const px = await js(`Array.from(document.getElementById('preview').getContext('2d').getImageData(${q.cx}, ${q.cy}, 1, 1).data).slice(0, 3).join(',')`);
-    check(px === '59,111,216', 'the selected key outlined in the accent: ' + px);
+    // the outline's middle line (3 px in from the key's edge) on each of its four sides, near the accent (#3b6fd8): not
+    // one exact pixel, which a stroke's width or anti-aliasing moves
+    const { b: qb } = await at('q');
+    const [mx, my] = [(qb[0] + qb[2]) / 2, (qb[1] + qb[3]) / 2];
+    const sides = await js(`[[${qb[0] + 3}, ${my}], [${qb[2] - 3}, ${my}], [${mx}, ${qb[1] + 3}], [${mx}, ${qb[3] - 3}]].map(([x, y]) =>
+      Array.from(document.getElementById('preview').getContext('2d').getImageData(Math.round(x), Math.round(y), 1, 1).data).slice(0, 3))`);
+    check(sides.every((px) => px.every((v, i) => Math.abs(v - [59, 111, 216][i]) <= 16)), 'the selected key outlined in the accent: ' + JSON.stringify(sides));
     await press('右移');
     await wait(300);
     check((await rowIds(0)).startsWith('w q e'), '→ moves it right: ' + await rowIds(0));

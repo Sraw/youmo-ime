@@ -39,6 +39,8 @@ PHRASES = {   # name: (what Kokoro is given, what X-ASR alone should hear, None:
     "iphone": ("我想买一个 I phone", "我想买一个iphone"),
     # a user word the recognizer alone mishears (蓝镜花园): heard only as the user's hotword
     "lanjing": ("我住在澜境花园", None),
+    # VO-56: 九键 not heard as 酒店 where a user word begins with 酒店 (20bbb03e0)
+    "jiujian": ("九键输入法", "九键输入法"),
     # VO-38: a user's name the recognizer hears as 徐静 (婧 never in its beam), its homophone put in;
     # 许静 (xu3) and 公式 (common) never
     "xujing": ("麻烦你去找一下徐婧", None),

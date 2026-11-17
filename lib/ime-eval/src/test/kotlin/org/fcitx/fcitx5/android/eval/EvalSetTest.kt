@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.eval
 
+import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.pinyin.Near
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -22,6 +25,19 @@ class EvalSetTest {
     fun aFourthFieldIsTheContext() {
         val set = EvalSet.parse(sequenceOf("jingli\t经理\tpair\t公司新来的"))
         assertEquals(listOf(Sample("jingli", "经理", "pair", "公司新来的")), set)
+    }
+
+    // review F8206: a sample of no context and no touches was written with an empty last field, which parse refuses
+    @Test
+    fun aSampleWrittenIsReadBack() {
+        val touch = Touch(0.1f, 0f, 36f, 50f, listOf(Near('h', 1f, 0f)))
+        // each row with what it holds (R26 F8475)
+        val why = mapOf(
+            Sample("nihao", "你好", "daily") to "no context, no touches (the F8206 bug: an empty last field)",
+            Sample("jingli", "经理", "pair", "公司新来的") to "a context: its fourth field",
+            Sample("ni", "你", "slips", touches = listOf(null, touch)) to "touches, one a key's none: their field",
+        )
+        assertRows(why.keys.toList(), { "${why.getValue(it)}: $it" }) { assertEquals(listOf(it), EvalSet.parse(sequenceOf(EvalSet.line(it)))) }
     }
 
     @Test(expected = IllegalArgumentException::class)

@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.uat
 
-import android.content.res.Configuration
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import android.widget.HorizontalScrollView
@@ -15,6 +14,7 @@ import org.fcitx.fcitx5.android.core.directBoot
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.inLandscape
 import org.fcitx.fcitx5.android.input.address.AddressLists
 import org.fcitx.fcitx5.android.input.address.AddressStore
 import org.junit.After
@@ -25,7 +25,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -241,18 +240,7 @@ class AddressUatTest {
                 h.idle()
                 h.relayout()
             },
-            "turned" to {
-                try {
-                    RuntimeEnvironment.setQualifiers("+land")
-                    h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
-                    h.idle()
-                } finally {
-                    RuntimeEnvironment.setQualifiers("+port")
-                    h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
-                    h.idle()
-                    h.relayout()
-                }
-            },
+            "turned" to { h.inLandscape(relayout = true) {} },
             "restarted" to { h.restart() },
         )
         // each way from an empty book: a row failing leaves none to the next

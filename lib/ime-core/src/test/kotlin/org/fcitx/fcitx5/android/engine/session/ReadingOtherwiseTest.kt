@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.Near
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
@@ -27,23 +28,16 @@ class ReadingOtherwiseTest {
         return reading(graph, graph.start, graph.end, id, data.dictionary, null) { _, _ -> "" }?.otherwise
     }
 
+    // 他 typed ta, and ya with y tapped at its left edge, towards t
+    private val t = Touch(-0.45f, 0f, 40f, 56f, listOf(Near('r', -1f, 0f), Near('y', 1f, 0f)))
+    private val y = Touch(-0.45f, 0f, 40f, 56f, listOf(Near('t', -1f, 0f), Near('u', 1f, 0f)))
+
     @Test
-    fun aWordReadByItsWholeSyllablesIsReadAsTyped() {
+    fun aWordIsReadOtherwiseOverAnInitialAloneOrASlipOnly() = assertRows(
         // 自然码 xw xia, mm mian
-        assertEquals(false, otherwise("xwmm", "下面"))
-    }
-
-    @Test
-    fun aWordReadByItsInitialsAloneIsReadOtherwise() {
-        assertEquals(true, otherwise("xm", "下面"))
-    }
-
-    @Test
-    fun aWordReadByAKeyTappedTowardsItsNeighbourIsReadOtherwise() {
-        // 他 typed ta, and ya with y tapped at its left edge, towards t
-        val t = Touch(-0.45f, 0f, 40f, 56f, listOf(Near('r', -1f, 0f), Near('y', 1f, 0f)))
-        val y = Touch(-0.45f, 0f, 40f, 56f, listOf(Near('t', -1f, 0f), Near('u', 1f, 0f)))
-        assertEquals(false, otherwise("ta", "他", arrayOf(t, null)))
-        assertEquals(true, otherwise("ya", "他", arrayOf(y, null)))
-    }
+        "a word read by its whole syllables: as typed" to { assertEquals(false, otherwise("xwmm", "下面")) },
+        "a word read by its initials alone: otherwise" to { assertEquals(true, otherwise("xm", "下面")) },
+        "a key tapped towards its neighbour, read as typed: as typed" to { assertEquals(false, otherwise("ta", "他", arrayOf(t, null))) },
+        "a key tapped towards its neighbour, read as the neighbour: otherwise" to { assertEquals(true, otherwise("ya", "他", arrayOf(y, null))) },
+    )
 }

@@ -128,9 +128,7 @@ object PackLayouts {
             if (f != null) own[src] = f
             fragments[src] = f ?: sources.fragment(src) ?: return Converted.Not("its fragment $src does not read")
         }
-        val app = sources.layout(id)
-        val appFragments = app?.parts?.filterIsInstance<Include>()?.mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }?.toMap().orEmpty()
-        judge(id, layout, fragments, app, appFragments)?.let { return Converted.Not(it) }
+        refused(id, layout, fragments, own, sources)?.let { return Converted.Not(it) }
         val (defaults, parts, renames) = renameKeys(layout.defaults, convertRows(layout.parts, own), newId, sources, appKeys(sources, id))
         val name = name(theme, layout.name, id)
         fun made(pads: List<String>?): Made {
@@ -236,6 +234,30 @@ object PackLayouts {
         f?.rows?.map { r -> Row(r.id, r.indent, r.endIndent, r.height, both(part.condition, r.condition), r.split, r.defaults.over(f.defaults), r.cells, r.line) }
             ?: listOf(part)
     }
+
+    /**
+     * The most `when=` alternatives a row made of an include's and its own may have ([both]: every pair of them): what
+     * the app's and a pack's boards write is a few; two files of [MAX_BYTES] would make millions before any size is
+     * checked (R26 F8348). PackSeparator holds a Shift's under its row's to it too.
+     */
+    internal const val MAX_ALTERNATIVES = 256
+
+    // why [layout] is not converted, if it is not: too many alternatives ([tooManyAlternatives]), else [judge]'s on the app's [id]
+    // (outside [convert], as its complexity allows)
+    private fun refused(id: String, layout: Layout, fragments: Map<String, Fragment>, own: Map<String, Fragment>, sources: LayoutCheck.Sources): String? {
+        tooManyAlternatives(layout.parts, own)?.let { return it }
+        val app = sources.layout(id)
+        val appFragments = app?.parts?.filterIsInstance<Include>()?.mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }?.toMap().orEmpty()
+        return judge(id, layout, fragments, app, appFragments)
+    }
+
+    // why not, where an include of [own]'s and a row of it would make more than [MAX_ALTERNATIVES] (what [convertRows] would)
+    private fun tooManyAlternatives(parts: List<Part>, own: Map<String, Fragment>): String? = parts.any { part ->
+        val include = part as? Include ?: return@any false
+        val f = own[include.src] ?: return@any false
+        val n = include.condition?.anyOf?.size ?: return@any false
+        f.rows.any { r -> n.toLong() * (r.condition?.anyOf?.size ?: 1) > MAX_ALTERNATIVES }
+    }.takeIf { it }?.let { "over $MAX_ALTERNATIVES when= alternatives an include's and its rows' make" }
 
     // a key id's most characters (LayoutReader): a name's part after its /
     private const val MAX_KEY_ID = 32

@@ -40,4 +40,25 @@ class EnglishTouchTest {
         assertEquals("hello ", hwllo(onW(0.45f)))
         assertEquals("hwllo ", hwllo(onW(0f)))
     }
+
+    // Stebe after "I met ", b tapped [b] (none: no place), with the default correction (R26 F8418): b's edge by v a
+    // slip, Steve; no place, a key beside, Steve; b's middle, as typed
+    private fun stebe(b: Touch?): String {
+        val s = EnglishSession(data)
+        s.apply(Action.Context("I met "))
+        "Ste".forEach { s.apply(Action.Key(it)) }
+        s.apply(Action.Key('b', touch = b))
+        s.apply(Action.Key('e'))
+        return s.apply(Action.Key(' ')).commit
+    }
+
+    private fun onB(dx: Float) = Touch(dx, 0f, 40f, 56f, listOf(Near('v', -1f, 0f), Near('n', 1f, 0f)))
+
+    @Test
+    @Uat("EN-30")
+    fun aNameTypedWithAKeyBesideIsCorrectedByWhereItWasTapped() {
+        assertEquals("by v's edge", "Steve ", stebe(onB(-0.45f)))
+        assertEquals("no place", "Steve ", stebe(null))
+        assertEquals("b's middle", "Stebe ", stebe(onB(0f)))
+    }
 }

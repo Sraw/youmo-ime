@@ -173,7 +173,8 @@ class SyllableGraph internal constructor(
             input, start, first, IntArray(kept.size) { edgeFrom[kept[it]] }, IntArray(kept.size) { edgeTo[kept[it]] },
             Array(kept.size) { edgeKind[kept[it]] }, Array(kept.size) { edgeMatches[kept[it]] },
             edgeAgainst?.let { a -> Array(kept.size) { a[kept[it]] } },
-            edgeSlips?.let { a -> Array(kept.size) { a[kept[it]] } },
+            // no edge kept is a slip: none, or the graph had other readings still (review F8203)
+            null,
         )
     }
 

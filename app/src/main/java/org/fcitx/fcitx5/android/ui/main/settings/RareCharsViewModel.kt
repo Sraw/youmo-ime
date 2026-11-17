@@ -68,6 +68,9 @@ class RareCharsViewModel : ViewModel() {
     ) {
         val readOnly: Boolean get() = unreadable || edits.readOnly
 
+        /** Each group's cells, [sorted]'s count: not RareGrid.count's pass over the whole grid, asked twice a card a step (R26 F8326). */
+        fun total(level: Level): Int = sorted[level]?.size ?: grid.count(level)
+
         /** The letter [cell]'s section is under: its first reading's first. */
         fun letterOf(cell: Int): Char = grid.spelling(cell).first()
     }

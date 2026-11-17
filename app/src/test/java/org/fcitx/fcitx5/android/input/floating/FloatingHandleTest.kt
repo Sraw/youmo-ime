@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
@@ -160,6 +161,24 @@ class FloatingHandleTest {
                 assertEquals(listOf("resize", "resize end"), log)
             },
         )
+    }
+
+    // a right-to-left language (Arabic, Hebrew, Uyghur): the dock button at the right end still, the resize button at the
+    // left, not both at the left with the resize button over the dock button (R26 F8126: Gravity.END was the left there)
+    @Test
+    @Uat("TB-24")
+    fun rightToLeftTheDockButtonStaysAtTheRightEnd() {
+        val handle = FloatingHandle(
+            PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.Bottom,
+            FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize),
+        )
+        handle.layoutDirection = View.LAYOUT_DIRECTION_RTL
+        Robolectric.buildActivity(Activity::class.java).setup().also(activities::add).get()
+            .setContentView(handle, ViewGroup.LayoutParams(1000, 24))
+        handle.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(24, View.MeasureSpec.EXACTLY))
+        handle.layout(0, 0, 1000, 24)
+        assertEquals("laid out right to left", View.LAYOUT_DIRECTION_RTL, handle.layoutDirection)
+        assertEquals(listOf(1000, 0), listOf(handle.dockButton!!.right, handle.resizeButton!!.left))
     }
 
     // TalkBack's long press is no touch: nothing to carry on, or a later touch would be taken for it

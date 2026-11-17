@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLE_DIR
 import org.fcitx.fcitx5.android.engine.data.CodeTable
+import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.platform.Blobs
@@ -24,7 +25,6 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.zip.CRC32
-import java.util.zip.DataFormatException
 
 /**
  * The table input methods of [Engines], each loaded at first need and kept, with what the user

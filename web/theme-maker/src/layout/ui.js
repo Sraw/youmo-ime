@@ -30,6 +30,9 @@
   const themes = new Map(); // a built-in theme read, by id
   const store = (() => { try { return M.idbStore(window.indexedDB, 'youmo-layout-maker'); } catch (e) { return null; } })();
 
+  // what a text a page before L8 wrote had changed in it on opening (M.oldGroupFaces): said after what was opened
+  const OLD_GROUPS = (keys) => (keys ? '；' + keys + ' 个分组键显示的字改成了大写字母（旧版页面写的 {group:…} 超过两个字母，App 读不了）' : '');
+
   function toast(text) {
     const t = $('toast');
     const host = document.querySelector('dialog[open]') || document.body;
@@ -224,7 +227,13 @@
   const xmlNow = () => history.current.xml;
   const keyboardAttrs = (xml) => { const k = F.elements(xml, 'keyboard')[0]; return k ? Object.fromEntries(k.attrs) : {}; };
   const columnsOf = (xml) => parseFloat(keyboardAttrs(xml).columns) || 10;
-  const parsed = () => LE.parse(xmlNow());
+  // the text's rows and cells, read once a text (a drag repaints on every pointer move: five passes over up to 64 KB each)
+  let parsedOf = { xml: null, p: null };
+  const parsed = () => {
+    const xml = xmlNow();
+    if (parsedOf.xml !== xml) parsedOf = { xml, p: LE.parse(xml) };
+    return parsedOf.p;
+  };
   // a fragment's text by its id (the app's bottom row): its keys' ids are the board's too
   const source = (src) => { try { return E.layoutSource(src) || null; } catch (e) { return null; } };
   const hasOwn = (o, k) => !!k && Object.hasOwn(o, k);
@@ -910,10 +919,11 @@
     try {
       // a file far past the limit is not read whole to be refused
       const bytes = new Uint8Array(await f.slice(0, FORMAT.limits.bytes + 1).arrayBuffer());
-      set(LM.openText(bytes, FORMAT.limits.bytes, f.size), { fresh: true });
+      const read = M.oldGroupFaces(LM.openText(bytes, FORMAT.limits.bytes, f.size));
+      set(read.xml, { fresh: true });
       edited = true;
       keep();
-      toast('已打开 ' + f.name);
+      toast('已打开 ' + f.name + OLD_GROUPS(read.keys));
       return true;
     } catch (e) {
       toast('打不开 ' + f.name + '：' + (e.message || e));
@@ -1173,7 +1183,9 @@
       btn.addEventListener('click', () => chooseBase(ex));
       $('layout-examples').append(btn);
     }
-    $('new-make').addEventListener('click', makeNew);
+    // the form's default button (Enter in the name or the id is a click of it): its submit, which would close the
+    // dialog unchecked, is makeNew's to do
+    $('new-make').addEventListener('click', (e) => { e.preventDefault(); makeNew(); });
     $('help-button').addEventListener('click', () => $('help-panel').showModal());
     $('new-open').addEventListener('click', async () => { if (await openFile()) $('new-panel').close(); });
     $('new-panel').addEventListener('close', () => { if (!history) set(LM.fromBuiltin(E, 'qwerty', LM.suggested('qwerty', FORMAT).id, LM.suggested('qwerty', FORMAT).name), { fresh: true }); });
@@ -1205,8 +1217,10 @@
           if (!LM.info(kept.doc.xml)) throw new Error('没有 <keyboard>');
           env = LM.restoreEnv(kept.env, [...E.themes()], [...FORMAT.pads]);
           fillEnv();
-          history = new M.History(M.doc(kept.doc.xml));
+          const restored = M.oldGroupFaces(kept.doc.xml);
+          history = new M.History(M.doc(restored.xml));
           changed();
+          if (restored.keys) toast('草稿已恢复' + OLD_GROUPS(restored.keys));
           return;
         } catch (e) {
           history = null;

@@ -56,7 +56,7 @@
 ### HW-09 [P1] 收起键盘时没上屏的字留在框里
 - **前提**：B0-手写。
 - **操作**：写「人」，停笔；点工具栏的 ⌄ 收起键盘（或点别的输入框）。
-- **预期**：「人」上屏留在「普通文本」框里（没写完的字收起时上屏，DECISIONS A2；拼音打了一半的编码不上屏）。
+- **预期**：「人」上屏留在「普通文本」框里（编码行里写好的字收起时上屏：`InkOver` 收到重置时交出，dev/design/061-handwriting-toolbar.md 换输入法一条，转屏、换主题时同样上屏见 LC-35；拼音打了一半的编码不上屏）。
 - **JVM**：`HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes`（收起键盘后「人」上屏、编码处清空；拼音打的 ni 收起时不上屏）；设备上不跑。
 
 ### HW-10 [P1] 上屏后联想下一个词
@@ -84,11 +84,11 @@
 - **预期**：第二次写，「入」排第二、第一个仍是「人」；第三次「入」排第一（同样三个候选，连着点了两次）。
 - **JVM**：`HandwritingEngineUatTest.aCharacterPickedRanksUpTwiceFirst`（:lib:ime-eval:uatTest，真数据）（点一次「入」排第二，两次排第一）；设备上不跑。
 
-### HW-16 [P1] 密码框里没有手写按钮，出来后接着写
+### HW-16 [P1] 密码框里手写按钮变灰，出来后接着写
 - **前提**：B0-手写。
 - **操作**：点「密码」框，点几个字母；再点「普通文本」框，写「人」。
-- **预期**：密码框里是英文全键盘，字母不变淡、点了就打出，工具栏上没有 **手写**；回到「普通文本」框，**手写** 还亮着，字母又变淡，写得出「人」。
-- **JVM**：`HandwritingUatTest.aPasswordIsTypedOnAndHandwritingComesBackAfter`（换成英文后没有手写按钮、不写；回普通框按钮亮着、一笔写得上）；设备上不跑。
+- **预期**：密码框里是英文全键盘，字母不变淡、点了就打出；栏上是数字行，没有工具栏（隐藏设置「输入密码时在工具栏上显示数字行」默认开）；回到「普通文本」框，**手写** 还亮着，字母又变淡，写得出「人」。
+- **JVM**：`HandwritingUatTest.aPasswordIsTypedOnAndHandwritingComesBackAfter`（关掉那项隐藏设置时，密码框和换成英文后手写按钮灰着〔TB-67〕、不写；回普通框按钮亮着、一笔写得上）；设备上不跑。
 
 ### HW-19 [P1] 手写的候选长按：没有固定首位；屏蔽能撤销，忘掉当场重排
 <!-- learning: U-82 C18 F2738 F2697 -->
@@ -151,17 +151,17 @@
 - **预期**：写的时候键上画出笔迹，没有按键预览、没有打出字母；停笔后笔迹淡出，候选里有「人」；点空格后框里是「人」。w 上的短划当成一笔（写字），不打出角标「2」。
 - **JVM**：`KeyHandwritingUatTest.aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed`（笔画读出来交给引擎、没发按键、停笔后片段写完）、`KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner`（短划不打角标）、`InkOverTest.anInkIsWrittenItsCandidatesPickedAndWhatWasPutInToldPinyin`（ime-core）；设备上跑写字和空格。
 
-### HW-34 [P1] 写字中途点一下是一笔，⌫ 撤一笔，空格先写完再上屏
+### HW-34 [P1] 写字时 ⌫ 撤一笔，空格先写完再上屏
 - **前提**：B0-手写，**通用输入 → 手写** 里停笔时间选最长。
 - **操作**：写「大」的前两笔，马上点 ⌫；再写那一笔；点空格。
 - **预期**：⌫ 撤掉最后一笔（键上的笔迹少一笔），没有删框里的字；空格把这个字写完并上屏「大」。
-- **JVM**：`KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits`；设备上不跑（adb 的触摸间隔掐不准停笔时间）。
+- **JVM**：`KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits`（同一条也查写字时点一下是一笔，那一步见 HW-42）；设备上不跑（adb 的触摸间隔掐不准停笔时间）。
 
 ### HW-36 [P1] 九键、14 键、五笔、注音上也能写
 - **前提**：B0-手写，**输入法 → 拼音** 的 **键盘** 分别选九键、14 键；添加「五笔」「注音」。
 - **操作**：在拼音九键、14 键、五笔、注音（大千和注音九键）的键上各写「人」。
 - **预期**：和全键盘一样写出「人」。
-- **JVM**：`KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo`（九键、五笔、14 键、注音大千、注音九键各一行）；设备上不跑。
+- **JVM**：`KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo`（九键、五笔、14 键、注音大千、注音九键各一行；HW-44 用同一条，另查英文里手写变灰）；设备上不跑。
 
 ### HW-37 [P1] 网址、邮箱框照写；密码框、英文、快速输入、触摸浏览时不写
 - **前提**：B0-手写。
@@ -195,11 +195,11 @@
 - **预期**：这些键照常（123、符号面板打开，地球键换输入法）；Shift 上起笔是一笔、不切大小写；从字母区划过空格是一笔，空格不打。
 - **JVM**：`KeyHandwritingUatTest.shiftIsWrittenOn`（Shift 上起笔写字、不发 Shift）；设备上不跑。
 
-### HW-44 [P1] 别的键盘也能写；英文没有手写按钮，切回来还开着
+### HW-44 [P1] 别的键盘也能写；英文里手写按钮变灰，切回来还开着
 - **前提**：B0-手写。
 - **操作**：在拼音九键、14 键、18 键、注音九键、大千、五笔上各写「人」；切到英文看工具栏；切回拼音写「人」。
-- **预期**：每种键盘都写得出「人」；英文里工具栏没有 **手写**，字母照打；切回拼音 **手写** 还亮着，写得出。
-- **JVM**：`KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo`、`KeyHandwritingUatTest.anotherInputMethodAndBackTheToggleIsKept`、`HandwritingModeTest.offeredInEveryChineseInputMethodNotEnglishNorAPassword`（ime-core）；设备上不跑。
+- **预期**：每种键盘都写得出「人」；英文里工具栏的 **手写** 灰着、留在原处（TB-67），字母照打；切回拼音 **手写** 还亮着，写得出。
+- **JVM**：`KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo`（各键盘写字同 HW-36）、`KeyHandwritingUatTest.anotherInputMethodAndBackTheToggleIsKept`、`HandwritingModeTest.offeredInEveryChineseInputMethodNotEnglishNorAPassword`（ime-core）；设备上不跑。
 
 ### HW-45 [P1] 写着字时候选栏上的手写按钮
 - **前提**：B0-手写。
@@ -233,9 +233,9 @@
 
 ### HW-50 [P1] 手写开着时滑行输入、笔画筛选、上下滑都不起
 - **前提**：B0-设置，**通用输入 → 在键上划** 选滑行输入；回测试页打开手写。
-- **操作**：从 t 划到 p；关掉手写，再从 t 划到 p。再把在键上划改成笔画筛选、打开手写，打 ni 后在键上划一横；在 w 上往上划一下。
-- **预期**：手写开着时划过去是写字（出笔迹），不出滑行的词；关掉后照旧是滑行输入。笔画筛选、上下滑的角标也一样：手写开着时都是写字的笔画。
-- **JVM**：`KeyHandwritingUatTest.glideTypingWaitsWhileHandwritingIsOn`（开着划是写字、不送滑行；关了送滑行）、`KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner`（短划不打角标）；设备上不跑。
+- **操作**：从 t 划到 p；关掉手写，再从 t 划到 p。再把在键上划改成笔画筛选、打开手写，在键上划一横（手写开着时点字母是写字的一笔，打不出拼音，笔画筛选也就没有要筛的）；在 w 上往上划一下。
+- **预期**：手写开着时划过去是写字（出笔迹），不出滑行的词；关掉后照旧是滑行输入。笔画筛选时划的一横、上滑也一样：手写开着时都是写字的笔画（出笔迹、候选是写出的字），不发笔画、不打角标。
+- **JVM**：`KeyHandwritingUatTest.glideTypingWaitsWhileHandwritingIsOn`（开着划是写字、不送滑行；关了送滑行）、`KeyHandwritingUatTest.aShortSwipeIsAStrokeNotTheKeysCorner`（短划不打角标）、`KeyHandwritingUatTest.strokeFilteringWaitsWhileHandwritingIsOn`（笔画筛选开着也是写字、点一下是一笔）；设备上不跑。
 
 ### HW-51 [P1] 拼音上手写的多音字标全部读音，长按是完整字卡
 - **前提**：B0-手写，**候选词注音** 选拼音。

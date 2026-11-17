@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.layout
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.input.layout.LayoutImport.Verdict
 import org.fcitx.fcitx5.android.utils.appContext
@@ -130,7 +131,8 @@ class CustomLayoutsTest {
         val listed = CustomLayouts.list(dir)
         assertEquals(listOf("kept", "new", "same"), listed.map { it.id }.sorted())
         assertEquals("备份的", listed.single { it.id == "same" }.name)
-        assertEquals("p@1\nq@2\n", File(dir, CustomLayoutFiles.CONVERTED).readText())
+        // the phone's then the backup's, a line of both where it was written last (R26 F8170)
+        assertEquals("q@2\np@1\n", File(dir, CustomLayoutFiles.CONVERTED).readText())
         // a backup of none (0.6.0's): the phone's as they were
         CustomLayouts.restore(File(folder.root, "none"), dir, "0.6.1")
         assertEquals(3, CustomLayouts.list(dir).size)
@@ -164,6 +166,28 @@ class CustomLayoutsTest {
         // where the folder cannot be made (a file in its place): an IOException, for the import to log and go past
         val blocked = File(folder.root, "blocked").apply { writeText("not a folder") }
         assertTrue(runCatching { CustomLayouts.restore(backup, blocked, "0.6.1") }.exceptionOrNull() is IOException)
+    }
+
+    // the record of the packs converted written (a pack's layouts listed, a restore): the keyboards as listed kept, the
+    // same list, not forgotten till listed again (R26 F8226: KeyboardPicker.offers had none meanwhile); a layout saved
+    // lists them anew
+    @Test
+    fun theRecordWrittenKeepsTheKeyboardsAsListed() {
+        val dirWas = CustomKeyboards.dir
+        try {
+            CustomKeyboards.dir = { dir }
+            CustomLayouts.save("my17", own("my17"), dir)
+            CustomKeyboards.awaitListed()
+            val listed = CustomKeyboards.listed()
+            assertEquals(listOf("my17"), listed.map { it.id })
+            CustomLayouts.recordConverted(listOf("p@1"), dir)
+            assertSame(listed, CustomKeyboards.listed())
+            CustomLayouts.save("my18", own("my18"), dir)
+            CustomKeyboards.awaitListed()
+            assertEquals(listOf("my17", "my18"), CustomKeyboards.listed().map { it.id }.sorted())
+        } finally {
+            forgetTheTestsLayouts(dirWas)
+        }
     }
 
     @Test

@@ -38,6 +38,10 @@ import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
+/**
+ * KB-106, KB-107: the full keyboard's Shift is 分词 while pinyin or 双拼 is typed, through a real engine (its data
+ * built here, PinyinDataBuilder): what the separator splits. ShiftSeparatorCanvasTest has the scenes and a theme's own qwerty.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")

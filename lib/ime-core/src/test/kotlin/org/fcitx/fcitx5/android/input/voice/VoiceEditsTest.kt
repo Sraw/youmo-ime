@@ -38,7 +38,9 @@ class VoiceEditsTest {
         }
     }
 
-    private val words = Words().apply {
+    // the characters' readings, and what [set] sets: a row that sets the user's words has its own (R26 F8147: rows set
+    // and reset one shared, and a row failed before its reset left them set for the rows after it)
+    private fun words(set: Words.() -> Unit = {}) = Words().apply {
         for ((c, readings) in listOf(
             '我' to listOf("wo" to 3), '找' to listOf("zhao" to 3), '了' to listOf("le" to 0, "liao" to 3),
             '徐' to listOf("xu" to 2), '许' to listOf("xu" to 3), '静' to listOf("jing" to 4), '婧' to listOf("jing" to 4),
@@ -46,10 +48,13 @@ class VoiceEditsTest {
             '公' to listOf("gong" to 1), '攻' to listOf("gong" to 1), '式' to listOf("shi" to 4), '势' to listOf("shi" to 4),
             '柜' to listOf("gui" to 4), '贵' to listOf("gui" to 4),
         )) chars[c] = readings.map { (s, t) -> reading(Syllables.id(s), t) }.toIntArray()
+        set()
     }
 
+    private val words = words()
+
     private val traditional = mapOf('靜' to '静', '許' to '许')
-    private fun edits() = VoiceEdits(words) { s -> s.map { traditional[it] ?: it }.joinToString("") }
+    private fun edits(words: Words = this.words) = VoiceEdits(words) { s -> s.map { traditional[it] ?: it }.joinToString("") }
 
     // voice's [said] in an empty field, its last [n] deleted by Backspace, [typed] typed into the gap by pinyin:
     // what is asked once the field reads as followed
@@ -127,24 +132,16 @@ class VoiceEditsTest {
             assertFalse(e.open)
         },
         "one character typed again (Q3), with no word around it voice would take" to {
-            words.refused = setOf("徐婧", "找徐婧", "婧了")
-            assertNull(edits().retype("我找徐静", 1, "婧"))
-            words.refused = emptySet()
+            assertNull(edits(words { refused = setOf("徐婧", "找徐婧", "婧了") }).retype("我找徐静", 1, "婧"))
         },
         "a word added by hand already" to {
-            words.added = setOf("徐婧")
-            assertNull(edits().retype("我找徐静", 2, "徐婧"))
-            words.added = emptySet()
+            assertNull(edits(words { added = setOf("徐婧") }).retype("我找徐静", 2, "徐婧"))
         },
         "a word blocked in it" to {
-            words.blocked = setOf("婧")
-            assertNull(edits().retype("我找徐静", 2, "徐婧"))
-            words.blocked = emptySet()
+            assertNull(edits(words { blocked = setOf("婧") }).retype("我找徐静", 2, "徐婧"))
         },
         "a word voice would not put in (a common word it leaves)" to {
-            words.refused = setOf("徐婧")
-            assertNull(edits().retype("我找徐静", 2, "徐婧"))
-            words.refused = emptySet()
+            assertNull(edits(words { refused = setOf("徐婧") }).retype("我找徐静", 2, "徐婧"))
         },
         "a polyphone kept beside the changed one, the dictionary not settling it: its reading not known" to { assertNull(edits().retype("长长", 2, "掌长")) },
     )
@@ -169,27 +166,22 @@ class VoiceEditsTest {
     @Uat("VO-43")
     fun `the word to ask about`() = assertRows(
         "one character typed again, a learned word over it: that word (§2.4 a)" to {
-            words.learned = setOf("徐婧")
-            assertEquals("徐婧", edits().retype("我找徐静", 1, "婧")?.word)
-            words.learned = emptySet()
+            assertEquals("徐婧", edits(words { learned = setOf("徐婧") }).retype("我找徐静", 1, "婧")?.word)
         },
         "a learned word added since: not asked (the hint aside)" to {
-            words.learned = setOf("徐婧")
-            words.added = setOf("徐婧")
-            assertEquals(null, edits().retype("我找徐静", 1, "婧")?.word?.takeIf { it.isNotEmpty() })
-            words.learned = emptySet()
-            words.added = emptySet()
+            val mine = words {
+                learned = setOf("徐婧")
+                added = setOf("徐婧")
+            }
+            assertEquals(null, edits(mine).retype("我找徐静", 1, "婧")?.word?.takeIf { it.isNotEmpty() })
         },
         "two to four typed, one of them kept: all typed (§2.4 b)" to { assertEquals("zhang gui", edits().retype("找长柜", 2, "掌柜")?.pinyin) },
         "two to four typed, the changed ones first (§2.4 b)" to { assertEquals("公式", edits().retype("我找攻势", 3, "找公式")?.word) },
         "the changed ones refused: all typed" to {
-            words.refused = setOf("公式")
-            assertEquals("找公式", edits().retype("我找攻势", 3, "找公式")?.word)
-            words.refused = emptySet()
+            assertEquals("找公式", edits(words { refused = setOf("公式") }).retype("我找攻势", 3, "找公式")?.word)
         },
         "the dictionary's reading settles a polyphone kept beside the changed one" to {
-            words.dictionary["掌长"] = "zhang zhang"
-            assertEquals("zhang zhang", edits().retype("长长", 2, "掌长")?.pinyin)
+            assertEquals("zhang zhang", edits(words { dictionary["掌长"] = "zhang zhang" }).retype("长长", 2, "掌长")?.pinyin)
         },
         "traditional typed is read simplified" to { assertEquals("徐婧", edits().retype("我找徐靜", 2, "徐婧")?.word) },
     )
@@ -360,18 +352,36 @@ class VoiceEditsTest {
 
     @Test
     @Uat("VO-49")
-    fun `an emoji's Backspace is not counted`() {
-        val e = edits()
-        e.said("我找徐静😀", "我找徐静😀")
-        e.backspace()
-        assertRows(
-            "still open, waiting" to { assertTrue(e.open) },
-            "the next Backspace, not knowing where it is: over" to {
-                e.backspace()
-                assertFalse(e.open)
-            },
-        )
-    }
+    fun `an emoji's Backspace is not counted`() = assertRows(
+        "an emoji at the cursor: its Backspace waits, the next one ends the window" to {
+            val e = edits()
+            e.said("我找徐静😀", "我找徐静😀")
+            // the steps of one scenario, in order: each needs the one before (R26 F8499)
+            e.backspace()
+            assertTrue("still open, waiting", e.open)
+            e.backspace()
+            assertFalse("the next Backspace, not knowing where it is: over", e.open)
+        },
+        // R26 F8293: any emoji in the window made every Backspace end it
+        "an emoji elsewhere in the window: a Backspace over Chinese is counted" to {
+            val w = edits()
+            w.said("😀我找徐静", "😀我找徐静")
+            repeat(2) { w.backspace() }
+            w.committed("徐婧", typed = true)
+            assertEquals("徐静", w.putIn("徐婧").ask?.heard)
+        },
+        // R26 F8439: the unit a Backspace takes at a gap is the one before the gap, not the cursor's
+        "an emoji before a gap: its Backspace waits, the next one ends the window" to {
+            val g = edits()
+            g.said("我😀找", "我😀找")
+            // in order: 找 taken (a gap), then the emoji before the gap, then one more
+            g.backspace()
+            g.backspace()
+            assertTrue("still open, waiting", g.open)
+            g.backspace()
+            assertFalse("the next Backspace, not knowing where it is: over", g.open)
+        },
+    )
 
     @Test
     @Uat("VO-44")

@@ -81,44 +81,39 @@ class HeldWordsTest {
         val mine = model.own(UserModel.Entry("龘龘", syl("da", "da")))
         val before = model.changes
         model.held = HeldWords.of(outToo, data.vocabulary)
-        assertRows(
-            "a new HeldWords is a change, as a block is: a glide's cache reads the model anew" to { assertTrue(model.changes > before) },
-            "the dictionary's 龘 blocked anyhow and at any node" to {
-                assertTrue(model.blockedAnyhow(id("龘")))
-                assertTrue(model.blocked(id("龘"), 0))
-            },
-            "the dictionary's 大 not" to { assertFalse(model.blockedAnyhow(id("大"))) },
-            "the user's own 龘龘, past the dictionary's ids, by its text" to {
-                assertTrue(mine >= data.vocabulary.size)
-                assertTrue(model.blockedAnyhow(mine))
-            },
-            "held no longer, neither is" to {
-                model.held = HeldWords.NONE
-                assertFalse(model.blockedAnyhow(id("龘")))
-                assertFalse(model.blockedAnyhow(mine))
-            },
-            "an imported word with 龘, past the merged ids, by its text" to {
-                model.attachImports(ImportedWords().import("龘好" to "da hao", "大好" to "da hao"))
-                model.held = HeldWords.of(outToo, data.vocabulary)
-                val imported = model.known(UserModel.Entry("龘好", syl("da", "hao")))
-                assertTrue(imported >= data.vocabulary.size)
-                assertTrue(model.blockedAnyhow(imported))
-                assertFalse(model.blockedAnyhow(model.known(UserModel.Entry("大好", syl("da", "hao")))))
-            },
-            "a whole phrase learned with 龘 not continued after 大; one without it is" to {
-                model.continuations.set("大龘大", 3, 5, 3)
-                model.continuations.set("大大好", 3, 5, 3)
-                assertEquals(listOf("大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest })
-                model.held = HeldWords.NONE
-                assertEquals(setOf("龘大", "大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest }.toSet())
-            },
-            "the same HeldWords again is no change" to {
-                val held = HeldWords.of(gate, data.vocabulary)
-                model.held = held
-                val now = model.changes
-                model.held = held
-                assertEquals(now, model.changes)
-            },
-        )
+        // the steps of one scenario, in order, each on the model as the one before left it (review F8119)
+        // a new HeldWords is a change, as a block is: a glide's cache reads the model anew
+        assertTrue(model.changes > before)
+        // the dictionary's 龘 blocked anyhow and at any node
+        assertTrue(model.blockedAnyhow(id("龘")))
+        assertTrue(model.blocked(id("龘"), 0))
+        // the dictionary's 大 not
+        assertFalse(model.blockedAnyhow(id("大")))
+        // the user's own 龘龘, past the dictionary's ids, by its text
+        assertTrue(mine >= data.vocabulary.size)
+        assertTrue(model.blockedAnyhow(mine))
+        // held no longer, neither is
+        model.held = HeldWords.NONE
+        assertFalse(model.blockedAnyhow(id("龘")))
+        assertFalse(model.blockedAnyhow(mine))
+        // an imported word with 龘, past the merged ids, by its text
+        model.attachImports(ImportedWords().import("龘好" to "da hao", "大好" to "da hao"))
+        model.held = HeldWords.of(outToo, data.vocabulary)
+        val imported = model.known(UserModel.Entry("龘好", syl("da", "hao")))
+        assertTrue(imported >= data.vocabulary.size)
+        assertTrue(model.blockedAnyhow(imported))
+        assertFalse(model.blockedAnyhow(model.known(UserModel.Entry("大好", syl("da", "hao")))))
+        // a whole phrase learned with 龘 not continued after 大; one without it is
+        model.continuations.set("大龘大", 3, 5, 3)
+        model.continuations.set("大大好", 3, 5, 3)
+        assertEquals(listOf("大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest })
+        model.held = HeldWords.NONE
+        assertEquals(setOf("龘大", "大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest }.toSet())
+        // the same HeldWords again is no change
+        val held = HeldWords.of(gate, data.vocabulary)
+        model.held = held
+        val now = model.changes
+        model.held = held
+        assertEquals(now, model.changes)
     }
 }

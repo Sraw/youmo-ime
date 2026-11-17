@@ -55,52 +55,50 @@ class RareCharsCardsUatTest : RarePageUat() {
     fun theTitleBarsUndoTakesBackTheLastStepTillASave() {
         RareCharsManager.update(listOf(Change.On(true), Change.One(0x9F98, true)), TestCharLevels.levels)
         openPage()
-        assertRows(
-            "nothing done yet: ↶ grayed" to { assertFalse(menuItem(R.string.undo).isEnabled) },
-            "some held → all: 「已屏蔽 6/6」" to {
-                assertEquals(MaterialCheckBox.STATE_INDETERMINATE, strip(R.string.rare_group_out).state)
-                strip(R.string.rare_group_out).performClick()
-                idle()
-                assertEquals(s(R.string.rare_chars_card_held, "6", "6"), strip(R.string.rare_group_out).count.text.toString())
-            },
-            "the snackbar gone, ↶ takes the picked one back: some again, 龘 alone, ↶ grayed" to {
-                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
-                assertFalse(shown().contains(s(R.string.rare_chars_changed_held, "5")))
-                tapUndo()
-                assertEquals(MaterialCheckBox.STATE_INDETERMINATE, strip(R.string.rare_group_out).state)
-                assertEquals(s(R.string.rare_chars_card_held, "1", "6"), strip(R.string.rare_group_out).count.text.toString())
-                assertFalse(menuItem(R.string.undo).isEnabled)
-            },
-            "one cell is a step too" to {
-                openGroup(R.string.rare_group_out)
-                cell("炟").performClick()
-                idle()
-                assertTrue(cell("炟").held)
-                tapUndo()
-                assertFalse(cell("炟").held)
-                assertTrue(cell("龘").held)
-            },
-            "a save as the page stops: ↶ grayed, nothing to take back" to {
-                cell("炟").performClick()
-                idle()
-                assertTrue(menuItem(R.string.undo).isEnabled)
-                st.leaveAndReturn()
-                assertFalse(menuItem(R.string.undo).isEnabled)
-                assertTrue(cp("炟") in file().block)
-            },
-            "the switch takes ↶ and the snackbar's 撤销 away: neither turns it back on with the step before" to {
-                back()
-                strip(R.string.rare_group_out).performClick()
-                idle()
-                assertTrue(menuItem(R.string.undo).isEnabled)
-                snackbarUndo()
-                switch().isChecked = false
-                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
-                assertFalse(menuItem(R.string.undo).isEnabled)
-                assertTrue(views().none { it is TextView && it.text.toString() == s(R.string.undo) && it.hasOnClickListeners() })
-                assertFalse(switch().isChecked)
-            },
-        )
+        step("nothing done yet: ↶ grayed") { assertFalse(menuItem(R.string.undo).isEnabled) }
+        step("some held → all: 「已屏蔽 6/6」") {
+            assertEquals(MaterialCheckBox.STATE_INDETERMINATE, strip(R.string.rare_group_out).state)
+            strip(R.string.rare_group_out).performClick()
+            idle()
+            assertEquals(s(R.string.rare_chars_card_held, "6", "6"), strip(R.string.rare_group_out).count.text.toString())
+        }
+        step("the snackbar gone, ↶ takes the picked one back: some again, 龘 alone, ↶ grayed") {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+            assertFalse(shown().contains(s(R.string.rare_chars_changed_held, "5")))
+            tapUndo()
+            assertEquals(MaterialCheckBox.STATE_INDETERMINATE, strip(R.string.rare_group_out).state)
+            assertEquals(s(R.string.rare_chars_card_held, "1", "6"), strip(R.string.rare_group_out).count.text.toString())
+            assertFalse(menuItem(R.string.undo).isEnabled)
+        }
+        step("one cell is a step too") {
+            openGroup(R.string.rare_group_out)
+            cell("炟").performClick()
+            idle()
+            assertTrue(cell("炟").held)
+            tapUndo()
+            assertFalse(cell("炟").held)
+            assertTrue(cell("龘").held)
+        }
+        step("a save as the page stops: ↶ grayed, nothing to take back") {
+            cell("炟").performClick()
+            idle()
+            assertTrue(menuItem(R.string.undo).isEnabled)
+            st.leaveAndReturn()
+            assertFalse(menuItem(R.string.undo).isEnabled)
+            assertTrue(cp("炟") in file().block)
+        }
+        step("the switch takes ↶ and the snackbar's 撤销 away: neither turns it back on with the step before") {
+            back()
+            strip(R.string.rare_group_out).performClick()
+            idle()
+            assertTrue(menuItem(R.string.undo).isEnabled)
+            snackbarUndo()
+            switch().isChecked = false
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            assertFalse(menuItem(R.string.undo).isEnabled)
+            assertTrue(views().none { it is TextView && it.text.toString() == s(R.string.undo) && it.hasOnClickListeners() })
+            assertFalse(switch().isChecked)
+        }
     }
 
     // §3.2: each group's grid where it was left, over the cards and a turn; back to the cards from the up arrow too
@@ -113,29 +111,27 @@ class RareCharsCardsUatTest : RarePageUat() {
         list().scrollBy(0, list().height * 2)
         idle()
         val at = manager.findFirstVisibleItemPosition()
-        assertRows(
-            "scrolled down" to { assertTrue("$at", at > 10) },
-            "another group and back: where it was" to {
-                back()
-                openGroup(R.string.rare_group_l3)
-                assertEquals(0, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
-                back()
-                openGroup(R.string.rare_group_out)
-                assertEquals(at, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
-            },
-            "a turn: still in the group, its title, where it was" to {
-                st.recreate()
-                until("the grid again") { cells().isNotEmpty() }
-                assertEquals(s(R.string.rare_group_out), title())
-                assertEquals(at, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
-            },
-            "the up arrow: the cards, not the page left" to {
-                activity.onSupportNavigateUp()
-                idle()
-                assertEquals(4, cards().size)
-                assertTrue(st.page is RareCharsFragment)
-            },
-        )
+        step("scrolled down") { assertTrue("$at", at > 10) }
+        step("another group and back: where it was") {
+            back()
+            openGroup(R.string.rare_group_l3)
+            assertEquals(0, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
+            back()
+            openGroup(R.string.rare_group_out)
+            assertEquals(at, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
+        }
+        step("a turn: still in the group, its title, where it was") {
+            st.recreate()
+            until("the grid again") { cells().isNotEmpty() }
+            assertEquals(s(R.string.rare_group_out), title())
+            assertEquals(at, (list().layoutManager as GridLayoutManager).findFirstVisibleItemPosition())
+        }
+        step("the up arrow: the cards, not the page left") {
+            activity.onSupportNavigateUp()
+            idle()
+            assertEquals(4, cards().size)
+            assertTrue(st.page is RareCharsFragment)
+        }
     }
 
     // §2.6, §3.1: a card's description two lines at most, never cut, in each language: four across a phone on its side
@@ -221,34 +217,34 @@ class RareCharsCardsUatTest : RarePageUat() {
                 assertEquals(4, node(grid).collectionInfo.rowCount)
                 assertEquals(1, node(body(R.string.rare_group_l3)).collectionItemInfo.rowIndex)
             },
-            "a group's grid: the letters there" to {
-                openGroup(R.string.rare_group_l3)
-                assertEquals(listOf('b', 'z'), views().filterIsInstance<LetterScroller>().single().letters)
-            },
-            "the letters read as an adjustable, a swipe the next letter (review N12)" to {
-                val letters = views().filterIsInstance<LetterScroller>().single()
-                fun at(): Int {
-                    val info = AccessibilityNodeInfo.obtain()
-                    letters.onInitializeAccessibilityNodeInfo(info)
-                    assertEquals(SeekBar::class.java.name, info.className)
-                    return info.rangeInfo.current.toInt()
-                }
-                assertEquals(0, at())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
-                idle()
-                assertEquals(1, at())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null))
-                idle()
-                assertEquals(0, at())
-            },
-            "the letter it is at read out, the next once gone to" to {
-                val letters = views().filterIsInstance<LetterScroller>().single()
-                val first = letters.letters.first().uppercase()
-                assertEquals(first, ViewCompat.getStateDescription(letters)?.toString())
-                assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
-                idle()
-                assertEquals(letters.letters[1].uppercase(), ViewCompat.getStateDescription(letters)?.toString())
-            },
         )
+        step("a group's grid: the letters there") {
+            openGroup(R.string.rare_group_l3)
+            assertEquals(listOf('b', 'z'), views().filterIsInstance<LetterScroller>().single().letters)
+        }
+        step("the letters read as an adjustable, a swipe the next letter (review N12)") {
+            val letters = views().filterIsInstance<LetterScroller>().single()
+            fun at(): Int {
+                val info = AccessibilityNodeInfo.obtain()
+                letters.onInitializeAccessibilityNodeInfo(info)
+                assertEquals(SeekBar::class.java.name, info.className)
+                return info.rangeInfo.current.toInt()
+            }
+            assertEquals(0, at())
+            assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
+            idle()
+            assertEquals(1, at())
+            assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null))
+            idle()
+            assertEquals(0, at())
+        }
+        step("the letter it is at read out, the next once gone to") {
+            val letters = views().filterIsInstance<LetterScroller>().single()
+            val first = letters.letters.first().uppercase()
+            assertEquals(first, ViewCompat.getStateDescription(letters)?.toString())
+            assertTrue(letters.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null))
+            idle()
+            assertEquals(letters.letters[1].uppercase(), ViewCompat.getStateDescription(letters)?.toString())
+        }
     }
 }

@@ -36,45 +36,55 @@ class DropPredictionsTest {
         override fun settings(settings: EngineSettings) = Unit
     }
 
-    private val host = Host()
-    private val core = HostCore(host, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true).also {
-        it.activate(1)
-        it.setCapabilities(Capability.PREEDIT or Capability.COMMIT_STRING_WITH_CURSOR)
-        it.focus(true)
+    // a bar of its own for each row: what one row showed is never the next row's (review F8120)
+    private class Bar {
+        val host = Host()
+        val core = HostCore(host, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true).also {
+            it.activate(1)
+            it.setCapabilities(Capability.PREEDIT or Capability.COMMIT_STRING_WITH_CURSOR)
+            it.focus(true)
+        }
+        val log = mutableListOf<HostEvent>().also { l -> core.events += HostEvents { l += it } }
+
+        fun shown(s: Snapshot) {
+            host.next = s
+            core.sendKey(Key(KeySyms.fromUnicode('a'.code)))
+        }
+
+        fun lastCandidates() = log.filterIsInstance<HostEvent.Candidates>().last()
     }
-    private val log = mutableListOf<HostEvent>().also { l -> core.events += HostEvents { l += it } }
 
-    private fun shown(s: Snapshot) {
-        host.next = s
-        core.sendKey(Key(KeySyms.fromUnicode('a'.code)))
-    }
-
-    private fun lastCandidates() = log.filterIsInstance<HostEvent.Candidates>().last()
-
+    // named so (review F8300): the × sends no Escape and resets nothing, the bug DropPredictionsEnginesTest pins
     @Test
-    fun theCrossDropsThePredictionsAloneAsEscapeDoes() {
+    fun theCrossDropsThePredictionsAlone() {
         assertRows(
             "联想 shown: the bar told so; the × puts them away (no Escape, no reset), the list empty" to {
-                shown(PREDICTING)
-                assertTrue(lastCandidates().predicting)
-                host.kinds.clear()
-                assertTrue(core.dropPredictions())
-                assertEquals(listOf(EngineEvent.DROP_PREDICTIONS), host.kinds)
-                assertEquals(HostEvent.Candidates.EMPTY, lastCandidates())
+                with(Bar()) {
+                    shown(PREDICTING)
+                    assertTrue(lastCandidates().predicting)
+                    host.kinds.clear()
+                    assertTrue(core.dropPredictions())
+                    assertEquals(listOf(EngineEvent.DROP_PREDICTIONS), host.kinds)
+                    assertEquals(HostEvent.Candidates.EMPTY, lastCandidates())
+                }
             },
             "something typed: not 联想's, the × not there; a tap that came late drops nothing" to {
-                shown(COMPOSING)
-                assertFalse(lastCandidates().predicting)
-                host.kinds.clear()
-                assertFalse(core.dropPredictions())
-                assertEquals(emptyList<Int>(), host.kinds)
-                assertEquals(listOf("你", "尼"), lastCandidates().candidates.map { it.text })
+                with(Bar()) {
+                    shown(COMPOSING)
+                    assertFalse(lastCandidates().predicting)
+                    host.kinds.clear()
+                    assertFalse(core.dropPredictions())
+                    assertEquals(emptyList<Int>(), host.kinds)
+                    assertEquals(listOf("你", "尼"), lastCandidates().candidates.map { it.text })
+                }
             },
             "nothing shown: nothing to drop" to {
-                shown(NOTHING.copy(handled = true))
-                host.kinds.clear()
-                assertFalse(core.dropPredictions())
-                assertEquals(emptyList<Int>(), host.kinds)
+                with(Bar()) {
+                    shown(NOTHING.copy(handled = true))
+                    host.kinds.clear()
+                    assertFalse(core.dropPredictions())
+                    assertEquals(emptyList<Int>(), host.kinds)
+                }
             },
         )
     }

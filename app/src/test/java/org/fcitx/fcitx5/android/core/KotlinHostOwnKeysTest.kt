@@ -92,6 +92,8 @@ class KotlinHostOwnKeysTest {
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], 0u, 0, false, 0)
         assertEquals(listOf("nih"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
+        // the code committed, then the key itself on to the engine: not swallowed by the turn
+        assertEquals(listOf(EngineEvent.ENTER, EngineEvent.CHAR), engine.events.takeLast(2))
         assertFalse("not reset", EngineEvent.RESET in engine.events.takeLast(3))
     }
 
@@ -112,7 +114,9 @@ class KotlinHostOwnKeysTest {
     }
 
     // review H1: the field's composing text (English's word) is no code of the groups: other groups
-    // told while it is there leave it, nothing committed, nothing cleared; nor the first groups ever told
+    // told while it is there leave it, nothing committed, nothing cleared; nor the first groups ever told.
+    // A key of none of theirs waits (OwnKeysTurn.Step.WAIT), never reaching HostCore.commitCode; their first code
+    // turns (COMMIT_AND_TURN), and it is commitCode's guard (a code on the panel, not the field's word) that keeps it
     @Test
     fun otherGroupsLeaveTheFieldsComposingTextAlone() = runBlocking {
         focused()
@@ -127,6 +131,10 @@ class KotlinHostOwnKeysTest {
         assertEquals("a", fcitx.clientPreeditCached.toString())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('b', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
+        assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
+        assertEquals("ab", fcitx.clientPreeditCached.toString())
+        // their first code turns all the same (COMMIT_AND_TURN): commitCode reached, the word kept as it is
+        fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], KeyStates.VIRTUAL.toUInt(), 0, false, 0)
         assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
         assertEquals("ab", fcitx.clientPreeditCached.toString())
     }

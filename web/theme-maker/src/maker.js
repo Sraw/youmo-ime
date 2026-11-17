@@ -491,14 +491,18 @@
    */
   const KEYBOARD_DP = { portrait: 267, landscape: 192, landscapeLarge: 224 };
   const LARGE_SHORT_SIDE_DP = 600;
-  // a window this wide is 横屏 held either way (ScreenShape.WIDE_DP): a tablet upright has the turned height, as in the app
-  const WIDE_DP = 600;
 
-  /** The keyboard's height in dp on [e]'s device as held ([KEYBOARD_DP]). */
-  function keyboardDp(e) {
-    const across = (e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h)) / e.density;
-    if (!e.landscape && across < WIDE_DP) return KEYBOARD_DP.portrait;
-    return Math.min(e.w, e.h) / e.density >= LARGE_SHORT_SIDE_DP ? KEYBOARD_DP.landscapeLarge : KEYBOARD_DP.landscape;
+  /**
+   * The window [e] is drawn in as the app lays it out: its width in px across the device as held ([e].landscape: turned),
+   * 横屏 or not by the engine's answer (ScreenShape: turned, or 600 dp wide; a tablet upright is 横屏 throughout, its
+   * `@landscape` styles, sizes' second values and landscape cut as well as its height), the keyboard's height in px
+   * ([KEYBOARD_DP]).
+   */
+  function shape(E, e) {
+    const width = e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
+    const landscape = !!E.screenLandscape(!!e.landscape, Math.round(width / e.density));
+    const dp = !landscape ? KEYBOARD_DP.portrait : Math.min(e.w, e.h) / e.density >= LARGE_SHORT_SIDE_DP ? KEYBOARD_DP.landscapeLarge : KEYBOARD_DP.landscape;
+    return { landscape, width, height: Math.round(dp * e.density) };
   }
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols'];
@@ -512,6 +516,27 @@
     device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none',
     field: 'text', ime: 'pinyin', show: '', bar: 'idle', panel: '',
   };
+  /**
+   * A draft's kept environment [kept] (keepDraft's) as the page can show it now: a choice its form does not offer
+   * ([offered]: a key of ENV to its select's values) the default's, as 0.6.0's 手写 board, gone since (a board the engine
+   * does not have draws nothing and leaves the form's select empty); a device it does not list `custom` (its size kept);
+   * a size not a positive number, or a value of another type, the default's.
+   */
+  function restoreEnv(kept, offered) {
+    const k = kept && typeof kept === 'object' ? kept : {};
+    const e = Object.assign({}, ENV);
+    for (const key of Object.keys(ENV)) {
+      const v = k[key];
+      if (typeof v !== typeof ENV[key]) continue;
+      if (typeof v === 'number' && !(Number.isFinite(v) && v > 0)) continue;
+      if (offered[key] && !offered[key].includes(v)) {
+        if (key === 'device') e.device = 'custom';
+        continue;
+      }
+      e[key] = v;
+    }
+    return e;
+  }
   /** The fields and input methods the environment offers: the engine's (Selector.FIELDS, Selector.IMS). */
   const FIELDS = ['text', 'password', 'url', 'number', 'email'];
   const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie'];
@@ -528,17 +553,13 @@
   };
 
   /**
-   * [e] (the page's choices) as the engine's EnvJson: the keyboard's width and height in px, the form's flags, and
+   * [e] (the page's choices) as the engine's EnvJson: the window's [shape], the form's flags, and
    * Chinese punctuation (ZH_PUNCTUATION) for any input method but English, as on a new install.
    */
-  function envJson(e) {
-    const across = e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
-    const out = {
-      width: across,
-      height: Math.round(keyboardDp(e) * e.density),
-      density: e.density,
-    };
-    if (e.landscape) out.landscape = true;
+  function envJson(E, e) {
+    const s = shape(E, e);
+    const out = { width: s.width, height: s.height, density: e.density };
+    if (s.landscape) out.landscape = true;
     if (e.dark) out.dark = true;
     if (e.shift && e.shift !== 'none') out.shift = e.shift;
     if ((e.field && e.field !== 'text') || (e.ime && e.ime !== 'pinyin')) out.input = { field: e.field || 'text', ime: e.ime || 'pinyin' };
@@ -552,22 +573,59 @@
   }
 
   /**
-   * A `.layout` file's [bytes] as 环境 › 键盘 draws the theme on it (061-custom-layout §10): `{id, name, layout}`, the
-   * layout as the engine's readOwnLayout reads it; throws with what the page says otherwise (a zip, past the app's
-   * size, not UTF-8, one that does not read: its first problem; one of a built-in board's id). A layout the checker would
-   * refuse otherwise is still drawn.
+   * A `.layout` file's [bytes] as its text, the one opener of the theme maker's 打开 .layout… and the layout maker's
+   * (LM.openText): UTF-8 (its byte-order mark gone, its line ends \n), within the app's [max] bytes (§2.6); throws with
+   * what the page says otherwise, a zip (a .theme) said to be one. [size]: the file's, where [bytes] is only its start
+   * (a file far past the limit is not read whole to be refused).
    */
-  function openLayout(E, bytes) {
+  function layoutText(bytes, max, size = bytes.length) {
     if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包（.theme），不是 .layout 布局文件');
-    const max = E.layoutFormat().limits.bytes;
-    if (bytes.length > max) throw new Error('文件 ' + bytes.length + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
+    if (size > max) throw new Error('文件 ' + size + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
     let text;
     try {
       text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     } catch (e) {
       throw new Error('不是 UTF-8 文本');
     }
-    const r = E.readOwnLayout(text.replace(/^\uFEFF/, ''));
+    // Windows' line ends as the page's: the lines the layout maker adds (a <meta>) are \n, a textarea gives \n back
+    return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  }
+
+  /**
+   * [text] (a layout's) with each key's face a layout maker before L8 wrote of three letters or more (`{group:hjk}`,
+   * W2's merge: LayoutReader refuses it, its GROUP_ARG is one or two) written as that page writes it now, the letters'
+   * capitals (LE.groupLabel): `{xml, keys}`, how many changed. Only where the key's letters= are those letters: another
+   * face is the user's own. Both pages' openers run it (review R26 D8; F8459: 打开 .layout here showed a line error for
+   * a file of then, nothing said why).
+   */
+  function oldGroupFaces(text) {
+    let out = text;
+    let keys = 0;
+    // from the last, so each key found is still where it was found
+    for (const k of F.elements(text, 'key').reverse()) {
+      const a = Object.fromEntries(k.attrs);
+      const m = /^\{group:([a-z;]{3,})\}$/.exec(a.label || '');
+      if (!m || (a.letters || '').replace(/ /g, '') !== m[1]) continue;
+      // the label= attribute itself, the tag's attributes gone through whole (a "label=…" inside another's value is that value)
+      const at = [...k.tag.matchAll(/(\s+)([\w:.-]+)\s*=\s*("[^"]*"|'[^']*')/g)].find((x) => x[2] === 'label');
+      if (!at) continue;
+      const tag = k.tag.slice(0, at.index) + at[1] + 'label="' + m[1].toUpperCase() + '"' + k.tag.slice(at.index + at[0].length);
+      out = out.slice(0, k.start) + tag + out.slice(k.start + k.tag.length);
+      keys++;
+    }
+    return { xml: out, keys };
+  }
+
+  /**
+   * A `.layout` file's [bytes] as 环境 › 键盘 draws the theme on it (061-custom-layout §10): `{id, name, layout}`, the
+   * layout as the engine's readOwnLayout reads it, `oldFaces` its group keys' faces of a page before L8 drawn as now
+   * (oldGroupFaces: the file itself the app still refuses); throws with what the page says otherwise (a zip, past the
+   * app's size, not UTF-8, one that does not read: its first problem; one of a built-in board's id). A layout the
+   * checker would refuse otherwise is still drawn.
+   */
+  function openLayout(E, bytes) {
+    const read = oldGroupFaces(layoutText(bytes, E.layoutFormat().limits.bytes));
+    const r = E.readOwnLayout(read.xml);
     if (!r.ok) {
       const p = r.problems[0];
       throw new Error((p && p.line ? '第 ' + p.line + ' 行：' : '') + (p ? p.message : '读不出'));
@@ -575,7 +633,7 @@
     // the app's own board of this id is what 键盘 lists already, and a style picked on it would be that board's: the app's
     // import refuses it too (LayoutCheck id-built-in)
     if (E.layoutSource(r.layout.id) != null) throw new Error('id「' + r.layout.id + '」和 App 自带的键盘重名，App 不会导入它：换一个 id');
-    return { id: r.layout.id, name: r.layout.name, layout: r.layout };
+    return { id: r.layout.id, name: r.layout.name, layout: r.layout, oldFaces: read.keys };
   }
 
   /**
@@ -640,8 +698,12 @@
     // a board the app draws its own of since 0.6.1 (26 键, 14/18 键…: the pack's is one of the user's layouts once imported)
     if (own == null || !E.replaces(board)) return board;
     const fragments = Object.create(null);
-    // the pack's fragments the app reads: only under an id of its own (ThemePackLayouts.read)
-    for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.replaces(n.slice(0, -4))) fragments[n.slice(0, -4)] = t;
+    // the pack's fragments the app reads: those the board includes, only under an id of its own (ThemePackLayouts.taken,
+    // .read); never the pack's other boards, keyboards that fail it read as fragments
+    for (const inc of F.elements(own, 'include')) {
+      const src = Object.fromEntries(inc.attrs).src;
+      if (src && src !== board && E.replaces(src) && typeof d.layouts[src + '.xml'] === 'string') fragments[src] = d.layouts[src + '.xml'];
+    }
     const l = E.readLayout(own, fragments, board);
     if (!l.ok) {
       warn(l.problems.map((p) => ({ line: 0, message: 'layouts/' + board + '.xml' + (p.line ? ' 第 ' + p.line + ' 行' : '') + '：' + p.message + '（App 会用自己的这个键盘）' })));
@@ -774,6 +836,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, openError, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, openError, open, save, same, History, keepDraft, draft, dropDraft, idbStore, shape, envJson, restoreEnv, check, layoutText, oldGroupFaces, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

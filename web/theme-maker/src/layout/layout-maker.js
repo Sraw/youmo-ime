@@ -10,7 +10,6 @@
   if (!F || !M) throw new Error('youmo-layout-maker needs youmo-form and youmo-maker loaded first');
   const { escape } = F;
 
-  const BOM = '\uFEFF';
   const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
   /** The app's boards one starts from (LayoutCheck.BASES), as the 新建 dialog names them. */
@@ -22,6 +21,11 @@
     phone: '电话', datetime: '日期时间',
   };
   const ROLE_LABEL = { symbols: '符', back: '返回', numbers: '123' };
+  /** LayoutCheck.kept's slots (LayoutReader's kinds) and keys (its roles, else a digit key's id) a board must keep. */
+  const SLOT_LABEL = {
+    'handwriting-pad': '手写区', 'nine-side': '九键左边的符号列', 'handwriting-candidates': '手写候选栏', 'symbol-categories': '符号面板的分类栏', 'symbol-grid': '符号面板的符号格子',
+  };
+  const KEY_LABEL = { backspace: '删除', enter: '回车', lang: '地球键' };
   const BOARD_LABEL = { Number: '数字键盘', Symbol: '符号面板' };
   /** The app's boards a key's name is of (LayoutCheck's held), as the app's key page names them. */
   const APP_BOARD_LABEL = {
@@ -32,6 +36,12 @@
   // ---- the checker's findings in words (LayoutCheck.KEYS: the test holds the table to the engine's list) ----
 
   const q = (s) => '「' + s + '」';
+  // an app board's name amid Chinese, as the app's LayoutTexts.spaced writes it (R26 F8374): a space on a side where it
+  // starts or ends with a digit or a Latin letter (是 18 键的键), none beside a Chinese one (是数字行的键)
+  const boardName = (board) => {
+    const n = APP_BOARD_LABEL[board] || board;
+    return (/^[0-9A-Za-z]/.test(n) ? ' ' : '') + n + (/[0-9A-Za-z]$/.test(n) ? ' ' : '');
+  };
   const WORDS = {
     // errors
     read: ([msg]) => '读不进来：' + msg,
@@ -64,9 +74,9 @@
     commits: ([n]) => n + ' 个键点按打出写死的文字（导入时 App 会列给用户看）',
     'theme-blank': ([where]) => '预览主题下这个键什么都不显示：' + where,
     unnamed: ([key]) => '键' + q(key) + '没有按键名（shortcut=）：用户在 App 里改不了它的长按、上下滑',
-    held: ([key, board]) => key + ' 是' + (APP_BOARD_LABEL[board] || board) + '的键，这里写的长按、角标、滑动不起作用',
-    'held-letters': ([key, board]) => key + ' 是' + (APP_BOARD_LABEL[board] || board) + '的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名',
-    'held-popups': ([board]) => '这里写的 popups= 不起作用，跟' + (APP_BOARD_LABEL[board] || board) + '一样',
+    held: ([key, board]) => key + ' 是' + boardName(board) + '的键，这里写的长按、角标、滑动不起作用',
+    'held-letters': ([key, board]) => key + ' 是' + boardName(board) + '的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名',
+    'held-popups': ([board]) => '这里写的 popups= 不起作用，跟' + boardName(board) + '一样',
     'gap-look': () => '空位（gap）的 look=、class= 不起作用',
     'pad-lacks': ([pad, keys]) => '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来',
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',
@@ -211,23 +221,9 @@
 
   // ---- 打开、保存 ----
 
-  /**
-   * A file's bytes as a layout's text: UTF-8 (its byte-order mark gone, its line ends \n), within the app's [max] bytes (§2.6); throws
-   * with what the page says otherwise. A zip (a .theme) is said to be one. [size]: the file's, where [bytes] is only
-   * its start (a file far past the limit is not read whole to be refused).
-   */
+  /** A file's bytes as a layout's text (M.layoutText, the theme maker's opener too), one with a `<keyboard>`. */
   function openText(bytes, max, size = bytes.length) {
-    if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包：用「打开 .layout 或 .theme…」打开它');
-    if (size > max) throw new Error('文件 ' + size + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
-    let text;
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    } catch (e) {
-      throw new Error('不是 UTF-8 文本');
-    }
-    if (text.startsWith(BOM)) text = text.slice(1);
-    // Windows' line ends as the page's: the lines it adds (a <meta>) are \n, a textarea gives \n back
-    text = text.replace(/\r\n?/g, '\n');
+    const text = M.layoutText(bytes, max, size);
     if (!keyboardOf(text)) throw new Error('不是布局文件：没有 <keyboard>');
     return text;
   }
@@ -310,11 +306,8 @@
    * wide), and the keyboard's px. Held as it is shown, never a 横屏 the device would not lay out (§12.2).
    */
   function shape(E, e) {
-    const across = e.turned ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
-    const widthDp = Math.round(across / e.density);
-    const landscape = !!E.screenLandscape(!!e.turned, widthDp);
-    const dp = !landscape ? M.KEYBOARD_DP.portrait : Math.min(e.w, e.h) / e.density >= 600 ? M.KEYBOARD_DP.landscapeLarge : M.KEYBOARD_DP.landscape;
-    return { widthDp, landscape, width: across, height: Math.round(dp * e.density) };
+    const s = M.shape(E, { w: e.w, h: e.h, density: e.density, landscape: !!e.turned });
+    return { widthDp: Math.round(s.width / e.density), landscape: s.landscape, width: s.width, height: s.height };
   }
 
   /**
@@ -410,6 +403,11 @@
     if ((m = /^its family is (.*), the app's (.*)$/.exec(w))) return '种类是 ' + m[1] + '，App 的这块是 ' + m[2];
     if ((m = /^the app's (.*) does not read$/.exec(w))) return 'App 自带的 ' + m[1] + ' 读不出来';
     if ((m = /^made one that does not take: (.*)$/.exec(w))) return '转出来的布局检查不过：' + m[1];
+    if ((m = /^its pads lack keys: (.*)$/.exec(w))) return '它写的数字键盘缺键：' + m[1].split(' ').map((p) => '「' + (PAD_LABEL[p] || p) + '」').join('、');
+    if ((m = /^over (\S+) when= alternatives an include's and its rows' make$/.exec(w))) return '它用的片段和片段里的行，when= 条件合起来超过 ' + m[1] + ' 种';
+    if (w === 'it serves no pad') return '哪种数字键盘都缺键，一种也用不了';
+    if ((m = /^it has no slot \[(.*)\]$/.exec(w))) return '少了 App 这块必有的位置：' + m[1].split(', ').map((k) => SLOT_LABEL[k] || k).join('、');
+    if ((m = /^it has no key \[(.*)\]$/.exec(w))) return '少了 App 这块必有的键：' + m[1].split(', ').map((k) => KEY_LABEL[k] || k).join('、');
     return w || '转不出来';
   }
 
@@ -432,15 +430,9 @@
     });
   }
 
-  /** The line of [xml] where key [id] is (its `id="…"`), 0 where none: what a finding of a key without a line goes to. */
-  function lineOfKey(xml, id) {
-    const at = F.uncommented(xml).search(new RegExp('<key\\b[^>]*\\sid\\s*=\\s*["\']' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\']'));
-    return at < 0 ? 0 : xml.slice(0, at).split('\n').length;
-  }
-
   root.YoumoLayoutMaker = {
     BASE_LABEL, FAMILY_LABEL, PAD_LABEL, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
     words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, fromExample, openText, fileName, saveCheck,
-    restoreEnv, shape, envJson, check, lineOfKey, themeBoards, refusal,
+    restoreEnv, shape, envJson, check, themeBoards, refusal,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

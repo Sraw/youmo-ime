@@ -12,12 +12,12 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyEffects
@@ -76,25 +76,8 @@ class KeyEffectTest {
     }.toByteArray()
 
     // a user's pack of material's file with [styles] last and the images ring.png and star.png; its light version
-    private fun theme(vararg styles: String): Theme {
-        val text = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_material)
-            .replace("name=\"material\"", "name=\"effects\"")
-            .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
-        val zip = ByteArrayOutputStream().also { bytes ->
-            ZipOutputStream(bytes).use {
-                it.putNextEntry(ZipEntry("theme.xml"))
-                it.write(text.encodeToByteArray())
-                it.putNextEntry(ZipEntry("ring.png"))
-                it.write(png(RING_PX))
-                it.putNextEntry(ZipEntry("star.png"))
-                it.write(png(STAR_PX))
-            }
-        }.toByteArray()
-        val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
-        val versions = opened.commit().getOrThrow()
-        ThemeManager.packPlaced(versions[0].file)
-        return versions.first { !it.isDark }
-    }
+    private fun theme(vararg styles: String): Theme =
+        materialPack("effects", *styles, files = mapOf("ring.png" to png(RING_PX), "star.png" to png(STAR_PX)))
 
     private fun ripple() = theme("<style select=\"key:pressed\" effect=\"ripple-image(ring.png, 100%, 300ms)\"/>")
 

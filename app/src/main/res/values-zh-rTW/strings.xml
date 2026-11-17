@@ -283,7 +283,7 @@
     <string name="exception_user_data_too_old">這個備份來自 0.3.0 或更早的版本，這一版不再讀取那時學到的內容。請先在 0.4.x 裡還原它、打幾個字、停一下、重新備份，再在這裡還原新的備份</string>
     <string name="user_data_imported">已匯入來自 %1$s 的使用者資料，正在重新啟動</string>
     <string name="user_data_exported">已備份到 %1$s</string>
-    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語、常用詞、快速輸入和剪貼簿，標點用內建的（備份裡沒有的，手機上的也刪掉：0.5.1 以前的備份沒有快速輸入，自己加的條目會沒了，關掉的內建表會重新打開；0.6.0 以前的備份沒有常用詞，手機上的會沒了；備份裡沒有生僻字屏蔽的（0.6.1 以前的，或做備份時沒開過它），恢復後它是關的），學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
+    <string name="confirm_import_user_data">匯入使用者資料會覆寫設定、自訂短語、常用詞、快速輸入和剪貼簿，標點用內建的（備份裡沒有的，手機上的也刪掉：0.5.1 以前的備份沒有快速輸入，自己加的條目會沒了，關掉的內建表會重新打開；0.6.0 以前的備份沒有常用詞，手機上的會沒了；備份裡沒有生僻字屏蔽的（0.6.1 以前的，或做備份時沒開過它），還原後它是關的），學到的和詞庫與手機上現有的合併；重新啟動後生效。是否繼續？</string>
     <string name="clear_clp_db_confirm">剪貼簿資料庫將會被完全清空，包括已置頂條目。是否繼續？</string>
     <string name="clear_clp_db_not_all">部分剪貼簿資料未能清除，可能仍然存在，或在下次啟動時重新出現；再次清空，或重新啟動後再清空，或許有效。</string>
     <string name="lang_switch_key_behavior">語言切換鍵行為</string>
@@ -668,10 +668,11 @@
     <string name="keyboard_custom">自訂佈局</string>
     <string name="keyboard_custom_named">%1$s（自訂）</string>
     <string name="keyboard_custom_unread">%1$s（讀不出，暫用 %2$s）</string>
+    <string name="keyboard_custom_unusable">%1$s（這裡用不了，暫用 %2$s）</string>
     <string name="im_pinyin_keys18">拼音 · 18 鍵</string>
     <string name="im_shuangpin_keys14">雙拼 · 14 鍵</string>
     <string name="learning_kind_keys18">拼音 18 鍵</string>
-    <string name="learning_kind_keys_own">拼音 主題鍵盤</string>
+    <string name="learning_kind_keys_own">拼音 自己的分組</string>
     <string name="learning_kind_shuangpin_keys14">雙拼 14 鍵</string>
     <string name="english_keyboard">鍵盤</string>
     <string name="english_keyboard_summary">螢幕上打英文用的鍵盤。實體鍵盤仍按字母打。</string>
@@ -717,8 +718,6 @@
     <string name="im_candidate_reading_off">關閉</string>
     <string name="im_candidate_reading_pinyin">拼音</string>
     <string name="im_candidate_reading_zhuyin">注音符號</string>
-    <string name="hw_reading_key_on">%1$s，已開</string>
-    <string name="hw_reading_key_off">%1$s，已關</string>
     <string name="char_card_readings">讀音</string>
     <string name="char_card_radical">部首</string>
     <string name="char_card_strokes">%1$d 畫</string>
@@ -1083,7 +1082,7 @@
     <string name="home_input_methods_summary">新增、排序，每種輸入法自己的選項</string>
     <string name="home_shared_input_summary">各輸入法共用：聯想、表情、滑行、模糊音</string>
     <string name="home_words_summary">你的詞、匯入的詞庫、自訂短語</string>
-    <string name="home_look_summary">主題、鍵盤大小，單手 / 分體 / 懸浮</string>
+    <string name="home_look_summary">主題、佈局、鍵盤大小，單手 / 分體 / 懸浮</string>
     <string name="home_keys_summary">長按、劃動、空白鍵、鍵上的字元</string>
     <string name="home_sound_summary">按鍵音、振動</string>
     <string name="home_clipboard_summary">剪貼簿歷史、表情膚色</string>
@@ -1367,6 +1366,7 @@
     <string name="shortcut_card_count">%1$d/%2$d</string>
     <string name="long_press_card">長按選單</string>
     <string name="long_press_card_summary">首選 %1$s · 共 %2$d 個</string>
+    <string name="long_press_card_summary_no_first">無首選 · 共 %1$d 個</string>
     <string name="long_press_card_summary_none">長按不彈出字元</string>
     <string name="long_press_card_read_only">唯讀</string>
     <string name="long_press_card_line">點一個字元選中它，再調整</string>

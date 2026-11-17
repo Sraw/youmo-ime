@@ -89,6 +89,20 @@ class DockedRoomTest {
         assertEquals(1, relayouts)
     }
 
+    // the input view replaced between the post and its frame (detached, its listeners gone): nothing of it laid out again
+    // (R26 F8411, F8486)
+    @Test
+    fun aViewDetachedBeforeTheFrameIsNotLaidOutAgain() {
+        laidOut(dp(300.0))
+        frame()
+        room.take()
+        relayouts = 0
+        laidOut(dp(200.0))
+        (view.parent as ViewGroup).removeView(view)
+        frame()
+        assertEquals(0, relayouts)
+    }
+
     @Test
     fun floatingHasNoRoom() {
         docked = false

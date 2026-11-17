@@ -104,6 +104,13 @@ class SceneA11yTest {
     fun theLockSaidAsWhatATapDoes() {
         assertEquals("锁定", board("symbols.xml", SceneData.portrait).said("lock"))
         assertEquals("解锁", board("symbols.xml", SceneData.portrait.copy(states = mapOf("lock" to setOf(KeyState.Locked)))).said("lock"))
+        // R26 F8188: a toggle whose words are no resource's name (a layout's own text) is said as written, no state added
+        val lock = board("symbols.xml", SceneData.portrait.copy(states = mapOf("lock" to setOf(KeyState.Locked)))).keys.first { it.id == "lock" }
+        val plain = KeyNode(
+            lock.id, lock.copy, lock.kind, lock.role, lock.shape, lock.bounds, lock.hit, lock.anchor, lock.up, lock.states, lock.faces,
+            "锁", lock.actions,
+        )
+        assertEquals("锁", SceneA11y.of(plain, said::get).description)
     }
 
     @Test

@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
-import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
@@ -347,6 +346,8 @@ class KotlinHost(
         val turn = bridge.turnAt(own, unicode)
         if (turn == OwnKeysTurn.Step.COMMIT_AND_TURN) commitCode()
         if (turn != OwnKeysTurn.Step.WAIT) bridge.syncOwnKeys(own)
+        // the tap's place is all this payload carries to the engine (Keyboard.char reads only .touch): its char is no key's
+        // for a code past the BMP (a group's tap code, Keyboard.TAPS_18, PLACES) or a sym of none (0)
         val payload = touch?.takeUnless { up }?.let { Action.Key(unicode.toChar(), touch = it) }
         sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp, payload = payload)
     }
@@ -384,20 +385,6 @@ class KotlinHost(
 
     override suspend fun punctuationMap(lang: String) = withContext(dispatcher) {
         if (lang != ZH_CN) emptyList() else punctuationMaps.load(ZH_CN)
-    }
-
-    override suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) = onHost {
-        if (lang != ZH_CN) return@onHost
-        // a table (PunctuationProfile::set) saved whole, then used; no page edits it since 0.6.1 (the edits reset,
-        // PunctuationMaps.dropEdited), but a test's table is put in so
-        val profile = PunctuationProfile.fromEntries(entries.map { PunctuationEntry(it.key, it.mapping, it.altMapping) })
-        // a save refused (the data not settled, the table not read) goes back to the caller: used here anyway,
-        // the edit would hold this run and be gone at the next
-        punctuationMaps.save(ZH_CN, profile.entries.map { PunctuationMapEntry(it.key, it.mapping, it.altMapping) })
-        modules?.punctuation?.setProfile(profile)
-        // with no context focused no status goes out: the keys' marks kept for the keyboard to come
-        punctuationCached = punctuationKeys()
-        keepStartKeys()
     }
 
     // ---- quick input, focus, status area, candidates
@@ -522,8 +509,8 @@ class KotlinHost(
         step("config")
         engine.start()
         step("engine.start")
-        // an edited table not read is not saved over, nor one where the data is not settled; the user told
-        punctuationMaps = PunctuationMaps(data.dir, writable = !directBoot && data.writable, onUnreadable = { dataUnreadable() }) { lang ->
+        // an edited table not read leaves the built-in one; the user told
+        punctuationMaps = PunctuationMaps(data.dir, onUnreadable = { dataUnreadable() }) { lang ->
             try {
                 context.assets.open("$BUILT_IN/punctuation/punc.mb.$lang")
             } catch (_: IOException) {

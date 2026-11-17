@@ -24,7 +24,7 @@ template <typename F> static bool table(AndroidEngineConfig &c, const std::strin
 }
 // stdin: an INI file, read as the addon reads it at start (readAsIni: a full load).
 // then each "page <group> <ini>": a page's partial save (setConfigForInputMethod); <group> a table's or "-".
-// then "save": the file as safeSaveAsIni writes it; or "show <pinyin|shuangpin|english|handwriting|Group>": that page
+// then "save": the file as safeSaveAsIni writes it; or "show <pinyin|shuangpin|english|Group>": that page
 // (getConfigForInputMethod); "nodesc" first: description comments left out.
 int main(int argc, char **argv) {
     std::stringstream in; in << std::cin.rdbuf();
@@ -48,7 +48,6 @@ int main(int argc, char **argv) {
             if (k == "pinyin") { EnginePinyinPage p; p.load(all, true); p.save(out); }
             else if (k == "shuangpin") { EngineShuangpinPage p; p.load(all, true); p.save(out); }
             else if (k == "english") { EngineEnglishPage p; p.load(all, true); p.save(out); }
-            else if (k == "handwriting") { EngineHandwritingPage p; p.load(all, true); p.save(out); }
             else table(config, k, [&](auto &t, auto p) { p.load(all, true); RawConfig own; t.value().save(own); p.load(own, true); p.save(out); });
         }
         if (nodesc) clear(out);

@@ -105,6 +105,12 @@ class YoumoLayout internal constructor(
     internal val variantOf: String = layout.id,
     // a user's own layout (readOwnLayout): a key of the app's name is the app's key, its marks the app's board's (DefaultMarks.ownNodes)
     internal val own: Boolean = false,
+    // the layout as read, before KeyData laid the app's keys' data on it: what [YoumoEngine.writeLayout] writes, so a file
+    // made of it holds none of the app's long presses and swipes, which would be told of as `held` once they change (R26 F8297)
+    internal val written: Layout = layout,
+    // the app's board whose key shape it has (14 or 18 keys: a group's corner, 双拼's `L;`): its own family's, a grouped
+    // one based on qwerty k18's (LayoutCheck.baseId), while its styles and shortcuts are [variantOf]'s (R26 F8437)
+    internal val shapeOf: String = variantOf,
 ) {
     val id: String get() = layout.id
     val name: String get() = layout.name
@@ -177,7 +183,7 @@ object YoumoEngine {
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
         val includes = builtIns.includes(layout.value, own)
         val held = optionalText(board, "board")?.let { id -> includes.orNull()?.let { KeyData.of(id, layout.value, it, KeyData.Mode.Pack, basedOn = null) } }
-        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments) } ?: YoumoLayout(layout.value, it)) }
+        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments, written = layout.value) } ?: YoumoLayout(layout.value, it)) }
         answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
         answer
     }
@@ -192,9 +198,16 @@ object YoumoEngine {
         val layout = LayoutReader.layout(text(xml, "layout"))
         if (layout !is Parsed.Ok) return@checked result(layout) { "layout" to null }
         val includes = builtIns.includes(layout.value)
-        val held = includes.orNull()?.let { KeyData.of(layout.value.id, layout.value, it, KeyData.Mode.Own) }
         val basedOn = layout.value.basedOn ?: layout.value.id
-        val answer = result(includes) { "layout" to (held?.let { h -> YoumoLayout(h.layout, h.fragments, basedOn, own = true) } ?: YoumoLayout(layout.value, it, basedOn, own = true)) }
+        // its key shape its own family's (R26 F8437), as the app's (SceneLayout.fallback) and LayoutCheck's
+        val shape = LayoutCheck.baseId(layout.value, checkSources) ?: basedOn
+        val held = includes.orNull()?.let { KeyData.of(layout.value.id, layout.value, it, KeyData.Mode.Own, shape = shape) }
+        val answer = result(includes) {
+            "layout" to (
+                held?.let { h -> YoumoLayout(h.layout, h.fragments, basedOn, own = true, written = layout.value, shapeOf = shape) }
+                    ?: YoumoLayout(layout.value, it, basedOn, own = true, shapeOf = shape)
+                )
+        }
         answer.ignored = held?.ignored.orEmpty().map { obj("file" to it.file, "line" to it.line, "what" to it.what) }.toTypedArray()
         // the reader's warnings too (an attribute that does nothing): the page lists them, the checker does not
         if (includes is Parsed.Ok) answer.warnings = problems(layout.warnings + includes.warnings)
@@ -259,7 +272,7 @@ object YoumoEngine {
         val map = HashMap<String, String>()
         if (punctuation != null) for (k in keys(punctuation, "punctuation")) map[k] = text(punctuation[k], "punctuation $k")
         val nodes = if (l.own) DefaultMarks.ownNodes(l.layout, l.fragments) { id -> layout(id)?.let { it.layout to it.fragments } } else DefaultMarks.nodes(l.layout, l.fragments)
-        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.variantOf), punctuation = map, nodes = nodes)))
+        JSON.parse<dynamic>(DefaultMarks.json(DefaultMarks.shortcuts(l.layout, l.fragments, DefaultMarks.variantOf(l.layout, l.shapeOf), punctuation = map, nodes = nodes)))
     }
 
     /** The app's boards' ids (`qwerty`, `nine`…). */
@@ -613,8 +626,8 @@ object YoumoEngine {
         }
     }
 
-    /** [layout] written as layout 1 (LayoutWriter: what the app exports, canonical, comments gone). */
-    fun writeLayout(layout: YoumoLayout): String = LayoutWriter.write(layout.layout)
+    /** [layout] written as layout 1 (LayoutWriter: what the app exports, canonical, comments gone), as it was read. */
+    fun writeLayout(layout: YoumoLayout): String = LayoutWriter.write(layout.written)
 
     // the app's boards and fragments as LayoutCheck reads them, its answers on them kept between checks
     private val checkSources by lazy {

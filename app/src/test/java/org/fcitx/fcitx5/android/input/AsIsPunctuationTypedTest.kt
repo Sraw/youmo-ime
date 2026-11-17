@@ -185,6 +185,7 @@ class AsIsPunctuationTypedTest {
     }
 
     // the job's host calls done before it waited on them: the candidate, which the engine's commit puts in, still first
+    // (the .你 order race fixed in d8876b6e6)
     @Test
     fun theCandidateGoesFirstWhenTheHostAnswersAtOnce() {
         commaList(marked = true)

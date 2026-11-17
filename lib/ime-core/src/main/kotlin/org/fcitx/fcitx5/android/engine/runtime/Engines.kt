@@ -263,7 +263,7 @@ class Engines(
             hostThread.check()
             learner.useHabits = value
             // voice's text not followed while off, nor what was before (review S4)
-            if (!value) voiceEdits.edits.clear()
+            if (!value) voiceEdits.end()
         }
 
     /** [LexiconFacade.userWords]. */
@@ -516,7 +516,7 @@ class Engines(
      */
     fun voiceSaid(text: String, before: String?, hinted: Boolean) = checked {
         voiceEdits.edits.hinted = hinted
-        if (learner.useHabits) voiceEdits.edits.said(text, before) else voiceEdits.edits.clear()
+        if (learner.useHabits) voiceEdits.edits.said(text, before) else voiceEdits.end()
     }
 
     /** The app put [text] in the field: [VoiceEdits.putIn]. */
@@ -526,7 +526,10 @@ class Engines(
     fun voiceConfirm(before: String?, after: String?): VoiceEdits.Ask? = checked { voiceEdits.edits.confirm(before, after) }
 
     /** Nothing of voice's text followed any more: another field, input finished. */
-    fun voiceEditsEnd() = checked { voiceEdits.edits.clear() }
+    fun voiceEditsEnd() = checked { voiceEdits.end() }
+
+    /** Whether voice's edits hold the user's words read for them: for tests (review F8342). */
+    internal val voiceEditsHoldWords: Boolean get() = voiceEdits.holdsWords
 
     /** 「记住」 tapped: [ask]'s word added by hand; false if it does not read so (nothing added). */
     fun voiceRemember(ask: VoiceEdits.Ask): Boolean = checked { voiceEdits.remember(ask) }

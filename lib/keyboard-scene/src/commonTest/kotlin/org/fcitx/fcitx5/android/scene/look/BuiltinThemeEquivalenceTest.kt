@@ -64,7 +64,7 @@ class BuiltinThemeEquivalenceTest {
     }
 
     // the edit menu's cell in focus told from the others at a glance (0.6.1: all were Return's colour, the one in
-    // focus 12–20% darker or lighter, 1.05–1.44 to 1): its face against theirs, each over the version's own ground
+    // focus 12–20% darker or lighter, 1.05–1.44 to 1): its face against theirs, each over white (light) or black (dark)
     @Test
     @Uat("KB-105")
     fun theMenusCellInFocusStandsOutInEveryBuiltInTheme() {
@@ -86,9 +86,16 @@ class BuiltinThemeEquivalenceTest {
         }
     }
 
-    // a cell's face: its fills, the first the face, over [ground] in turn (the cell in focus's overlay among them)
-    private fun face(ops: List<Op>, ground: Argb): Argb =
-        ops.filterIsInstance<Op.Fill>().fold(ground) { under, fill -> over(fill.color, under) }
+    // a cell's face: its fills, the first the face, over [ground] in turn (the cell in focus's overlay among them). Only
+    // plain fills are read (R26 F8305): a gradient, a picture or a nine-slice face, or a depth's band (a fill [Op.Fill.less]
+    // the face), would be taken for what it is not, so a theme drawing one fails here until this reads it
+    private fun face(ops: List<Op>, ground: Argb): Argb {
+        val unread = ops.filter { it is Op.Gradient || it is Op.NineSlice || it is Op.Picture || it is Op.Fill && it.less != null }
+        assertTrue(unread.isEmpty(), "a face not of plain fills: $unread")
+        val fills = ops.filterIsInstance<Op.Fill>()
+        assertTrue(fills.isNotEmpty(), "a face of no fill: $ops")
+        return fills.fold(ground) { under, fill -> over(fill.color, under) }
+    }
 
     private fun over(top: Argb, under: Argb): Argb {
         val a = top.alpha / FULL

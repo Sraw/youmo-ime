@@ -75,6 +75,23 @@ abstract class RarePageUat {
     protected fun until(what: String, test: () -> Boolean) =
         waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
+    /**
+     * One step of a walk over the page, done on what the step before left: the first to fail stops the test,
+     * named by [why]. Not a row of assertRows, which runs every row and so fails each one after a real failure
+     * (review R26 F8132). Any failure is named, not only a failed assert: a wait run out ([until]'s
+     * IllegalStateException), a view not found (NoSuchElementException, a null) is as much the step that broke
+     * (review R26 F8454).
+     */
+    protected fun step(why: String, body: () -> Unit) {
+        try {
+            body()
+        } catch (e: AssertionError) {
+            throw AssertionError("$why: ${e.message}", e)
+        } catch (e: Exception) {
+            throw AssertionError("$why: $e", e)
+        }
+    }
+
     protected fun s(id: Int, vararg args: Any) = st.s(id, *args)
 
     protected fun views() = KeyboardHarness.all(activity.window.decorView).filter { it.isShown }

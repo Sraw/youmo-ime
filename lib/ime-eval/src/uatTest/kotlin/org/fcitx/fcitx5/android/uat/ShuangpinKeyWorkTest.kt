@@ -123,7 +123,9 @@ class ShuangpinKeyWorkTest {
     }
 
     // what marking every typed word's nodes anew takes, said (the host's time; a phone's is several times
-    // it): done as a word goes, not as one comes, which PinyinSessionAbbrevTest holds
+    // it): done as a word goes, not as one comes, which PinyinSessionAbbrevTest holds by the times the nodes
+    // are marked anew (a count). Said, not asserted: the only wall-clock comparison of this file, which a
+    // loaded machine's GC or JIT could turn over (review F8174)
     @Test
     fun markingTheTypedWordsNodesAnewIsTimed() {
         val data = UatEngines.pinyinData
@@ -145,7 +147,6 @@ class ShuangpinKeyWorkTest {
                 anew = minOf(anew, System.nanoTime() - t)
             }
             println("双拼 typed nodes, $words words typed: marked anew in %.2f ms, a word added in %.3f ms".format(anew / 1e6, added / 1e6))
-            assertTrue("$added of $anew", added < anew)
         }
     }
 

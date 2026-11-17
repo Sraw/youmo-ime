@@ -353,6 +353,9 @@ class RecordingContext {
     const view = icons[p.d];
     const corners = [this.map(0, 0), this.map(view.vw, 0), this.map(view.vw, view.vh), this.map(0, view.vh)];
     this.lines.push('icon ' + p.d + ' ' + RecordingContext.box(RecordingContext.bounds(corners)) + ' ' + argb(this.s.fillStyle));
+    // where the viewport's top left went, beside the line (EnginePaintTest's format has its box alone): a square
+    // turned about its middle has the box it had, so a turn is seen only here
+    (this.iconCorners ??= []).push(corners[0].map((v) => Math.round(v * 10) / 10 + 0));
   }
 
   // a stroked text's line is its stroke's; the fill right after it must be the same text at the same place in the
@@ -475,6 +478,13 @@ test('paintIcon draws a name of the icons given in its box and tint, turned abou
   const turned = new RecordingContext();
   assert.ok(E.paintIcon(turned, { icons }, 'toolbar-expand', 0, 0, 20, '#ff000000', -90).ok);
   assert.deepEqual(turned.written().filter((l) => l.startsWith('icon')), ['icon toolbar-expand 0.0,0.0,20.0,20.0 #ff000000']);
+  // turned: its box the same, its top left gone to the bottom left (a quarter turn back about the middle, as the
+  // app's canvas.rotate(-90f, cx, cy)); not turned, where it was (review R26 F8154)
+  assert.deepEqual(turned.iconCorners, [[0, 20]]);
+  assert.deepEqual(ctx.iconCorners, [[10, 4]]);
+  const back = new RecordingContext();
+  assert.ok(E.paintIcon(back, { icons }, 'toolbar-collapse', 0, 0, 20, '#ff000000', 90).ok);
+  assert.deepEqual(back.iconCorners, [[20, 0]]);
   const none = new RecordingContext();
   assert.ok(E.paintIcon(none, { icons: {} }, 'undo', 0, 0, 20, '#ff000000', 0).ok);
   assert.ok(!none.written().some((l) => l.startsWith('icon')));
@@ -632,7 +642,7 @@ test("a pack's layout made one of the user's is the JVM's, byte for byte", () =>
   const zhuyin = E.convertPackLayout('薄荷', null, 'zhuyin', E.layoutSource('zhuyin'), null, '0.6.1');
   assert.equal(zhuyin.ok, false);
   assert.ok(zhuyin.why);
-  // a layout of the user's drawn with the styles of the board it is based on (§10)
+  // what it makes reads as a layout of the user's (readOwnLayout, as 外观 → 布局 reads it)
   const own = E.readOwnLayout(c.text);
   assert.ok(own.ok, JSON.stringify(own.problems));
 });

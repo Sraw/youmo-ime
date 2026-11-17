@@ -52,6 +52,14 @@ object BarIconDrawables {
     /** Whether the theme writes [icon]'s name: the app's image is never drawn for it then (but where its file fails). */
     fun themed(icons: PackIcons, icon: BarIcons.Icon): Boolean = icons.file(icon.name) != null
 
+    /**
+     * Whether [icon] is drawn as the theme's: its file read, or not yet (nothing drawn till it is). One gone, broken or too
+     * long draws the app's image, to be turned as the app's is (R26 F8310: a restored backup's pack is not held to the
+     * import's checks).
+     */
+    fun drawsOwn(icons: PackIcons, icon: BarIcons.Icon): Boolean =
+        icons.file(icon.name)?.let { icons.outline(it) != null || icons.pending(it) } == true
+
     private fun fallback(context: Context, icon: BarIcons.Icon, @ColorInt tint: Int): Drawable =
         ContextCompat.getDrawable(context, ToolbarButtonLooks.drawable(icon.fallback))!!.mutate().apply { setTint(tint) }
 

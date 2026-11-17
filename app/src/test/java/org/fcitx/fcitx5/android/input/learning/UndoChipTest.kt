@@ -392,6 +392,7 @@ class UndoChipTest {
 
     // 051-fix-popup: the edit menu opened where the notices go, under their window
     @Test
+    @Uat("KB-62")
     fun theEditMenuPutsAwayWhatWasDoneAndHidesAFailureTillItGoes() {
         val chip = chip()
         chip.show("已复制")

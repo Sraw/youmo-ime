@@ -155,7 +155,7 @@
         <item quantity="one">This theme brings %1$d layout: %2$s. Imported with it, it is in Look → Layouts.</item>
         <item quantity="other">This theme brings %1$d layouts: %2$s. Imported with it, they are in Look → Layouts.</item>
     </plurals>
-    <string name="theme_pack_layouts_listed_commits">In them, %1$d actions type text written in the layout.</string>
+    <string name="theme_pack_layouts_listed_commits">Actions in them typing text written in the layout: %1$d.</string>
     <string name="theme_pack_layouts_replaces">Replaces your existing “%1$s” (the layout an earlier import of this theme made, unchanged since).</string>
     <plurals name="theme_pack_layouts_full">
         <item quantity="one">Look → Layouts is full (%2$d): %1$d of them will not be put in it.</item>
@@ -690,10 +690,11 @@
     <string name="keyboard_custom">Your own layout</string>
     <string name="keyboard_custom_named">%1$s (your own)</string>
     <string name="keyboard_custom_unread">%1$s (unreadable, %2$s for now)</string>
+    <string name="keyboard_custom_unusable">%1$s (not usable here, %2$s for now)</string>
     <string name="im_pinyin_keys18">Pinyin (18 keys)</string>
     <string name="im_shuangpin_keys14">Shuangpin (14 keys)</string>
     <string name="learning_kind_keys18">Pinyin, 18 keys</string>
-    <string name="learning_kind_keys_own">Pinyin, a theme\'s keys</string>
+    <string name="learning_kind_keys_own">Pinyin, own grouped keys</string>
     <string name="learning_kind_shuangpin_keys14">Shuangpin, 14 keys</string>
     <string name="english_keyboard">Keyboard</string>
     <string name="english_keyboard_summary">The on-screen keyboard English is typed on. A hardware keyboard still types letters.</string>
@@ -739,8 +740,6 @@
     <string name="im_candidate_reading_off">Off</string>
     <string name="im_candidate_reading_pinyin">Pinyin</string>
     <string name="im_candidate_reading_zhuyin">Zhuyin</string>
-    <string name="hw_reading_key_on">%1$s, on</string>
-    <string name="hw_reading_key_off">%1$s, off</string>
     <string name="char_card_readings">Readings</string>
     <string name="char_card_radical">Radical</string>
     <string name="char_card_strokes">%1$d strokes</string>
@@ -1110,7 +1109,7 @@
     <string name="home_input_methods_summary">Add and order them, and each one\'s own options</string>
     <string name="home_shared_input_summary">Shared by every input method: prediction, emoji, glide typing, fuzzy pinyin</string>
     <string name="home_words_summary">Your words, imported dictionaries, custom phrases</string>
-    <string name="home_look_summary">Theme, keyboard size, one-handed / split / floating</string>
+    <string name="home_look_summary">Themes, layouts, keyboard size, one-handed / split / floating</string>
     <string name="home_keys_summary">Long press, swipes, the space key, the characters on the keys</string>
     <string name="home_sound_summary">Key sound, vibration</string>
     <string name="home_clipboard_summary">Clipboard history, emoji skin tone</string>
@@ -1397,6 +1396,7 @@
     <string name="shortcut_card_count">%1$d/%2$d</string>
     <string name="long_press_card">Long press</string>
     <string name="long_press_card_summary">First %1$s · %2$d in all</string>
+    <string name="long_press_card_summary_no_first">No first · %1$d in all</string>
     <string name="long_press_card_summary_none">Offers nothing</string>
     <string name="long_press_card_read_only">Read-only</string>
     <string name="long_press_card_line">Tap a character to select it, then change it</string>
@@ -1422,7 +1422,7 @@
     <string name="swipe_fate_on">%1$s: %2$s</string>
     <string name="rare_chars">Rare characters</string>
     <string name="rare_chars_off">Off</string>
-    <string name="rare_chars_held">%1$s characters held back</string>
+    <string name="rare_chars_held">Characters held back: %1$s</string>
     <string name="rare_chars_switch">Hold back rare characters</string>
     <string name="rare_chars_note">%1$s · Never in candidates, predictions, handwriting or voice · Changes take effect when you leave this page</string>
     <string name="rare_chars_note_off">Off · Changes take effect when you leave this page</string>
@@ -1435,7 +1435,7 @@
     <string name="rare_group_trad">Traditional</string>
     <string name="rare_group_out">Other unlisted</string>
     <string name="rare_group_ext">Extensions</string>
-    <string name="rare_chars_unread">%1$s more characters have no reading data: held back or let through with this group</string>
+    <string name="rare_chars_unread">Without reading data, held back or let through with this group: %1$s more</string>
     <string name="rare_chars_unshown">%1$s cannot be shown on this phone</string>
     <string name="rare_chars_box_all">all held back</string>
     <string name="rare_chars_box_some">some held back</string>
@@ -1444,8 +1444,8 @@
     <string name="rare_chars_cell_a11y">%1$s, %2$s</string>
     <string name="rare_chars_reset">Restore defaults</string>
     <string name="rare_chars_reset_confirm">Hold back the extensions alone again, and clear the characters held back or let through one by one?</string>
-    <string name="rare_chars_changed_held">%1$s characters held back</string>
-    <string name="rare_chars_changed_allowed">%1$s characters let through</string>
+    <string name="rare_chars_changed_held">Characters held back: %1$s</string>
+    <string name="rare_chars_changed_allowed">Characters let through: %1$s</string>
     <string name="rare_chars_newer">These settings were written by a newer version of Youmo IME; this version cannot change them</string>
     <string name="rare_chars_unreadable">The rare characters settings could not be read: off for now</string>
     <string name="rare_word_has">Has characters held back: %1$s</string>
@@ -1484,7 +1484,7 @@
     <string name="layout_import_too_big">The file is over 64 KB: no layout is that big</string>
     <string name="layout_import_not_text">This file is no layout (not UTF-8 text)</string>
     <string name="layout_import_too_many">You have %1$d layouts of your own already: delete one first</string>
-    <string name="layout_import_commits">%1$d keys of this layout type text written into it: %2$s</string>
+    <string name="layout_import_commits">Keys of this layout typing text written into it (%1$d): %2$s</string>
     <string name="layout_import_commits_more">%1$s, and %2$d more</string>
     <string name="layout_imported">Imported %1$s</string>
     <string name="layout_used_for">Can be used for: %1$s</string>
@@ -1560,7 +1560,7 @@
     <string name="layout_finding_command">Key %1$s’s %2$s is a command: a letter key or the space may only have the commands its base’s same key has</string>
     <string name="layout_finding_no_way">No key switches to %1$s</string>
     <string name="layout_finding_narrow">Key %1$s is narrow, maybe hard to press</string>
-    <string name="layout_finding_commits">%1$s keys type text written into the layout</string>
+    <string name="layout_finding_commits">Keys typing text written into the layout: %1$s</string>
     <string name="layout_finding_theme_blank">With the theme in use, this key shows nothing: %1$s</string>
     <string name="layout_finding_unnamed">Key %1$s has no key name (shortcut=): its long press and swipes cannot be changed in the app</string>
     <string name="layout_finding_held">%1$s is a key of the app’s %2$s: the long press, corner and swipes written here are not used</string>

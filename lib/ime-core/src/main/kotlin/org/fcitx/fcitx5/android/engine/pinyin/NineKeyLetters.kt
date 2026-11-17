@@ -314,9 +314,10 @@ class NineKeyLetters private constructor(
 
         /**
          * [keyboard], a layout's own ([custom]), as the one in use: its codes are read as its keys
-         * ([ofCode], Keyboard.typedLetter) until another is. The session that types on it is to say
-         * so when it is made (T9b wires it: till then only tests call it, and [ofCode] reads no
-         * custom code); nothing else sets it (made, compared and filed keyboards do not).
+         * ([ofCode], Keyboard.typedLetter) until another is. Engines says so as the settings tell it
+         * ([EngineSettings.ownKeyboard][org.fcitx.fcitx5.android.engine.runtime.EngineSettings.ownKeyboard],
+         * the app's EngineBridge.syncOwnKeys; review F8245); nothing else sets it (made, compared and filed
+         * keyboards do not).
          */
         fun inUse(keyboard: NineKeyLetters) {
             if (keyboard.codes.firstOrNull()?.code in CUSTOM_BLOCK) current = keyboard

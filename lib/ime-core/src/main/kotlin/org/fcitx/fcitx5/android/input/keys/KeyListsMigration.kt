@@ -53,8 +53,9 @@ object KeyListsMigration {
             lists[id] = UserList(off = false, items = symbols)
         }
         val kept = lists.filterNot { (id, list) -> same(list, defaultOf(id)) }
-        // `@1`'s: a key's symbols above its row, upgraded as any `@1` (upgrade)
-        return Migrated(KeyLists.HEADER_1 + KeyLists.of(kept).serialize().removePrefix(KeyLists.HEADER), lost)
+        // `@1`'s: a key's symbols above its row, upgraded as any `@1` (upgrade). Its own first line dropped whichever it is
+        // (`@2`, or `@3` were an item marked: none migrated is, R26 F8249)
+        return Migrated(KeyLists.HEADER_1 + KeyLists.of(kept).serialize().dropWhile { it != '\n' }, lost)
     }
 
     private fun fromCharacters(o: PopupOverrides, named: Set<KeyId>, lists: MutableMap<KeyId, UserList>, lost: MutableList<String>) {

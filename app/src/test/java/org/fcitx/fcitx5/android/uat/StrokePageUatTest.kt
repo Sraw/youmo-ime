@@ -175,18 +175,22 @@ class StrokePageUatTest {
             ),
             { it.why },
         ) { row ->
-            prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, row.board)
-            prefs.set(keyboard.keyDrawing, KeyDrawing.StrokeFilter)
-            open = KeyboardHarness(TestThemes.PixelLight).start()
-            typed("hao")
-            val keys = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
-            assertEquals("the keys", row.draws, keys.drawsStrokes())
-            candidates(*Array(80) { "字$it" })
-            h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
-            h.api.calls.clear()
-            draw("字20", 0f, 40f)
-            assertEquals("the page: ${h.api.calls}", row.draws, strokesSent().isNotEmpty())
-            close()
+            // closed whether the row passes or not: the next row starts on its own keyboard (review R26 F8133)
+            try {
+                prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, row.board)
+                prefs.set(keyboard.keyDrawing, KeyDrawing.StrokeFilter)
+                open = KeyboardHarness(TestThemes.PixelLight).start()
+                typed("hao")
+                val keys = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
+                assertEquals("the keys", row.draws, keys.drawsStrokes())
+                candidates(*Array(80) { "字$it" })
+                h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
+                h.api.calls.clear()
+                draw("字20", 0f, 40f)
+                assertEquals("the page: ${h.api.calls}", row.draws, strokesSent().isNotEmpty())
+            } finally {
+                close()
+            }
         }
     }
 
@@ -259,16 +263,19 @@ class StrokePageUatTest {
             ),
             { it.why },
         ) { row ->
-            row.set()
-            val rv = page(row.drawing, row.pinyin, row.aux)
-            h.api.calls.clear()
-            draw("字20", 0f, 40f)
-            assertEquals(listOf<String>(), strokesSent())
-            dragUp(rv)
-            assertTrue("scrolled", first(rv) > 0)
-            close()
-            prefs.set(AppPrefs.getInstance().internal.handwritingOpen, false)
-            HandwritingRecognition.shared.reader = reader
+            // put back whether the row passes or not: no handwriting or fake reader carried into the next (review R26 F8133)
+            try {
+                row.set()
+                val rv = page(row.drawing, row.pinyin, row.aux)
+                h.api.calls.clear()
+                draw("字20", 0f, 40f)
+                assertEquals(listOf<String>(), strokesSent())
+                dragUp(rv)
+                assertTrue("scrolled", first(rv) > 0)
+            } finally {
+                close()
+                prefs.set(AppPrefs.getInstance().internal.handwritingOpen, false)
+            }
         }
     }
 

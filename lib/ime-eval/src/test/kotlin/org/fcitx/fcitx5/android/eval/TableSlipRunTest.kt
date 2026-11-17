@@ -59,6 +59,8 @@ class TableSlipRunTest {
         val fields = lines[0].split('\t')
         assertEquals("abe ", fields[0])
         assertEquals(listOf("-", "-", eTowardR.text(), "-"), fields[4].split(' '))
+        // review F8207: the last words, short of a line, written too: eight keys a line, twelve typed
+        assertEquals(listOf("abe abe ", "abe "), run.touchedSet(listOf(u, u, u), perSample = 8).map { it.substringBefore('\t') })
     }
 
     @Test

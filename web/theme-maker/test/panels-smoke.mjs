@@ -3,10 +3,10 @@
 // the user (every change did that) took the field just entered away and the click with it. CI runs it on every push
 // and PR (unit_test.yml, with the runner's Chrome; R25 B13); it needs a Chromium (no jsdom here: no npm).
 // Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
-// (default: Playwright's headless shell, as pixel-smoke.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
+// (default: Playwright's headless shell, as cdp.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
 import { readFileSync } from 'node:fs';
 import { serve } from '../dev/serve.mjs';
-import { browser, chromium } from './pixel-smoke.mjs';
+import { browser, chromium } from './cdp.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -20,7 +20,7 @@ async function main() {
   let b = null;
   try {
     server = await serve(0);
-    b = await browser(shell);
+    b = await browser(shell, 'panels-smoke');
   } catch (e) {
     if (b) await b.close();
     if (server) server.close();
@@ -371,6 +371,31 @@ async function main() {
     const top = await js(`[document.documentElement.scrollWidth, ...[...document.querySelectorAll('#top a.link')].map((a) => Math.round(a.getBoundingClientRect().height))]`);
     check(top[0] <= 360 && top.slice(1).every((h) => h < 24), '360 px: the top bar within the screen, its links one line each: ' + top);
     await b.send('Emulation.clearDeviceMetricsOverride');
+
+    // a draft restored (review R26 F8152, F8447): its environment through the page's own selects (`form` is
+    // env-form-kind's, `panel` env-sheet's), a board the form does not offer now (0.6.0's 手写) or a layout opened (not
+    // kept: @own, @open) the default's, the rest as kept. A select id wrong threw inside the restore, and the page
+    // offered to drop the draft instead
+    await b.send('Page.enable');
+    await b.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm = (m) => { window.__asked = m; return false; };' });
+    const url = 'http://127.0.0.1:' + server.address().port + '/page.html';
+    const offered = (q) => js(`(async () => { for (let i = 0; i < 300 && !document.getElementById('restore-panel')?.open; i++) await new Promise((r) => setTimeout(r, 50)); return ${q}; })()`);
+    for (const board of ['handwriting', '@own', '@open']) {
+      // the page's own pending draft written first, so it does not replace the one put in below on leaving; the theme
+      // without the error put in above (a theme with an error draws nothing)
+      await wait(800);
+      await js(`window.YoumoMaker.keepDraft(window.YoumoMaker.idbStore(indexedDB), window.YoumoMaker.doc(document.getElementById('source').value.replace('<style select="key:pressed" fill="image(nope.png, 0dp)"/>', '')),
+        Object.assign({}, window.YoumoMaker.ENV, { board: ${JSON.stringify(board)}, form: 'split', panel: 'voice', bar: 'typing' }))`);
+      await b.send('Page.navigate', { url });
+      check(await offered(`document.getElementById('restore-panel').open`), board + ': the draft offered on the next visit');
+      await js(`document.querySelector('#restore-panel button[value=restore]').click()`);
+      await wait(1500);
+      const got = await js(`[window.__asked || '', ...['env-board', 'env-form-kind', 'env-sheet', 'env-bar'].map((id) => document.getElementById(id).value)]`);
+      check(got[0] === '' && got[1] === 'qwerty' && got[2] === 'split' && got[3] === 'voice' && got[4] === 'typing',
+        board + ': the draft restored, 26 键 drawn, the rest of its environment kept: ' + JSON.stringify(got));
+      const blank = await js(`(() => { const c = document.getElementById('preview'); const e = document.createElement('canvas'); e.width = c.width; e.height = c.height; return c.width === 0 || c.toDataURL() === e.toDataURL(); })()`);
+      check(!blank, board + ': the preview drawn: ' + await js(`document.getElementById('problems').textContent`));
+    }
   } finally {
     await b.close();
     server.close();

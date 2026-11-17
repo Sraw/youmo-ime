@@ -23,8 +23,9 @@ object KeyData {
     val HELD = setOf("long-press", "swipe-up", "swipe-down", "double-tap")
 
     /**
-     * The app's keyboards whose theme layouts 0.6.1 moves to the layout list (061-custom-layout §11): read as a user's
-     * layout is ([Mode.Own]'s rule) until then, so a key named by the theme keeps what it writes all along.
+     * The app's keyboards whose theme layouts 0.6.1 moves to the layout list (061-custom-layout §11; the app converts them,
+     * L7): where one is still read as a pack's board (the web theme maker's page), it is read as a user's layout is
+     * ([Mode.Own]'s rule), so a key named by the theme keeps what it writes, as in the layout it is made.
      */
     val LISTED = setOf("qwerty", "k14", "k18", "nine", "number", "symbols")
 
@@ -86,8 +87,14 @@ object KeyData {
      * app has none of: no data ([Mode.Pack]) or its own ([Mode.Own], and [LISTED]'s boards). A group key takes the
      * place of the app's key of its name, else none (-1): no corner of the app's ([Key.place]). `<defaults>` and a
      * row's are laid on each key first, so nothing written there reaches a key past it; a `<variant>` of a name of its
-     * own looks up that name, any other follows its key. What was written and differs from what is taken is
-     * [Result.ignored]: the import's and the theme maker's notice.
+     * own looks up that name, any other follows its key. A variant's is only its alt= and actions, laid over its key's
+     * as it is shown (Expand): what that name's key has none of, the key's own gives (its double tap, its long press's
+     * popup or menu), as the app's own boards' variants are read ([board]) (R26 F8294). What was written and differs
+     * from what is taken is [Result.ignored]: the import's and the theme maker's notice. A group key's corner written as
+     * the app draws it is told apart by [shape], the app's board whose key shape the layout has (14 or 18 keys): its own
+     * family's (LayoutCheck.baseId: a grouped layout based on qwerty has k18's), not [basedOn]'s (R26 F8437). The default
+     * is only right for the app's own boards and a pack's ([Mode.Pack]): a user's layout's caller passes its baseId, as
+     * each does (LayoutCheck, the web's engine, SceneLayouts, the layout page; R26 F8508).
      */
     fun of(
         id: String,
@@ -96,10 +103,11 @@ object KeyData {
         mode: Mode,
         basedOn: String? = layout.basedOn,
         app: Map<String, Board> = BuiltInKeyData.BOARDS,
+        shape: String = basedOn ?: id,
     ): Result {
         val own = listOfNotNull(app[id], basedOn?.let { app[it] })
         val all = (listOfNotNull(id, basedOn) + ORDER + app.keys.sorted()).distinct().mapNotNull { app[it] }
-        val r = Reading(own, all, mode == Mode.Own || id in LISTED, DefaultMarks.variantOf(layout, basedOn ?: id).form)
+        val r = Reading(own, all, mode == Mode.Own || id in LISTED, DefaultMarks.variantOf(layout, shape).form)
         val parts = layout.parts.map { p -> if (p is Row) r.row(id, p, layout.defaults) else p }
         val frags = fragments.mapValues { (src, f) ->
             Fragment(f.id, f.defaults.holding(NONE), f.rows.map { r.row(src, it, f.defaults.over(layout.defaults)) })

@@ -127,7 +127,7 @@ object DefaultMarks {
      * [layout]'s [nodes] as a user's layout's keys have them (061-custom-layout §19.2; L6 review S2, team-lead's decision):
      * a key of a name of the app's is that key of the app's, its long press and corner the app's board's node of the
      * name's ([appBoard]), whatever letters= or alt= the layout writes (LayoutCheck's `held` tells of them); a name of
-     * its own, what the layout writes. [basedOn]: the board KeyData held it to (the app: CustomKeyboards.baseOf). [board]
+     * its own, what the layout writes. [basedOn]: the board KeyData held it to, its own `based-on` (R26 F8117). [board]
      * reads one of the app's boards, its fragments with it, by its id.
      */
     fun ownNodes(
@@ -146,8 +146,12 @@ object DefaultMarks {
     /** The app's board key [name] is of, looked for as KeyData looks: [basedOn]'s, then [KeyData.ORDER]'s, then any other's by id; null where none has it. */
     fun appBoard(name: String, basedOn: String?): String? {
         val boards = BuiltInKeyData.BOARDS
-        return (listOfNotNull(basedOn) + KeyData.ORDER + boards.keys.sorted()).firstOrNull { boards[it]?.named?.containsKey(name) == true }
+        if (basedOn != null && boards[basedOn]?.named?.containsKey(name) == true) return basedOn
+        return LOOKED_IN.firstOrNull { boards[it]?.named?.containsKey(name) == true }
     }
+
+    // [appBoard]'s boards after the based-on, made once: asked of every node of a layout on the main thread (R26 F8296)
+    private val LOOKED_IN by lazy { (KeyData.ORDER + BuiltInKeyData.BOARDS.keys.sorted()).distinct() }
 
     // a send= that is a character (`q`, `,`, `:`) rather than an action (`sym:BackSpace`, `action:zhuyin`)
     private fun textOf(send: String?): String? {

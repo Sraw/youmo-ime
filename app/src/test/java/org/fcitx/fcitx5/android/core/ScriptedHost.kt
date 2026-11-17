@@ -5,9 +5,13 @@
 package org.fcitx.fcitx5.android.core
 
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
+import org.fcitx.fcitx5.android.host.PunctuationTable
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.utils.appContext
+import java.io.File
 
 /**
  * The Kotlin host on [side] (a [ScriptedEngine] for most), started and ready; as on a new install's
@@ -22,6 +26,17 @@ fun startedHost(side: KotlinHost.EngineSide, firstRun: Boolean = true, beforeSta
         start()
         until("the host ready") { isReady }
     }
+}
+
+/**
+ * [entries] as zh_CN's punctuation table of this host, started on a [ScriptedEngine] of [home]: the built-in table is
+ * an app asset, not on the JVM's classpath, and no app path saves one since 0.6.1 (HostApi has no setter), so it is
+ * put where a user's own table is read, under [home]'s data, and read again as fcitx's reload reads it.
+ */
+suspend fun KotlinHost.putPunctuationTable(home: File, entries: List<PunctuationMapEntry>) {
+    File(home, "data/${PunctuationMaps.DIR}/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }
+        .writeBytes(PunctuationTable.write(entries.map { PunctuationTable.Entry(it.key, it.mapping, it.altMapping) }))
+    reloadConfig()
 }
 
 /**

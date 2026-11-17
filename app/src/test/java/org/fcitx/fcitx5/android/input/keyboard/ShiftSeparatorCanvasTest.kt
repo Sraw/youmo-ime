@@ -56,6 +56,7 @@ class ShiftSeparatorCanvasTest {
     // KB-106: pinyin typed, 分词 in Shift's place: one scene made as typing starts, none after (the kept two reused, as
     // the nine keys' 1); another input method's typing none of pinyin's
     @Test
+    @Uat("KB-106")
     fun pinyinTypedSwapsShiftKeepingTheScenes() = harness().use { h ->
         val c = h.canvas()!!
         val board = h.textKeyboard()
@@ -160,6 +161,44 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
+    // KB-107: a theme's or user's own qwerty that keeps its Shift while pinyin is typed, 分词 beside it: its Shift a tap
+    // Shift once, no `'` sent (R26 F8178: 分词 anywhere in the scene took every Shift tap)
+    @Test
+    @Uat("KB-107")
+    fun aShiftKeptBesideTheSeparatorStaysShift() {
+        val app = RuntimeEnvironment.getApplication()
+        val builtIn = BuiltInLayouts(app)
+        // both in the row: Shift 1 wide, 分词 0.5, as wide as the two were one at a time
+        val own = builtIn.text("qwerty")!!
+            .replace("width=\"1.5\" icon=\"{shift-icon}\"", "width=\"1\" icon=\"{shift-icon}\"")
+            .replace("when=\"!table !composing\"", "when=\"!table\"")
+            .replace("id=\"apostrophe\" role=\"apostrophe\" kind=\"function\" width=\"1.5\"", "id=\"apostrophe\" role=\"apostrophe\" kind=\"function\" width=\"0.5\"")
+        val real = SceneLayouts.source
+        SceneLayouts.source = {
+            object : LayoutSource {
+                override val key = "own-both"
+                override fun text(id: String) = if (id == "qwerty") own else builtIn.text(id)
+            }
+        }
+        val im = KeyboardHarness.PINYIN.uniqueName
+        try {
+            harness().use { h ->
+                EngineState.syllablesState.value = EngineState.SyllableState(im, composing = true)
+                h.idle()
+                val keys = h.canvas()!!.scene!!.keys.map { it.id }
+                assertTrue(keys.toString(), "shift" in keys && "apostrophe" in keys)
+                val from = h.api.calls.size
+                h.tap(h.describedKey("Shift"))
+                h.idle()
+                assertEquals("Q", h.keyNamed("q").label)
+                assertTrue(h.api.calls.drop(from).toString(), h.separatorsSent(from).isEmpty())
+            }
+        } finally {
+            SceneLayouts.source = real
+            EngineState.syllablesState.value = EngineState.SyllableState()
+        }
+    }
+
     // KB-107: a theme's own `'` key (its m sending it here) is no 分词: Shift once is used up on it, with Shift sent, as in 0.6.0
     @Test
     @Uat("KB-107")
@@ -235,7 +274,8 @@ class ShiftSeparatorCanvasTest {
             val finger = h.fingerKept(separator)
             EngineState.syllablesState.value = EngineState.SyllableState(im)
             h.idle()
-            h.canvas()!!.scene
+            // drawn with Shift back, as a frame comes before the finger is lifted
+            assertNotNull(h.canvas()!!.scene!!.keys.firstOrNull { it.id == "shift" })
             val from = h.api.calls.size
             finger.up(upAt)
             h.idle()
@@ -251,6 +291,7 @@ class ShiftSeparatorCanvasTest {
     // KB-106: a field with an action (Send): Return's label and 分词 change in frames of their own as typing begins
     // and ends; the scenes made bounded, every round after the first made of kept ones alone
     @Test
+    @Uat("KB-106")
     fun aFieldsActionAndTheSeparatorReuseTheKeptScenes() = KeyboardHarness(im = KeyboardHarness.PINYIN).start(imeOptions = EditorInfo.IME_ACTION_SEND).use { h ->
         val c = h.canvas()!!
         val board = h.textKeyboard()

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.cards
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.ui.cards.CardColumns.CHOICE
 import org.fcitx.fcitx5.android.ui.cards.CardColumns.CHOICE_MIN_DP
 import org.fcitx.fcitx5.android.ui.cards.CardColumns.GROUP
@@ -39,26 +40,23 @@ class CardColumnsTest {
         }
     }
 
+    // R26 F8395: the columns' cases, a test each that differed only in width and scale, one table
     @Test
-    fun `keyboard cards make one row of eight from 696 dp`() {
-        assertEquals(8, choice(696, 1.0f))
-        assertEquals(4, choice(695, 1.0f))
-        assertEquals(8, choice(780, 1.0f))
-    }
-
-    @Test
-    fun `keyboard cards skip counts that leave one card alone`() {
+    fun `keyboard cards' columns`() = assertRows(
+        "one row of eight from 696 dp" to {
+            assertEquals(8, choice(696, 1.0f))
+            assertEquals(4, choice(695, 1.0f))
+            assertEquals(8, choice(780, 1.0f))
+        },
         // n = 5, 6, 7 fit but would leave a short last row: the next candidate down
-        assertEquals(4, choice(452, 1.0f)) // n = 5
-        assertEquals(4, choice(536, 1.0f)) // n = 6
-        assertEquals(4, choice(620, 1.0f)) // n = 7
-    }
-
-    @Test
-    fun `keyboard cards keep two columns however large the text`() {
-        assertEquals(2, choice(360, 1.5f))
-        assertEquals(2, choice(200, 2.0f))
-    }
+        "n = 5 leaves one card alone: four" to { assertEquals(4, choice(452, 1.0f)) },
+        "n = 6: four" to { assertEquals(4, choice(536, 1.0f)) },
+        "n = 7: four" to { assertEquals(4, choice(620, 1.0f)) },
+        "two columns however large the text" to {
+            assertEquals(2, choice(360, 1.5f))
+            assertEquals(2, choice(200, 2.0f))
+        },
+    )
 
     @Test
     fun `the name's size turns at 82 dp times the scale`() {
@@ -70,17 +68,17 @@ class CardColumnsTest {
 
     // §2.9, §2.10: two columns on a phone, one at 1.5 or at 360 dp × 1.3, four from 584 dp
     @Test
-    fun `group cards`() {
-        assertEquals(2, group(360, 1.0f))
-        assertEquals(2, group(393, 1.0f))
-        assertEquals(2, group(393, 1.3f))
-        assertEquals(1, group(393, 1.5f))
-        assertEquals(1, group(360, 1.3f))
-        assertEquals(4, group(584, 1.0f)) // the first width four fit: (584 − 24) ÷ 140 = 4
-        assertEquals(4, group(600, 1.0f))
-        assertEquals(4, group(780, 1.0f))
-        assertEquals(2, group(583, 1.0f)) // n = 3: three would leave one alone, so two
-    }
+    fun `group cards`() = assertRows(
+        "360 dp: two" to { assertEquals(2, group(360, 1.0f)) },
+        "393 dp: two" to { assertEquals(2, group(393, 1.0f)) },
+        "393 dp × 1.3: two" to { assertEquals(2, group(393, 1.3f)) },
+        "393 dp × 1.5: one" to { assertEquals(1, group(393, 1.5f)) },
+        "360 dp × 1.3: one" to { assertEquals(1, group(360, 1.3f)) },
+        "584 dp, the first width four fit: (584 − 24) ÷ 140 = 4" to { assertEquals(4, group(584, 1.0f)) },
+        "600 dp: four" to { assertEquals(4, group(600, 1.0f)) },
+        "780 dp: four" to { assertEquals(4, group(780, 1.0f)) },
+        "583 dp, n = 3: three would leave one alone, so two" to { assertEquals(2, group(583, 1.0f)) },
+    )
 
     @Test
     fun `nonsense is refused`() {

@@ -249,7 +249,8 @@ abstract class BaseKeyboard(
             strokeLift = { prefs.keyboard.strokeLift.getValue().dp },
             // as a tap there types, a stroke drawn there lifted short
             tapKey = { x, y -> sceneKeys.touch?.find(x, y)?.takeIf { it.enabled }?.let { it.key.tap(it.cell, x, y) } },
-            strokeKeys = { canvas?.scene?.keys.orEmpty().filter { it.role != SHIFT_ROLE && writesAlso(it) }.map { scenePlace(it.id, it.copy == 1) } },
+            // the keys drawn, as ScenePlace and keyAt read them: not a scene made anew here for a change not drawn yet
+            strokeKeys = { canvas?.shownKeys.orEmpty().filter { it.role != SHIFT_ROLE && writesAlso(it) }.map { scenePlace(it.id, it.copy == 1) } },
             ink = ink,
             writes = { keyWriting?.now == true },
             writingArea = { x, y -> letterArea?.at(canvas, x, y) == true },
@@ -677,7 +678,10 @@ abstract class BaseKeyboard(
      * ([sceneEnv]): a settings page's scene of the keyboard (SwipeFates); null, no layout read.
      */
     internal fun shownAs(look: ThemeLook, width: Int, height: Int): Pair<SceneLayout, Env>? =
-        drawnLayout?.let { it to sceneEnv(look, it, width, height) }
+        // nothing drawn (the rows counted, a settings page's scene): the minute [keyMarks] takes as drawn put back (R26
+        // F8366: [catchUpMinute] then left keys drawn a minute before as they were). Its layout is the drawn one
+        // ([drawnLayout]), so the keys' layout it sets is the same
+        drawnLayout?.let { val drawn = minuteDrawn; (it to sceneEnv(look, it, width, height)).also { minuteDrawn = drawn } }
 
     /** Whether the canvas draws its board's fill under the keys ([KeyboardCanvasView.drawsBase]): a row or a column laid on its own background, not. */
     protected open val sceneDrawsBase: Boolean get() = true

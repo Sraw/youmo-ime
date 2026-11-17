@@ -245,7 +245,7 @@
 - **JVM**：`TableSlipUatTest.wubisToppingKeyIsReadOnlyAtTheEdge`（真数据）+ ime-core `TableSlipTest.aKeyAfterAWholeCodeIsReadOnlyAtTheEdge`、`aKeyIsNeverReadAsOneLeadingToTheTextItWouldCommit`、`aWaitingCodeIsCommittedOnceWhereTheTableTops`、`ziranmaTopsAsWubiDoes`、`wubiPinyinReadsNoKeyAsOneLeadingToPinyinAlone`、`aKeyAfterAWholeCodeIsReadOnlyForACodeTheWordModelWeighsAsMuch`、`aCodeWithAKeyReadAsItsNeighbourNeverCommitsItself`、`aCodeWithEntriesIsNeverChanged`、`aCodesFirstKeyIsNeverRead`、`aFullCodesNextKeyStartsTheNextCode`、`theWildcardIsNeverReadAsAnotherKey`；设备上不跑（点在键边上的落点要模拟）。
 
 ### TBL-56 [P2] 关掉纠错时码表不纠按偏
-- **前提**：B0-仓颉；**拼音** 设置里关掉 **纠正错拼和按偏的键**。
+- **前提**：B0-仓颉；**通用输入** 里关掉 **纠正错拼和按偏的键**。
 - **操作**：打 h d，再按 `e`，落点同 TBL-54；按空格。
 - **预期**：`hde` 照原样是空码，没有候选，空格丢掉，什么也不上屏。
 - **JVM**：`TableSlipUatTest.slipsOffLeaveTheEmptyCodeToBeDropped`（真数据）+ ime-core `EnginesTableSlipTest.aSlipIntoAnEmptyCodeIsReadAsTheKeyMeantUnlessSlipsAreOff`（设置接到码表）；设备上不跑。

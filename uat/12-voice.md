@@ -274,7 +274,7 @@
 - **前提**：B0-语音；用户词库里没有「徐婧」。
 - **操作**：在「普通文本」框按住空格说"麻烦你去找一下徐婧"，松开（框里是「…徐静」，见 VO-38）。按 ⌫ 删掉句末标点和「徐静」，用拼音打 x u j i n g，选「徐婧」（一个字一个字选也行）。看键盘上方；点 **记住**；再点 **撤销**。再点一次 **记住** 后打开 **用户词库 → 手动添加的词**。
 - **预期**：重打以后键盘上方问「让语音记住『徐婧』？」，带 **记住** 按钮；点了提示变成「语音记住了『徐婧』」带 **撤销**，候选栏清空（不留重打前的联想），手动添加的词里有「徐婧」（拼音 xu jing）；点 **撤销** 又拿掉（学到的不动，不算删过）；再记住后再说"麻烦你去找一下徐婧"直接是「徐婧」。
-- **JVM**：`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示。
+- **JVM**：`VoiceAskFieldTest.aFieldLeftBeforeTheEngineAnswersIsNotReadNorAskedOver`（提交后、问之前离开输入框：不读新框、不问）、`VoiceAskFieldTest.theCodeInTheFieldIsNotReadAsItsText`（引擎回答前又打了一个键、编码写在框里（编码行：输入框里）：交给引擎的是「我找徐婧」，不带框里的编码，照样问）、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示。
 
 ### VO-42 [P1] 不点就什么都不记，下次再这样改还问
 - **前提**：B0-语音。
@@ -302,7 +302,7 @@
 
 ### VO-46 [P1] 不记录的框里、不用我的输入习惯时不问
 - **前提**：B0-语音。
-- **操作**：在要求不记录的框（`IME_FLAG_NO_PERSONALIZED_LEARNING`，测试 App 里的「不记录」框）照 VO-41 改；再在 **⋯ → 不用我的输入习惯** 时照样改；再在改到一半（删掉了「徐静」）时切到不用我的输入习惯，打「徐婧」。
+- **操作**：在要求不记录的框（`IME_FLAG_NO_PERSONALIZED_LEARNING`：输入测试台 `types` 页的 `no_learning` 框，「不要个性化学习」）照 VO-41 改；再在 **⋯ → 不用我的输入习惯** 时照样改；再在改到一半（删掉了「徐静」）时切到不用我的输入习惯，打「徐婧」。
 - **预期**：都不问；不记录的框里语音打的字也不交给引擎。
 - **JVM**：`VoiceAskUatTest.aFieldThatLearnsNothingIsNotFollowed`（不交给引擎，只告诉它结束）、ime-core `EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（不用输入习惯、改到一半关掉输入习惯、这次不学、框被清空、离开输入框）；设备上不跑。
 
@@ -320,9 +320,9 @@
 
 ### VO-49 [P2] 别的改法：在中间改、选中改、移开光标、表情、不报告选区的框
 - **前提**：B0-语音。
-- **操作**：语音打出「我找徐静了」后，把光标移到「徐静」后面删掉重打「徐婧」；或选中「徐静」直接打「徐婧」；或在中间打字后把光标移到别处再回来；删一个表情；在不报告选区的框里点到中间改字。
-- **预期**：看得准是删掉「徐静」重打成「徐婧」的（光标在那一段后面删、选中替换）照样问；弄不清删的是哪一段、光标去了别处、框没报告光标在哪，就不再跟着，不问（宁可不问，不问错）。
-- **JVM**：ime-core `VoiceEditsTest.edits made other ways than Backspace at the end`（中间删掉重打照样问）、`VoiceEditsTest.the window ends where what happened is not sure`（框不报告选区：读到的上下文对不上就不问）、`VoiceEditsTest.the anchor not read as voice's text waits for a context (review R6)`、`VoiceEditsTest.an emoji's Backspace is not counted`、`VoiceEditsTest.only the last characters are kept`、`VoiceEditsTest.what the host read is cut at its length`；设备上不跑。
+- **操作**：语音打出「我找徐静了」后，把光标移到「徐静」后面删掉重打「徐婧」；或选中「徐静」直接打「徐婧」；或在中间打字后把光标移到别处再回来；删一个表情；语音打出「😀我找徐静」后在末尾删掉「徐静」重打「徐婧」；在不报告选区的框里点到中间改字。
+- **预期**：看得准是删掉「徐静」重打成「徐婧」的（光标在那一段后面删、选中替换）照样问；弄不清删的是哪一段、光标去了别处、框没报告光标在哪，就不再跟着，不问（宁可不问，不问错）。前面有表情的「😀我找徐静」删掉「徐静」重打「徐婧」照样问「让语音记住『徐婧』？」：表情在别处不碍事，只有删的是表情本身才不再跟着。
+- **JVM**：ime-core `VoiceEditsTest.edits made other ways than Backspace at the end`（中间删掉重打照样问）、`VoiceEditsTest.the window ends where what happened is not sure`（框不报告选区：读到的上下文对不上就不问）、`VoiceEditsTest.the anchor not read as voice's text waits for a context (review R6)`、`VoiceEditsTest.an emoji's Backspace is not counted`（删的是表情本身不再跟着；「😀我找徐静」删「徐静」重打「徐婧」照样问）、`VoiceEditsTest.only the last characters are kept`、`VoiceEditsTest.what the host read is cut at its length`；设备上不跑。
 
 ### VO-50 [P0] 别的应用里也问：Chrome（模拟器）；微信、备忘录（真机）
 - **前提**：B0-语音；模拟器装了 Chrome（没有就用系统的 WebView Browser Tester）。
@@ -363,3 +363,11 @@
 - **JVM**：无（时间只在设备上量）。
 - **模拟器**：播 `jintian`、`zouba`，抬起定在语音结束时（同 VO-23 的计时，偏移在 [−100, +100] ms 的才算），每段数 3 次：字要对，调试日志 `voice timing:` 的 `stopToSaidMs`（松开到上屏）中位数 ≤ 1500 ms（粗线：2026-11-14 同一台模拟器两次的中位数 1029 和 509 ms，差一倍；真机那条才是门槛）。字对、只是时间超了，先在只开一台模拟器时重跑，重跑还超才算变慢。
 - **真机（发版时）**：OnePlus 6T 上同样做 30 句以上，长短都有，`stopToSaidMs` 平均 ≤ 1.45 s、九成 ≤ 1.85 s（2026-11-14 实测 40 句：1920 ms 分块 1.38 s、1.74 s；量过没采用的 960 ms 分块 1.24 s、1.37 s）。
+
+### VO-56 [P2] 用户词以「酒店」开头时，说「九键」不被听成酒店
+<!-- 20bbb03e0：热词只开了个头就到了一段的末尾，不再加分（n-best 按 FinalizedLogProb 排） -->
+- **前提**：B0-设置（导入了语音包），在 **词库与短语 → 用户词库** 里手动加「酒店式公寓」（拼音 jiu dian shi gong yu）。
+- **操作**：回测试页，按住空格说"九键输入法"，松开。
+- **预期**：框里是「九键输入法」，不是「酒店…」开头的（以前用户词或语音包的热词以「酒店」开头时，没说完的热词也加分，「九键」常被听成「酒店」）。
+- **JVM**：无（在语音识别的原生代码里，`~/voice-eval` 的九键片段集量过：手动加词后 396 段里对的从 283 到 306）。
+- **模拟器**：播 `jiujian`（`uat/tools/voice-clips.py` 生成，要 `~/voice-eval` 的模型），同 VO-14。

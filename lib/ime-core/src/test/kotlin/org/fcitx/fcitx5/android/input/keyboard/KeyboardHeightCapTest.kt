@@ -41,9 +41,6 @@ class KeyboardHeightCapTest {
             val keys = KeyboardHeightCap.keysHeight((851 * 0.9).toInt(), available, 58, 12)
             assertEquals(120, available - 58 - 12 - keys)
         },
-        "a screen too short for the bars gives no keys rather than a negative height" to {
-            assertEquals(0, KeyboardHeightCap.keysHeight(0, 50, 58, 12))
-        },
     )
 
     @Test
@@ -51,6 +48,10 @@ class KeyboardHeightCapTest {
     fun theRowsWinOverTheFloor() = assertRows(
         "a small phone under gestures: 272 of room leaves the keys 112, the rows keep 4 × 36" to {
             assertEquals(144, KeyboardHeightCap.keysHeight(192, 272, 40, 0))
+        },
+        // R26 F8123: was a request of 0 giving 0, which tested nothing once the rows won
+        "a screen too short even for the bars: the rows still keep 4 × 36, no less" to {
+            assertEquals(144, KeyboardHeightCap.keysHeight(192, 50, 58, 12))
         },
         "the rows as the layout has them: 注音's five, six" to {
             assertEquals(180, KeyboardHeightCap.keysHeight(236, 272, 40, 0, rows = 5.0))

@@ -110,6 +110,10 @@ object PackSeparator {
                 val shift = shiftGroups(groups)
                 // Shift there only while pinyin is typed: a when= of nothing is none, and 分词 alone in its place is no Shift's
                 if (separator.isNotEmpty() && shift.isEmpty()) return Found(why = "Shift shows only while pinyin is typed")
+                // every pair of the row's and the 分词's (product): a few as written, bounded so a file cannot make millions
+                if (groups(row.condition).size.toLong() * separator.size > PackLayouts.MAX_ALTERNATIVES) {
+                    return Found(why = "over ${PackLayouts.MAX_ALTERNATIVES} when= alternatives a Shift's and its row's make")
+                }
                 if (separator.isNotEmpty()) separators += Placed(element, shift, separator) to product(groups(row.condition), separator)
             }
         }

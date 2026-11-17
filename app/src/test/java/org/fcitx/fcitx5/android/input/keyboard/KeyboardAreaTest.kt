@@ -117,7 +117,6 @@ class KeyboardAreaTest {
     }
 
     @Test
-    @Uat("ST-141")
     fun theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut() {
         val s = KeyboardArea.screen(ctx)
         // the display whole as held, its status bar, and gestures' 48 dp under the input method (or the buttons')

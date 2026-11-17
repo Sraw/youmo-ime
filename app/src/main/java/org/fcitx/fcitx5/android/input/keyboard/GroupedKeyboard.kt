@@ -394,8 +394,9 @@ class GroupedKeyboard private constructor(
         super.onAction(resolve(action, source), source)
     }
 
-    // a tap on a key of two letters as its code with where it fell; a click no touch made (TalkBack),
-    // a swipe's, L and M as the code alone
+    // a tap as [tapped] reads it: a leaning group's code with where it fell (a swipe's own tap too, its clickAt set
+    // before the Up is sent), a key of one letter with it where any group leans; a click no touch made (TalkBack) as
+    // the code alone
     override fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning, clickDown)
 
     // the groups whose taps lean (按落点加权): the layout's lean=, whichever draws the keys, its groups the

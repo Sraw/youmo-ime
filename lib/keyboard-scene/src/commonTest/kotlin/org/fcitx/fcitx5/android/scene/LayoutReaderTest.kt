@@ -155,6 +155,15 @@ class LayoutReaderTest {
         assertEquals(emptyList(), l.problems().map { it.toString() })
         assertEquals(5, l.warnings().size, "${l.warnings()}")
         assertTrue(l.warnings().all { "注 is gone" in it.message }, "${l.warnings()}")
+        // a menu of its 注 items alone (0.6.0's handwriting.xml has one): no menu, each item warned of, still read (R26 F8209)
+        val only = LayoutReader.layout(
+            board("<row><key id=\"a\" label=\"注\"><menu><item label=\"y\" do=\"reading:tone\"/><item label=\"z\" do=\"reading:style\"/></menu></key></row>"),
+        )
+        assertEquals(emptyList(), only.problems().map { it.toString() })
+        assertEquals(2, only.warnings().size, "${only.warnings()}")
+        assertEquals(emptyList(), (only.ok().parts.filterIsInstance<Row>().single().cells.single() as Key).menu)
+        // a menu of no items at all still a problem
+        assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><menu></menu></key></row>")).isNotEmpty())
         // what is not 0.6.0's still a problem: a role of reading: has no such style
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" role=\"reading:tone\"/></row>")).isNotEmpty())
     }

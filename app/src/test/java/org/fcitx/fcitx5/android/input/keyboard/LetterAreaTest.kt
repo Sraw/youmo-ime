@@ -112,16 +112,16 @@ class LetterAreaTest {
         val one = b.key("1").bounds
         val three = b.key("3").bounds
         val backspace = b.key("backspace").bounds
-        // the gap between the letters and the side column: each side's half goes as a tap there does
-        val gap = b.canvas.scene!!.keys.filter { it.id !in keys && it.bounds.right <= one.left && it.bounds.bottom > one.top }
-            .maxOfOrNull { it.bounds.right }
+        // the gap between the letters and the side column, each side's half going as a tap there does: [everywhere]'s. The
+        // area at a point is the key a tap there presses asked (LetterArea.at), so an edge pixel adds no answer that key's
+        // other pixels in [everywhere] do not give; the press's own answer as its row's expectation, the edges' rows were the
+        // same check again (R26 F8361, F8485)
         assertRows(
             listOf(
                 Point("the gap between 2 and 3", (b.key("2").bounds.right + three.left) / 2, one.centerY, true),
                 Point("1", one.centerX, one.centerY, true),
                 Point("⌫, the right column", backspace.centerX, backspace.centerY, false),
-                Point("just left of 1, its half of the gap", one.left - 1, one.centerY, b.pressed(one.left - 1, one.centerY)?.id == "1"),
-            ) + listOfNotNull(gap?.let { Point("just right of the side column, its half", it + 1, one.centerY, b.pressed(it + 1, one.centerY)?.id == "1") }),
+            ),
             Point::why,
         ) { p ->
             assertEquals("pressed ${b.pressed(p.x, p.y)?.id}", p.inArea, b.at(p.x, p.y))

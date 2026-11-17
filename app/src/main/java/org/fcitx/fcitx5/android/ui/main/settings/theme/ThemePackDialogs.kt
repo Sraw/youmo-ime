@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import org.fcitx.fcitx5.android.R
@@ -107,7 +108,9 @@ object ThemePackDialogs {
             addView(TextView(ctx).apply { this.text = text })
             below?.let(::addView)
         }
-        return AlertDialog.Builder(ctx).setTitle(title).setView(body)
+        // scrolled: an AlertDialog's own view does not scroll, so on a low screen (a phone turned) the preview and a long
+        // text left [below] (一起导入, checked) no room, unseen and not to be unchecked (R26 F8162)
+        return AlertDialog.Builder(ctx).setTitle(title).setView(ScrollView(ctx).apply { addView(body) })
     }
 
     // the preview at most the dialog's size: a 2048 px one (ThemeAssetLimits) decoded at a quarter

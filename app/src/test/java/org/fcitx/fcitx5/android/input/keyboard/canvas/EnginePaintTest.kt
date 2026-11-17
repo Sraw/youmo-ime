@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.SCREENSHOT_SDK
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.BoardImages
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
@@ -106,6 +107,7 @@ class EnginePaintTest {
     // the icon page's groups by where a name is drawn (a name in each it is drawn in), the bar's own image of a name whose
     // key's differs (hide-keyboard's ▾, not the key's keyboard), the menu key's ⌄ turned: `youmo-bar-icons` (061-toolbar-icons §2.6)
     @Test
+    @Uat("ST-131")
     fun theBarsIconsAreThePages() {
         fun list(names: List<String>) = names.distinct().joinToString(",", "[", "]") { "\"$it\"" }
         val groups = linkedMapOf(

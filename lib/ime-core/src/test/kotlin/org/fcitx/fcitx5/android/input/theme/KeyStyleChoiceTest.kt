@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyStyleChoiceTest {
@@ -84,8 +85,10 @@ class KeyStyleChoiceTest {
     @Test
     fun upAndDownVeryCompactIsAsTightAsAcrossCompact() {
         val v = KeyStyleChoice.V_VERY_COMPACT
-        assertEquals(KeyStyleChoice.H_COMPACT, v)
+        // its documented 2 dp both ways, tighter than 紧凑 (R26 F8396: was H_COMPACT == v, the two axes' constants
+        // pinned to each other rather than to what they are)
         assertEquals(KeyStyleChoice.Spacing(2, 2), v)
+        assertTrue(v.portrait < KeyStyleChoice.V_COMPACT.portrait && v.landscape < KeyStyleChoice.V_COMPACT.landscape)
         val gap = KeyStyleChoice(null, KeyStyleChoice.H_COMPACT, v, null).applyTo(look).keys.gap
         assertEquals(Gap(2, 2, 2, 2), gap)
         assertEquals(1 to 1, gap.vCompact to gap.vLandCompact)

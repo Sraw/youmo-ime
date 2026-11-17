@@ -38,6 +38,21 @@ class ThemeWriterTest {
         }
     }
 
+    // a control or U+FFFF in a name (a theme 3.0's JSON name, converted): left out as written, so what is written reads
+    // back; and a file written with one as it is, as before 0.6.1, still reads, the control dropped (R26 F8187)
+    @Test
+    fun aCharacterXmlHasNoneForIsLeftOutAndAFileWithOneStillReads() {
+        val t = read("material-light.xml")
+        val named = Theme(
+            "a\u0001b\uFFFFc", t.dark, t.version, t.colors, t.styles, t.fonts, t.icons, t.picture, t.variants, t.baseColors, t.darkColors, t.meta,
+        )
+        val text = ThemeWriter.write(named)
+        assertTrue("a\u0001b" !in text && '\uFFFF' !in text, text)
+        assertEquals("abc", ThemeReader.theme(text).ok().name)
+        val old = testData("material-light.xml").replaceFirst("name=\"MaterialLight\"", "name=\"Material\u0001Light\"")
+        assertEquals("MaterialLight", ThemeReader.theme(old).ok().name)
+    }
+
     // 060-theme-sounds-icons §1.1: <sounds> written back as read, a later version's class too, in its order
     @Test
     fun soundsAreWrittenAsRead() {

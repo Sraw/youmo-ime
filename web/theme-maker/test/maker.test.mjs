@@ -240,7 +240,7 @@ test('a converted theme keeps its files byte for byte', async () => {
 
 test('the engine throwing is a problem said, not a throw', () => {
   const bad = { readTheme: () => { throw new Error('boom'); } };
-  const r = M.check(bad, M.doc('<x/>'), 'qwerty', M.envJson(M.ENV), null);
+  const r = M.check(bad, M.doc('<x/>'), 'qwerty', M.envJson(E, M.ENV), null);
   assert.equal(r.scene, null);
   assert.match(r.problems[0].message, /boom/);
 });
@@ -284,31 +284,53 @@ test('a draft kept is given back whole; none, a broken one or a failing store is
   await M.dropDraft(failing);
 });
 
+// review R26 F8152: a 0.6.0 page's draft kept 手写 (gone from BOARDS and the engine): drawn on the default, not on nothing
+test('a draft\'s environment comes back as the page offers it now: a choice gone the default\'s', () => {
+  const offered = { device: [...M.DEVICES.map((d) => d.id), 'custom'], board: M.BOARDS, form: M.FORMS, field: M.FIELDS, ime: M.IMES };
+  const kept = Object.assign({}, M.ENV, { board: 'handwriting', form: 'split', dark: true, landscape: true, w: 1200 });
+  assert.deepEqual(M.restoreEnv(kept, offered), Object.assign({}, M.ENV, { form: 'split', dark: true, landscape: true, w: 1200 }));
+  assert.equal(M.restoreEnv({ board: 'nine', ime: 'zhuyin' }, offered).board, 'nine', 'one still offered kept');
+  assert.equal(M.restoreEnv({ board: 'nine', ime: 'zhuyin' }, offered).ime, M.ENV.ime);
+  // a device no longer listed: custom, its size as kept; a size not a positive number, a value of another type: the default's
+  assert.deepEqual(M.restoreEnv({ device: 'old-phone', w: 720, h: 0, density: 'x', dark: 'yes' }, offered),
+    Object.assign({}, M.ENV, { device: 'custom', w: 720 }));
+  assert.deepEqual(M.restoreEnv(null, offered), M.ENV);
+  // what the engine draws: the board restored builds
+  const r = M.check(E, M.fromBuiltin(E, 'material'), M.restoreEnv(kept, offered).board, M.envJson(E, M.restoreEnv(kept, offered)), null);
+  assert.ok(r.scene);
+  assert.equal(M.BOARDS.includes('handwriting'), false);
+});
+
 test('the environment is the engine\'s: every board and form builds, its size the device\'s keyboard', () => {
   const d = M.fromBuiltin(E, 'material');
   for (const board of M.BOARDS) {
     for (const form of M.FORMS) {
       for (const landscape of [false, true]) {
-        const env = M.envJson(Object.assign({}, M.ENV, { board, form, landscape }));
+        const env = M.envJson(E, Object.assign({}, M.ENV, { board, form, landscape }));
         const r = M.check(E, d, board, env);
         assert.deepEqual(r.problems.filter((p) => p.level === 'error'), [], board + ' ' + form);
         assert.ok(r.scene, board + ' ' + form);
       }
     }
   }
-  assert.deepEqual(M.envJson(M.ENV), { width: 1080, height: Math.round(267 * 2.625), density: 2.625, texts: { punctuation: M.ZH_PUNCTUATION } });
-  assert.equal(M.envJson(Object.assign({}, M.ENV, { ime: 'english' })).texts, undefined, 'English: punctuation as written');
-  assert.equal(M.envJson(Object.assign({}, M.ENV, { landscape: true })).width, 2340);
+  assert.deepEqual(M.envJson(E, M.ENV), { width: 1080, height: Math.round(267 * 2.625), density: 2.625, texts: { punctuation: M.ZH_PUNCTUATION } });
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, { ime: 'english' })).texts, undefined, 'English: punctuation as written');
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, { landscape: true })).width, 2340);
   // turned, 标准's four rows: 48 dp on a phone, 56 dp where the short side is 600 dp or more (061-landscape-height)
-  assert.equal(M.envJson(Object.assign({}, M.ENV, { landscape: true })).height, Math.round(192 * 2.625));
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, { landscape: true })).height, Math.round(192 * 2.625));
   const tablet = M.DEVICES.find((d) => d.id === 'tablet');
-  assert.equal(M.envJson(Object.assign({}, M.ENV, tablet, { landscape: true })).height, 224 * 2);
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, tablet, { landscape: true })).height, 224 * 2);
   // a tablet upright is 800 dp wide: 横屏 either way up (ScreenShape), its turned height, not 30% of a phone
-  assert.equal(M.envJson(Object.assign({}, M.ENV, tablet)).height, 224 * 2);
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, tablet)).height, 224 * 2);
+  // and 横屏 throughout as the app lays it out: its @landscape styles, sizes' second values, landscape cut (review R26 F8153)
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, tablet)).landscape, true);
+  assert.equal(M.envJson(E, Object.assign({}, M.ENV, tablet)).width, 1600, 'as held: its short side across');
+  assert.deepEqual(M.shape(E, Object.assign({}, M.ENV, tablet)), { landscape: true, width: 1600, height: 224 * 2 });
+  assert.equal(M.envJson(E, M.ENV).landscape, undefined, 'a phone upright: 竖屏');
 });
 
 test('what is wrong is said with its line: a theme the engine refuses has no scene', () => {
-  const r = M.check(E, M.doc('<theme xmlns="https://youmo-ime/theme/4" version="4.0">\n<bogus/>\n</theme>'), 'qwerty', M.envJson(M.ENV));
+  const r = M.check(E, M.doc('<theme xmlns="https://youmo-ime/theme/4" version="4.0">\n<bogus/>\n</theme>'), 'qwerty', M.envJson(E, M.ENV));
   assert.equal(r.scene, null);
   assert.ok(r.problems.some((p) => p.level === 'error' && p.line > 0), JSON.stringify(r.problems));
 });
@@ -376,12 +398,12 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
   const styles = (doc.xml.match(/<style /g) || []).length;
   assert.ok(styles > 1000, styles + " styles");
   at = performance.now();
-  const r = M.check(E, doc, 'qwerty', M.envJson(M.ENV), null);
+  const r = M.check(E, doc, 'qwerty', M.envJson(E, M.ENV), null);
   const checkMs = performance.now() - at;
   assert.deepEqual(r.problems.filter((p) => p.level === 'error'), []);
   at = performance.now();
   const edited = M.doc(F.setProp(doc.xml, 'key', 'radius', '9dp'), doc.files, doc.layouts);
-  assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(M.ENV), null).problems.filter((p) => p.level === 'error'), []);
+  assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(E, M.ENV), null).problems.filter((p) => p.level === 'error'), []);
   const editMs = performance.now() - at;
   // loose: tens of ms here; a slip to seconds per edit (a quadratic cascade) is what this catches, not a slow machine
   assert.ok(editMs < 5000, 'an edit and its check took ' + editMs.toFixed(0) + ' ms');
@@ -403,7 +425,7 @@ test('each example opens, passes the check before a save with no error, and save
   assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'mint']);
   for (const ex of examples) {
     const d = M.exampleDoc(ex);
-    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
+    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV));
     assert.deepEqual(errors, [], ex.id);
     // none carries layouts/ (§11: the 17 keys are the layout maker's example)
     assert.deepEqual(warnings.map((w) => w.message), [], ex.id);
@@ -413,7 +435,7 @@ test('each example opens, passes the check before a save with no error, and save
   }
   // 0.6.0's example, its k18.xml one of the user's layouts once imported since 0.6.1: said so, kept as it is
   const mint = oldMint();
-  const told = M.exportCheck(E, L, FORMAT, mint, E.layouts(), M.envJson(M.ENV));
+  const told = M.exportCheck(E, L, FORMAT, mint, E.layouts(), M.envJson(E, M.ENV));
   assert.deepEqual(told.errors, []);
   assert.deepEqual(told.warnings.map((w) => w.message), ['layouts/k18.xml：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）']);
   assert.ok(M.same(mint, (await M.open(E, L, FORMAT, M.save(L, mint).bytes)).doc));
@@ -434,7 +456,7 @@ test("Chinese punctuation is the app's file's, each key's first (a new install's
 
 test("no marks given: the preview draws the board's defaults as a new install shows them; marks given are drawn whole", () => {
   const d = M.fromBuiltin(E, 'material');
-  const env = M.envJson(M.ENV);
+  const env = M.envJson(E, M.ENV);
   // the scene's drawing (its text: a key's normal state draws its content first, then its marks); scene.json() has no marks
   const drawnMarks = (r) => r.scene.text().split('\nkey ').slice(1).flatMap((k) => {
     const normal = k.split('\n  normal\n')[1].split(/\n  (?! )/)[0].split('\n').map((l) => /^    (?:text "(.*)"|icon (\S+)) /.exec(l)).filter(Boolean);
@@ -454,21 +476,41 @@ test("no marks given: the preview draws the board's defaults as a new install sh
 
 test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {
   const d = M.fromBuiltin(E, 'material');
-  const keys = (doc) => M.check(E, doc, 'zhuyin', M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id);
+  const keys = (doc) => M.check(E, doc, 'zhuyin', M.envJson(E, M.ENV), null).scene.json().keys.map((k) => k.id);
   // 注音's, a board a pack still stands for: one key fewer drawn
   const fewer = E.layoutSource('zhuyin').replace(/<key id="q"[^>]*\/>/, '');
   assert.equal(keys(M.doc(d.xml, d.files, { 'zhuyin.xml': fewer })).length, keys(d).length - 1);
   const bad = M.doc(d.xml, d.files, { 'zhuyin.xml': '<keyboard' });
-  const r = M.check(E, bad, 'zhuyin', M.envJson(M.ENV), null);
+  const r = M.check(E, bad, 'zhuyin', M.envJson(E, M.ENV), null);
   assert.ok(r.problems.some((p) => p.level === 'warning' && p.message.startsWith('layouts/zhuyin.xml')), JSON.stringify(r.problems));
   assert.deepEqual(keys(bad), keys(d));
 });
 
+// review R26 F8414: the app reads a pack's fragments only where its board includes them (ThemePackLayouts.taken); the
+// pack's other boards, keyboards and not fragments, read as fragments failed every one
+test("a pack's two boards the app still reads are each drawn as the pack's, its fragment where they include it", () => {
+  const d = M.fromBuiltin(E, 'material');
+  const ids = (doc, board) => M.check(E, doc, board, M.envJson(E, M.ENV), null);
+  const zhuyin = E.layoutSource('zhuyin').replace(/<key id="q"[^>]*\/>/, '');
+  const nine = E.layoutSource('zhuyin-nine').replace('label="ㄅㄉㄚ"', 'label="ㄅ"');
+  const bottom = E.layoutSource('grouped-bottom').replace('id="enter"', 'id="go"');
+  const pack = M.doc(d.xml, d.files, { 'zhuyin.xml': zhuyin, 'zhuyin-nine.xml': nine, 'grouped-bottom.xml': bottom });
+  for (const board of ['zhuyin', 'zhuyin-nine']) {
+    const r = ids(pack, board);
+    assert.deepEqual(r.problems.filter((p) => p.level !== 'error' && p.message.startsWith('layouts/')), [], board + ': ' + JSON.stringify(r.problems));
+    const keys = r.scene.json().keys;
+    assert.ok(keys.some((k) => k.id === 'go') && !keys.some((k) => k.id === 'enter'), board + ': the pack\'s grouped-bottom');
+  }
+  assert.equal(ids(pack, 'zhuyin').scene.json().keys.length, ids(d, 'zhuyin').scene.json().keys.length - 1, 'the pack\'s 注音');
+  assert.match(ids(pack, 'zhuyin-nine').scene.text(), /ㄅ(?!ㄉ)/, 'the pack\'s 注音九键');
+  assert.doesNotMatch(ids(d, 'zhuyin-nine').scene.text(), /ㄅ(?!ㄉ)/);
+});
+
 test("a pack's board the user picks among their own layouts is not drawn for the app's, a warning says where it goes (061-custom-layout §11)", () => {
   const d = oldMint();
-  const keys = (doc) => M.check(E, doc, 'k18', M.envJson(M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
+  const keys = (doc) => M.check(E, doc, 'k18', M.envJson(E, M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
   assert.deepEqual(keys(d), keys(M.doc(d.xml)), "the app's 18 keys");
-  const { warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
+  const { warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV));
   assert.ok(warnings.some((p) => /^layouts\/k18\.xml：范围内的布局在 0\.6\.1 起要在布局列表里选/.test(p.message)), JSON.stringify(warnings));
   assert.ok(!warnings.some((p) => /App 没有这个键盘/.test(p.message)), JSON.stringify(warnings));
 });
@@ -478,7 +520,7 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
   const zhuyin = E.layoutSource('zhuyin');
   const swiped = zhuyin.replace('shortcut="zyfull/1"', 'shortcut="zyfull/1" swipe-up="commit:ㄅㄅ" alt="!"').replace('shortcut="zyfull/2"', 'shortcut="zyfull/2" double-tap="commit:ㄉ"');
   const lines = ['commit:ㄅㄅ', 'commit:ㄉ'].map((t) => swiped.split('\n').findIndex((l) => l.includes(t)) + 1);
-  const env = M.envJson(M.ENV);
+  const env = M.envJson(E, M.ENV);
   const r = M.check(E, M.doc(d.xml, d.files, { 'zhuyin.xml': swiped }), 'zhuyin', env, null);
   const notices = r.problems.filter((p) => p.level === 'warning' && /不起作用/.test(p.message));
   assert.equal(notices.length, 1, JSON.stringify(r.problems));
@@ -493,13 +535,13 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
 
 test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
   const d = M.fromBuiltin(E, 'material');
-  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV)), { errors: [], warnings: [] });
+  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV)), { errors: [], warnings: [] });
   // a file named and not brought: the app refuses it
   const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
-  assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
+  assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
   // a property of a later app: a warning, once though every board and version has it
   const later = M.doc(F.setProp(d.xml, 'key', 'sticker', 'none'));
-  const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(M.ENV));
+  const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(E, M.ENV));
   assert.deepEqual(w.errors, []);
   assert.equal(w.warnings.filter((p) => /sticker/.test(p.message)).length, 1, JSON.stringify(w.warnings));
 });
@@ -508,18 +550,18 @@ test("a pack's layouts the app refuses on import stop a save, by the app's own l
   const d = oldMint();
   const k18 = d.layouts['k18.xml'];
   const many = Object.fromEntries(Array.from({ length: FORMAT.limits.layouts + 1 }, (_, i) => ['k' + i + '.xml', k18]));
-  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(M.ENV)).errors.some((p) => /最多收/.test(p.message)));
+  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /最多收/.test(p.message)));
   const big = M.doc(d.xml, d.files, { 'k18.xml': k18 + '<!--' + 'x'.repeat(FORMAT.limits.layoutBytes) + '-->' });
-  assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
+  assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
   // the app's 注音 nine keys under another board's name: the app keeps its own 注音, so does the preview, with a warning
-  const keys = (doc, board) => M.check(E, doc, board, M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id).join();
+  const keys = (doc, board) => M.check(E, doc, board, M.envJson(E, M.ENV), null).scene.json().keys.map((k) => k.id).join();
   const wrong = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin-nine') });
-  const r = M.check(E, wrong, 'zhuyin', M.envJson(M.ENV), null);
+  const r = M.check(E, wrong, 'zhuyin', M.envJson(E, M.ENV), null);
   assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is zhuyin-nine）/.test(p.message)), JSON.stringify(r.problems));
   assert.equal(keys(wrong, 'zhuyin'), keys(M.doc(d.xml), 'zhuyin'));
   // and one with no backspace
   const noBack = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
-  assert.ok(M.check(E, noBack, 'zhuyin', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
+  assert.ok(M.check(E, noBack, 'zhuyin', M.envJson(E, M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
 });
 
 // an animated WebP's head (RIFF, VP8X with the animation flag, its frames of [ms] each), as the app's ThemeAssetLimitsTest makes one
@@ -539,7 +581,7 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
   assert.deepEqual([lim.animatedBytes, lim.animatedSide, lim.animatedFrames, lim.animatedFrameMs], [4194304, 720, 300, 50]);
   const check = (image, attrs = 'animated="true" ') => {
     const d = withPicture(M.fromBuiltin(E, 'nord'), image, 'webp');
-    return M.exportCheck(E, L, FORMAT, M.doc(d.xml.replace('<picture ', '<picture ' + attrs), d.files, d.layouts), ['qwerty'], M.envJson(M.ENV));
+    return M.exportCheck(E, L, FORMAT, M.doc(d.xml.replace('<picture ', '<picture ' + attrs), d.files, d.layouts), ['qwerty'], M.envJson(E, M.ENV));
   };
   const warned = (image) => {
     const { errors, warnings } = check(image);
@@ -564,7 +606,7 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
   assert.ok(check(animWebp(100, 100, [50]), 'animated="true" blur="4dp" ').warnings.some((p) => /not blurred/.test(p.message)));
   const d = withPicture(M.fromBuiltin(E, 'nord'), animWebp(100, 100, [50]), 'webp');
   const uncut = d.xml.replace('<picture ', '<picture animated="true" ').replace(/<cut\b[^>]*\/>/g, '');
-  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(uncut, d.files, d.layouts), ['qwerty'], M.envJson(M.ENV)).errors.some((p) => /needs a <cut>/.test(p.message)));
+  assert.ok(M.exportCheck(E, L, FORMAT, M.doc(uncut, d.files, d.layouts), ['qwerty'], M.envJson(E, M.ENV)).errors.some((p) => /needs a <cut>/.test(p.message)));
 });
 
 test('a sound the app would refuse cannot be saved; one it takes can (the engine\'s readSound, nothing of the page\'s)', () => {
@@ -617,10 +659,10 @@ test('a .layout opened for the preview: read as the app reads it, drawn with the
   // a byte-order mark is no matter
   assert.equal(M.openLayout(E, new Uint8Array([0xef, 0xbb, 0xbf, ...file])).id, 'k17');
   const d = M.doc(F.setProp(M.fromBuiltin(E, 'material').xml, 'k17/hjk', 'fill', '#ff0000'));
-  const r = M.check(E, d, own.layout, M.envJson(M.ENV), null);
+  const r = M.check(E, d, own.layout, M.envJson(E, M.ENV), null);
   assert.deepEqual(r.problems.filter((p) => p.level === 'error'), []);
   assert.ok(r.scene.json().keys.some((k) => k.id === 'hjk'), 'the layout drawn, not a board of the app');
-  const fill = E.sources(own.layout, r.theme, M.envJson(M.ENV), { widget: 'key', key: 'hjk' }).sources.find((s) => s.property === 'fill');
+  const fill = E.sources(own.layout, r.theme, M.envJson(E, M.ENV), { widget: 'key', key: 'hjk' }).sources.find((s) => s.property === 'fill');
   assert.equal(F.styles(d.xml)[fill.order].select, 'k17/hjk');
   // what it refuses, said
   assert.throws(() => M.openLayout(E, new Uint8Array([0x50, 0x4b, 3, 4])), /主题包/);

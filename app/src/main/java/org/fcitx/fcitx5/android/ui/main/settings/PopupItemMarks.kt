@@ -172,7 +172,7 @@ class PopupItemMarks(
          */
         fun convertible(ctx: Context): Set<String> {
             val app = ctx.applicationContext
-            val maps = PunctuationMaps(HostConfigDir.inUse(ConfigHome.DATA).dir, writable = false) { lang ->
+            val maps = PunctuationMaps(HostConfigDir.inUse(ConfigHome.DATA).dir) { lang ->
                 try {
                     app.assets.open("pkgdata/punctuation/punc.mb.$lang")
                 } catch (_: IOException) {

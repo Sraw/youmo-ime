@@ -45,7 +45,7 @@ class FakeHostApi : HostApi {
 
     /**
      * Engine requests in call order, e.g. `"select(2)"`, `"activateIme(pinyin)"`. Copy-on-write: a test
-     * polls it while a page's coroutine appends on another thread.
+     * polls it while a page's coroutine appends on another thread; so every list here the host's calls change.
      */
     val calls: MutableList<String> = CopyOnWriteArrayList()
 
@@ -89,7 +89,7 @@ class FakeHostApi : HostApi {
     }
 
     /** The user's words, as the engine would list them: kept as given, the pinyin not read. */
-    val userWords = ArrayList<UserWord>()
+    val userWords: MutableList<UserWord> = CopyOnWriteArrayList()
 
     override suspend fun userWords(): List<UserWord> = userWords.toList()
 
@@ -115,7 +115,7 @@ class FakeHostApi : HostApi {
 
     /** What [charCardOf] answers, by the character, and what it was asked. */
     val charCards = mutableMapOf<String, CharCard>()
-    val charCardsAsked = mutableListOf<Pair<String, CardReading?>>()
+    val charCardsAsked: MutableList<Pair<String, CardReading?>> = CopyOnWriteArrayList()
 
     /** Held till completed, if set: [charCardOf]'s answer late. */
     var charCardGate: CompletableDeferred<Unit>? = null
@@ -156,8 +156,12 @@ class FakeHostApi : HostApi {
     /** What the next report of a put-in asks ([voicePutIn]), confirmed as it is ([voiceConfirm]): none unless set here. */
     var voiceAsk: VoiceEdits.Ask? = null
 
+    /** Set, a report of a put-in ([voicePutIn]) answers once it is completed: what the field does meanwhile. */
+    var voicePutInHeld: CompletableDeferred<Unit>? = null
+
     override suspend fun voicePutIn(text: String): VoiceEdits.Reply {
         calls += "voicePutIn($text)"
+        voicePutInHeld?.await()
         return VoiceEdits.Reply(true, voiceAsk)
     }
 
@@ -186,7 +190,7 @@ class FakeHostApi : HostApi {
         userWords -= words.toSet()
     }
 
-    val englishWords = ArrayList<UserWord>()
+    val englishWords: MutableList<UserWord> = CopyOnWriteArrayList()
 
     override suspend fun englishWords(): List<UserWord> = englishWords.toList()
 
@@ -209,7 +213,7 @@ class FakeHostApi : HostApi {
     }
 
     /** What [importBatches] answers, as set by a test: nothing is imported here. */
-    val importBatches = ArrayList<ImportLayer.Batch>()
+    val importBatches: MutableList<ImportLayer.Batch> = CopyOnWriteArrayList()
 
     override suspend fun importBatches(): List<ImportLayer.Batch> = importBatches.toList()
 
@@ -287,7 +291,7 @@ class FakeHostApi : HostApi {
     }
 
     /** Each key sent with a tap's place, and the place ([TypingApi.sendKey]'s touch). */
-    val touches = ArrayList<Pair<String, Touch>>()
+    val touches: MutableList<Pair<String, Touch>> = CopyOnWriteArrayList()
 
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int, touch: Touch?) {
         slow()
@@ -388,7 +392,8 @@ class FakeHostApi : HostApi {
         return punctuationMaps[lang].orEmpty()
     }
 
-    override suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) {
+    /** [lang]'s table as fcitx would read it: a test's, as no app path saves one since 0.6.1 (HostApi has no setter). */
+    suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) {
         calls += "setPunctuationMap($lang)"
         punctuationMaps[lang] = entries.toList()
     }

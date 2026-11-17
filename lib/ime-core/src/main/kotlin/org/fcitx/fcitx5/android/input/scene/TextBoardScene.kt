@@ -113,17 +113,20 @@ object SceneMarks {
         charShortcuts: Boolean,
         names: Collection<String>,
         firsts: Map<String, String?> = emptyMap(),
-        now: Calendar = Calendar.getInstance(),
+        now: () -> Calendar = Calendar::getInstance,
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
         val user = HashSet<String>()
+        // one time for every mark of the board, read at the first that has variables (none: never), so two keys'
+        // `$minute` never show two minutes (R26 F8457)
+        val at by lazy(now)
         // the names as a layout reads them, one a key (`full/q`, `fn/space`): a slot stored by the same
         for (name in names) {
             for (up in listOf(true, false)) {
                 if (slots.isSet(name, up)) user += "$name:${if (up) "up" else "down"}"
                 marks["$name:${if (up) "up" else "down"}"] = when (val slot = slots.resolve(name, up)) {
                     SwipeSlot.First -> firsts[name]?.let(::symbol) ?: MarkContent.Empty
-                    else -> content(slot.shortcut, now) ?: MarkContent.Empty
+                    else -> content(slot.shortcut) { at } ?: MarkContent.Empty
                 }
             }
         }
@@ -149,11 +152,14 @@ object SceneMarks {
     /** A long press's first as its corner draws it: as a swipe's text is (KeyMarkText, two characters as seen and 「…」), one rule for both; typed and said whole. */
     fun symbol(first: String): MarkContent = MarkContent.Symbol(KeyMarkText.of(first))
 
-    /** [s] as its mark draws it, a text of variables filled in at [now] (none where that is nothing). */
-    fun content(s: KeyShortcut, now: Calendar): MarkContent? = when (s) {
+    /**
+     * [s] as its mark draws it, a text of variables filled in at [now] (none where that is nothing). [now] asked of a
+     * text of variables alone: a keyboard's marks are made at each state, some 30-70 slots, few of them such (R26 F8250).
+     */
+    fun content(s: KeyShortcut, now: () -> Calendar): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
         // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
-        is KeyShortcut.Text -> s.typed(now).takeIf { it.isNotEmpty() }?.let { MarkContent.Text(KeyMarkText.of(it), KeyMarkText.shorter(it)) }
+        is KeyShortcut.Text -> (if (s.variables) s.typed(now()) else s.text).takeIf { it.isNotEmpty() }?.let { MarkContent.Text(KeyMarkText.of(it), KeyMarkText.shorter(it)) }
         KeyShortcut.None -> null
     }
 

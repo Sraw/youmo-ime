@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes.touchesAt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,6 +33,18 @@ class NeighbourSlipTest {
             if (to(e) != to || !isSlip(e)) continue
             val m = matches(e)
             for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = slipCost(e, i)
+        }
+        return out
+    }
+
+    // how far each reading of [g] from [at] to [to], slip or not, goes against where the taps fell, as `sa:0.9`
+    // (one walk for the tests that weigh the letters; review F8299)
+    private fun SyllableGraph.againstOf(at: Int, to: Int): Map<String, Float> {
+        val out = HashMap<String, Float>()
+        for (e in edges(at)) {
+            if (to(e) != to) continue
+            val m = matches(e)
+            for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = against(e, i)
         }
         return out
     }
@@ -76,6 +89,21 @@ class NeighbourSlipTest {
         val n = QWERTY.around('g').first { it.char == 'h' }
         assertEquals(1f, n.nx, 1e-4f)
         assertEquals(0f, n.ny, 1e-4f)
+        // review F8167: x two rows high (rows="2") at the end of the second and third rows is in both, beside e and
+        // g, c above it; the rows it spans still above and below each other. By centres it was a row of its own,
+        // and e had neither x beside it nor g below
+        val box = { col: Int, row: Int, rows: Int -> KeyBoxes.Box(col * 40f, row * 50f, (col + 1) * 40f, (row + rows) * 50f) }
+        val tall = KeyBoxes(
+            mapOf(
+                'a' to box(0, 0, 1), 'b' to box(1, 0, 1), 'c' to box(2, 0, 1),
+                'd' to box(0, 1, 1), 'e' to box(1, 1, 1), 'x' to box(2, 1, 2),
+                'f' to box(0, 2, 1), 'g' to box(1, 2, 1),
+            ),
+        )
+        assertEquals("ceg".toSet(), tall.around('x').map { it.char }.toSet())
+        assertEquals("bdgx".toSet(), tall.around('e').map { it.char }.toSet())
+        assertEquals("efx".toSet(), tall.around('g').map { it.char }.toSet())
+        assertEquals("ace".toSet(), tall.around('b').map { it.char }.toSet())
     }
 
     @Test
@@ -148,10 +176,15 @@ class NeighbourSlipTest {
         assertTrue(g.hasOtherReadings)
         assertFalse(g.readsWhole(0, 5))
         assertFalse(g.withoutOtherReadings().anySlip())
+        // nor tells of other readings, so asked again is itself, not copied once more (review F8203)
+        assertFalse(g.withoutOtherReadings().hasOtherReadings)
+        assertSame(g.withoutOtherReadings(), g.withoutOtherReadings().withoutOtherReadings())
         val typed = PinyinSegmenter(neighbours = true).segment("nihao")
         assertTrue(typed.readsWhole(0, 5))
     }
 
+    // these and the keyboards' below have one shape (a tap toward a key reads a slip, in the middle none) but stay a test
+    // each: each is the JVM check of its own UAT case (@Uat), and their keyboards' setups differ (review F8394)
     @Test
     @Uat("SP-38")
     fun shuangpinReadsTwoKeysWithOneSlippedWhereTapped() {
@@ -250,16 +283,7 @@ class NeighbourSlipTest {
         val keys = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G18, neighbours = true)
         val fg = tap(G18, NineKeyLetters.G18.key('f'), dx = -0.45f)
         val typed = g18("f a")
-        fun against(taps: FloatArray?): Map<String, Float> {
-            val g = keys.segment(typed, taps, touchesAt(2, 0, fg))
-            val out = HashMap<String, Float>()
-            for (e in g.edges(0)) {
-                if (g.to(e) != 2) continue
-                val m = g.matches(e)
-                for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = g.against(e, i)
-            }
-            return out
-        }
+        fun against(taps: FloatArray?) = keys.segment(typed, taps, touchesAt(2, 0, fg)).againstOf(0, 2)
         val placed = against(floatArrayOf(0.05f, Float.NaN))
         assertTrue(placed.toString(), placed.getValue("sa") > 0.8f)
         assertEquals(0f, placed.getValue("da"), 1e-4f)
@@ -277,16 +301,7 @@ class NeighbourSlipTest {
     @Uat("PY-152")
     fun aKeyOfOneLetterHasItsPlaceForASlipFromItAlone() {
         val keys = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G18, neighbours = true)
-        fun against(typed: String, taps: FloatArray, touches: Array<Touch?>?): Map<String, Float> {
-            val g = keys.segment(typed, taps, touches)
-            val out = HashMap<String, Float>()
-            for (e in g.edges(0)) {
-                if (g.to(e) != 2) continue
-                val m = g.matches(e)
-                for (i in 0 until m.size) out[Syllables.spelling(m.syllable(i))] = g.against(e, i)
-            }
-            return out
-        }
+        fun against(typed: String, taps: FloatArray, touches: Array<Touch?>?) = keys.segment(typed, taps, touches).againstOf(0, 2)
         val a = tap(G18, NineKeyLetters.G18.key('a'), dx = 0.45f)
         val slipped = against(g18("a a"), floatArrayOf(0.95f, 0.5f), touchesAt(2, 0, a))
         assertTrue(slipped.toString(), slipped.getValue("da") > 0.8f)

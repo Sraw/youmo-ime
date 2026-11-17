@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.ScriptedEngine
+import org.fcitx.fcitx5.android.core.putPunctuationTable
 import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.host.ModuleConfigs
@@ -28,7 +29,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-/** The punctuation map in the Kotlin host's hands: a table saved whole (no page edits it since 0.6.1), then the keyboard's ， typed through it. */
+/** The punctuation map in the Kotlin host's hands: a table put where a user's own is read (nothing in the app writes one since 0.6.1), then the keyboard's ， typed through it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -67,8 +68,8 @@ class PunctuationMapUatTest {
     fun theCommaMappedToAnotherMarkTypesIt() {
         fcitx = startedHost(ScriptedEngine(home))
         runBlocking {
-            // a table saved whole (the built-in one is not among the test's assets)
-            fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", "")))
+            // a table of the user's (the built-in one is not among the test's assets)
+            fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", "")))
             assertEquals(listOf(PunctuationMapEntry(",", "、", "")), fcitx.punctuationMap("zh_CN"))
         }
         h = KeyboardHarness(host = fcitx)
@@ -89,8 +90,8 @@ class PunctuationMapUatTest {
             File(home, "config/" + ModuleConfigs.PUNCTUATION).apply { parentFile!!.mkdirs() }
                 .writeText("HalfWidthPuncAfterLetterOrNumber=" + (if (on) "True" else "False") + "\n")
             fcitx = startedHost(ScriptedEngine(home))
-            // the built-in table is not among the test's assets: its comma saved
-            runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "，", ""))) }
+            // the built-in table is not among the test's assets: its comma put in a user's table
+            runBlocking { fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "，", ""))) }
             h = KeyboardHarness(host = fcitx)
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
@@ -129,7 +130,7 @@ class PunctuationMapUatTest {
     @Test
     fun theFirstPressAtOnceShowsWhatItTypes() {
         fcitx = startedHost(ScriptedEngine(home))
-        runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+        runBlocking { fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", ""))) }
         h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()
@@ -142,12 +143,12 @@ class PunctuationMapUatTest {
         assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
     }
 
-    // a host that ran before saved its table, and stopped; a new one made, not started, and the keyboard up before it,
+    // a host that ran before read a user's table, and stopped; a new one made, not started, and the keyboard up before it,
     // with what the last run kept ([kept]) or none
     private fun keyboardBeforeTheHost(kept: Boolean): KotlinHost {
         PunctuationStartKeys.forget(appContext)
         startedHost(ScriptedEngine(home)).let { first ->
-            runBlocking { first.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+            runBlocking { first.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", ""))) }
             first.stop()
         }
         // the next process: what the last one kept, read from the file; or a first install's none
@@ -222,7 +223,7 @@ class PunctuationMapUatTest {
     @Test
     fun offThenOnTheCommaShowsWhatItTypesEachPress() {
         fcitx = startedHost(ScriptedEngine(home))
-        runBlocking { fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }
+        runBlocking { fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", ""))) }
         h = KeyboardHarness(host = fcitx)
         h.service.postFcitxJob { activate(1, "org.example.app") }
         h.start()

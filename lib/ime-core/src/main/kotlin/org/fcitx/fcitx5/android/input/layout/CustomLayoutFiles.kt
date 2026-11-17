@@ -140,13 +140,19 @@ object CustomLayoutFiles {
 
     /**
      * [text] of a [CONVERTED] record as its lines: blank ones and ones too long left out, each of a key once ([keyOf]:
-     * a pack's, a layout's) where it was first, as it was last (a pack imported again its new stamp, the old dropped;
-     * a layout written again its new digest); no more than [MAX_CONVERTED_LINES], nor than [MAX_CONVERTED_BYTES]
+     * a pack's, a layout's) as it was last and where it was last, the order the lines were written in (a pack imported
+     * again its new stamp, the old dropped; a layout written again its new digest, after those written since it was
+     * first: [Record.madeOf] takes the last, the limits drop the first); no more than [MAX_CONVERTED_LINES], nor than [MAX_CONVERTED_BYTES]
      * written a line each, the newest kept ([CURRENT] first, always).
      */
     fun convertedLines(text: String): List<String> {
         val last = LinkedHashMap<String, String>()
-        text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && it.length <= MAX_CONVERTED_LINE }.forEach { last[keyOf(it)] = it }
+        text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && it.length <= MAX_CONVERTED_LINE }.forEach {
+            // moved to the end, not left where the key first stood: R26 F8170
+            val key = keyOf(it)
+            last.remove(key)
+            last[key] = it
+        }
         val current = listOfNotNull(last.remove(CURRENT))
         var bytes = current.sumOf { it.encodeToByteArray().size + 1L }
         val kept = ArrayDeque<String>()

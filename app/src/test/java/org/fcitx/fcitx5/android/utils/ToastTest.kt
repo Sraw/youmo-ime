@@ -8,6 +8,7 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,32 +33,29 @@ class ToastTest {
 
     private fun latestCancelled() = shadowOf(ShadowToast.getLatestToast()).isCancelled
 
+    // shown, still there a millisecond before its time, put away at it: a text or a string resource, short or long
+    // (R26 F8182: one table, the resource's rows held to the millisecond before too)
     @Test
     @Uat("MN-26")
-    fun shortGoesAfterOneSecond() {
-        context.toast("已复制")
-        assertEquals("已复制", ShadowToast.getTextOfLatestToast())
-        idle(TOAST_SHORT_MS - 1L)
-        assertFalse(latestCancelled())
-        idle(1)
-        assertTrue(latestCancelled())
-    }
-
-    @Test
-    @Uat("MN-26")
-    fun longGoesAfterTwoSeconds() {
-        context.toast("没保存", Toast.LENGTH_LONG)
-        idle(TOAST_LONG_MS - 1L)
-        assertFalse(latestCancelled())
-        idle(1)
-        assertTrue(latestCancelled())
-    }
-
-    @Test
-    fun aStringResourceToastGoesTheSameWay() {
-        context.toast(android.R.string.ok)
-        idle(TOAST_SHORT_MS.toLong())
-        assertTrue(latestCancelled())
+    fun aToastGoesAfterItsTime() {
+        val ok = context.getString(android.R.string.ok)
+        assertRows(
+            *listOf(
+                Triple("text, short", { context.toast("已复制") } to "已复制", TOAST_SHORT_MS),
+                Triple("text, long", { context.toast("没保存", Toast.LENGTH_LONG) } to "没保存", TOAST_LONG_MS),
+                Triple("resource, short", { context.toast(android.R.string.ok) } to ok, TOAST_SHORT_MS),
+                Triple("resource, long", { context.toast(android.R.string.ok, Toast.LENGTH_LONG) } to ok, TOAST_LONG_MS),
+            ).map { (why, shown, ms) ->
+                why to {
+                    shown.first()
+                    assertEquals(shown.second, ShadowToast.getTextOfLatestToast())
+                    idle(ms - 1L)
+                    assertFalse("before ${ms - 1} ms", latestCancelled())
+                    idle(1)
+                    assertTrue("at $ms ms", latestCancelled())
+                }
+            }.toTypedArray(),
+        )
     }
 
     @Test

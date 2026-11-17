@@ -37,8 +37,9 @@ class RareCharsManagerTest {
             assertEquals(setOf(Level.EXT), made.groups)
             assertEquals("# youmo-rare-chars 1\non\t1\ngroups\tEXT\nallow\t\nblock\t\n", file.readText())
             assertEquals(made, RareCharsManager.load(file))
+            // the write done through a file beside it: nothing of it left (one row with the write it checks, R26 F8114)
+            assertEquals(listOf("rarechars.txt"), file.parentFile!!.list()!!.toList())
         },
-        "nothing beside the file left" to { assertEquals(listOf("rarechars.txt"), file.parentFile!!.list()!!.toList()) },
     )
 
     // the page and a user word's 「放行」 one after the other: each change laid over what the other wrote

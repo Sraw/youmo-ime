@@ -169,9 +169,6 @@ class StrokeUatTest {
         assertEquals(left, downs())
     }
 
-    // two thumbs overlapping: q drifting 14dp down as a lands, q lifted, then a: both typed, q first, no stroke
-    // (0.6.0 started a stroke at about 19dp down, and typed both)
-
     // the tap a short stroke is (GlideTouch.Route.TAP_KEY) goes to the engine with where the finger came down,
     // as a plain tap's does: a key tapped off-centre read as the one next to it (061-neighbour-correction)
     @Test
@@ -188,6 +185,9 @@ class StrokeUatTest {
         assertEquals(-10f, touch.dx * touch.widthDp, 1f)
         assertTrue(touch.near.toString(), touch.near('a') != null)
     }
+
+    // two thumbs overlapping: q drifting 14dp down as a lands, q lifted, then a: both typed, q first, no stroke
+    // (0.6.0 started a stroke at about 19dp down, and typed both)
     @Test
     @Uat("KB-101")
     fun aShortStrokeAsAnotherFingerLandsIsItsTapAndTheOtherKeyTypedToo() {

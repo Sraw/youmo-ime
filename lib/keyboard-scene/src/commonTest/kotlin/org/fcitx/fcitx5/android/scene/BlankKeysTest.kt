@@ -37,6 +37,18 @@ class BlankKeysTest {
         assertEquals(setOf("qwerty/enter", "other/enter"), blanks.map { "${it.board}/${it.key}" }.toSet())
     }
 
+    // two boards of one <keyboard id> (emoji.xml's and emoticon.xml's are both `emoji`): each asked, each its own keys,
+    // each told by the id it is drawn as (R26 F8415)
+    @Test
+    fun twoBoardsOfOneKeyboardIdAreEachAsked() {
+        val twin = BlankKeys.Board(LayoutReader.layout(Fixtures.qwertySource.replace(Regex("<key id=\"backspace\"[^>]*/>"), "")).ok(), id = "twin")
+        check(twin.layout.id == "qwerty")
+        fun found(t: Theme) = BlankKeys.find(t, listOf(qwerty, twin), limit = 100).map { "${it.board}/${it.key}" }.toSet()
+        assertEquals(setOf("qwerty/enter", "twin/enter"), found(theme("""<style select="*/enter" hidden="true"/>""")))
+        // the twin has no ⌫: its keys are its own, not those of the board asked before it of the same id
+        assertEquals(setOf("qwerty/backspace"), found(theme("""<style select="*/backspace" hidden="true"/>""")))
+    }
+
     @Test
     fun aBoardsOwnSceneIsAskedOnThatBoardAloneAndAlwaysThere() {
         // hidden on qwerty alone, its image qwerty's: the app draws qwerty with @keyboard=qwerty on, never the other

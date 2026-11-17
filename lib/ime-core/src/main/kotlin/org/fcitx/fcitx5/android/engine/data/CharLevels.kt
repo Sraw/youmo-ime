@@ -106,7 +106,7 @@ class CharLevelsBuilder {
             val cp = f[0].takeIf { it.startsWith("U+") }?.substring(2)?.toIntOrNull(HEX)
             val r = f[2].substringAfter(':', "").toIntOrNull()
             if (cp == null || r == null || !f[2].startsWith("2013:")) throw SourceException(source, n + 1, "not a kTGH line: $line")
-            if (rank.put(cp, r) != null) throw SourceException(source, n + 1, "U+${f[0]} twice")
+            if (rank.put(cp, r) != null) throw SourceException(source, n + 1, "${f[0]} twice")
         }
     }
 

@@ -149,13 +149,15 @@ class RareCharContractTest : EnginesFixture() {
 
     private fun some(held: String, of: List<String>) = assertTrue("$held not in $of", of.any { held in it })
 
-    // every way to type Chinese the fixture has, none offering [held]
-    private fun Engines.offersNone(held: String, pinyin: String, strokes: String, parts: String, code: String) {
+    // every way to type Chinese the fixture has, none offering [held]. The strokes' table has 大 and 龘 alone (a
+    // character of the basic plane alone): [strokes] null for 𤝰, a check there that held whatever is held (R26 F8502)
+    private fun Engines.offersNone(held: String, pinyin: String, strokes: String?, parts: String, code: String) {
         none(held, typed(PINYIN, pinyin))
         none(held, typed(SHUANGPIN, pinyin))
-        none(held, nineKeys("32"))
+        // the nine keys' digits of [pinyin], not those of da whatever it is (review F8351)
+        none(held, nineKeys(pinyin.map(NineKeyLetters.STANDARD::key).joinToString("")))
         none(held, glided(pinyin))
-        none(held, typed(PINYIN, "u$strokes"))
+        strokes?.let { none(held, typed(PINYIN, "u$it")) }
         none(held, typed(PINYIN, "u$parts"))
         none(held, typed(WUBI, code))
     }
@@ -195,83 +197,72 @@ class RareCharContractTest : EnginesFixture() {
 
     @Test
     fun theDefaultChoiceHoldsBackExtensionBAndTheOutOfTableAsChosen() = engines().use { e ->
-        assertRows(
-            "off: 𤝰 and 龘 offered, 你𤝰 as a glide's other reading" to {
-                some(ext, e.typed(PINYIN, "da"))
-                some(out, e.typed(PINYIN, "da"))
-                some(ext, e.glided("nihao"))
-            },
-            "turned on, 扩展 B alone: 𤝰 nowhere, 龘 and 大 still there" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tEXT\n"
-                e.reload()
-                e.offersNone(ext, "da", "hpn", "dalong", "ddda")
-                none(ext, e.glided("nihao"))
-                some(out, e.typed(PINYIN, "da"))
-                some("大", e.typed(PINYIN, "da"))
-            },
-            "OUT too: 龘 and the word with it nowhere, as an 打's prediction" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
-                e.reload()
-                e.offersNone(out, "da", "hpn", "dalong", "dddd")
-                none(out, e.typed(PINYIN, "dada"))
-                none(out, e.afterDa())
-            },
-            "a code whose one character is held commits nothing, offers nothing" to {
-                e.onEvent(WUBI, EngineEvent.RESET, 0)
-                val s = e.type(WUBI, "dddd")
-                assertEquals("", s.commit)
-                assertEquals(emptyList<String>(), e.texts(WUBI))
-            },
-            "龘 let through: back, the same engines" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\nallow\t$out\n"
-                e.reload()
-                some(out, e.typed(PINYIN, "da"))
-                some(out, e.glided("da"))
-                some(out, e.afterDa())
-                e.onEvent(WUBI, EngineEvent.RESET, 0)
-                assertEquals(out, e.type(WUBI, "dddd").commit)
-            },
-            "held again: gone again, keys and glide both" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
-                e.reload()
-                none(out, e.typed(PINYIN, "da"))
-                none(out, e.glided("da"))
-            },
-            "off: both back" to {
-                file = "# youmo-rare-chars 1\non\t0\ngroups\tOUT EXT\n"
-                e.reload()
-                some(out, e.typed(PINYIN, "da"))
-                some(ext, e.glided("da"))
-            },
-        )
+        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
+        // off: 𤝰 and 龘 offered, 你𤝰 as a glide's other reading
+        some(ext, e.typed(PINYIN, "da"))
+        some(out, e.typed(PINYIN, "da"))
+        some(ext, e.glided("nihao"))
+        // turned on, 扩展 B alone: 𤝰 nowhere, 龘 and 大 still there
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tEXT\n"
+        e.reload()
+        e.offersNone(ext, "da", null, "dalong", "ddda")
+        none(ext, e.glided("nihao"))
+        some(out, e.typed(PINYIN, "da"))
+        some("大", e.typed(PINYIN, "da"))
+        // OUT too: 龘 and the word with it nowhere, as an 打's prediction
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+        e.reload()
+        e.offersNone(out, "da", "hpn", "dalong", "dddd")
+        none(out, e.typed(PINYIN, "dada"))
+        none(out, e.afterDa())
+        // a code whose one character is held commits nothing, offers nothing
+        e.onEvent(WUBI, EngineEvent.RESET, 0)
+        val s = e.type(WUBI, "dddd")
+        assertEquals("", s.commit)
+        assertEquals(emptyList<String>(), e.texts(WUBI))
+        // 龘 let through: back, the same engines
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\nallow\t$out\n"
+        e.reload()
+        some(out, e.typed(PINYIN, "da"))
+        some(out, e.glided("da"))
+        some(out, e.afterDa())
+        e.onEvent(WUBI, EngineEvent.RESET, 0)
+        assertEquals(out, e.type(WUBI, "dddd").commit)
+        // held again: gone again, keys and glide both
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+        e.reload()
+        none(out, e.typed(PINYIN, "da"))
+        none(out, e.glided("da"))
+        // off: both back
+        file = "# youmo-rare-chars 1\non\t0\ngroups\tOUT EXT\n"
+        e.reload()
+        some(out, e.typed(PINYIN, "da"))
+        some(ext, e.glided("da"))
     }
 
     @Test
     fun aTablesGlideAndTheUsersOwnWordLeaveOutWhatIsHeld() = engines().use { e ->
         e.addWord("大$ext", "da da")
-        assertRows(
-            "off: 𤝰 a glide over 五笔's ddda offers, 龘 one over dfgh, and the user's 大𤝰 typed" to {
-                some(ext, e.tableGlided(WUBI, "ddda"))
-                some(out, e.tableGlided(WUBI, "dfgh"))
-                some("大$ext", e.typed(PINYIN, "dada"))
-            },
-            "on: neither, 大 still the glide's (its 重码 gone, committed alone)" to {
-                file = "# youmo-rare-chars 1\non\t1\n"
-                e.reload()
-                val glided = e.tableGlided(WUBI, "ddda")
-                none(ext, glided)
-                some("大", glided)
-                none(ext, e.typed(PINYIN, "dada"))
-            },
-            "the user's word kept, not offered" to { assertTrue(e.userWords().any { it.text == "大$ext" }) },
-            "OUT too: a glide over dfgh, 龘's code alone, goes on to the next code's 打, not to nothing" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
-                e.reload()
-                val glided = e.tableGlided(WUBI, "dfgh")
-                none(out, glided)
-                some("打", glided)
-            },
-        )
+        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
+        // off: 𤝰 a glide over 五笔's ddda offers, 龘 one over dfgh, and the user's 大𤝰 typed
+        some(ext, e.tableGlided(WUBI, "ddda"))
+        some(out, e.tableGlided(WUBI, "dfgh"))
+        some("大$ext", e.typed(PINYIN, "dada"))
+        // on: neither, 大 still the glide's (its 重码 gone, committed alone)
+        file = "# youmo-rare-chars 1\non\t1\n"
+        e.reload()
+        val glided = e.tableGlided(WUBI, "ddda")
+        none(ext, glided)
+        some("大", glided)
+        none(ext, e.typed(PINYIN, "dada"))
+        // the user's word kept, not offered
+        assertTrue(e.userWords().any { it.text == "大$ext" })
+        // OUT too: a glide over dfgh, 龘's code alone, goes on to the next code's 打, not to nothing
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+        e.reload()
+        val overDfgh = e.tableGlided(WUBI, "dfgh")
+        none(out, overDfgh)
+        some("打", overDfgh)
     }
 
     @Test
@@ -309,27 +300,24 @@ class RareCharContractTest : EnginesFixture() {
         e.reload()
         e.typed(PINYIN, "da")
         val made = e.rareHeldMade
-        assertRows(
-            "found once" to { assertEquals(1, made) },
-            "settings changed twice (each makes the sessions anew): not again" to {
-                e.settings = e.settings.copy(pageSize = 7)
-                e.typed(PINYIN, "da")
-                e.settings = e.settings.copy(pageSize = 8)
-                e.typed(PINYIN, "da")
-                assertEquals(1, e.rareHeldMade)
-            },
-            "reloaded, the same file: not again" to {
-                e.reload()
-                e.typed(PINYIN, "da")
-                assertEquals(1, e.rareHeldMade)
-            },
-            "the choice changed: again" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
-                e.reload()
-                e.typed(PINYIN, "da")
-                assertEquals(2, e.rareHeldMade)
-            },
-        )
+        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
+        // found once
+        assertEquals(1, made)
+        // settings changed twice (each makes the sessions anew): not again
+        e.settings = e.settings.copy(pageSize = 7)
+        e.typed(PINYIN, "da")
+        e.settings = e.settings.copy(pageSize = 8)
+        e.typed(PINYIN, "da")
+        assertEquals(1, e.rareHeldMade)
+        // reloaded, the same file: not again
+        e.reload()
+        e.typed(PINYIN, "da")
+        assertEquals(1, e.rareHeldMade)
+        // the choice changed: again
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+        e.reload()
+        e.typed(PINYIN, "da")
+        assertEquals(2, e.rareHeldMade)
     }
 
     // pinyin's 18 keys' codes for [letters], as the keyboard hands them
@@ -348,30 +336,26 @@ class RareCharContractTest : EnginesFixture() {
     @Test
     @Uat("WD-61")
     fun theChoiceOutlivesAKeyboardSwitch() = engines().use { e ->
-        assertRows(
-            "off: 龘 on each keyboard (the sessions made now, before it is on)" to {
-                some(out, e.nineKeys("32"))
-                some(out, e.typed(PINYIN, "da"))
-                some(out, e.keys18("da"))
-            },
-            "turned on while on the nine keys: 龘 and 𤝰 not there" to {
-                file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
-                e.reload()
-                none(out, e.nineKeys("32"))
-                none(ext, e.nineKeys("32"))
-            },
-            "the full keyboard next, no reload: not there either" to {
-                none(out, e.typed(PINYIN, "da"))
-                none(ext, e.typed(PINYIN, "da"))
-                some("大", e.typed(PINYIN, "da"))
-            },
-            "the 18 keys, then the nine keys again, then the full one: none" to {
-                none(out, e.keys18("da"))
-                none(out, e.nineKeys("32"))
-                none(out, e.typed(PINYIN, "da"))
-            },
-            "the words held found once for all the keyboards" to { assertEquals(1, e.rareHeldMade) },
-        )
+        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
+        // off: 龘 on each keyboard (the sessions made now, before it is on)
+        some(out, e.nineKeys("32"))
+        some(out, e.typed(PINYIN, "da"))
+        some(out, e.keys18("da"))
+        // turned on while on the nine keys: 龘 and 𤝰 not there
+        file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
+        e.reload()
+        none(out, e.nineKeys("32"))
+        none(ext, e.nineKeys("32"))
+        // the full keyboard next, no reload: not there either
+        none(out, e.typed(PINYIN, "da"))
+        none(ext, e.typed(PINYIN, "da"))
+        some("大", e.typed(PINYIN, "da"))
+        // the 18 keys, then the nine keys again, then the full one: none
+        none(out, e.keys18("da"))
+        none(out, e.nineKeys("32"))
+        none(out, e.typed(PINYIN, "da"))
+        // the words held found once for all the keyboards
+        assertEquals(1, e.rareHeldMade)
     }
 
     @Test

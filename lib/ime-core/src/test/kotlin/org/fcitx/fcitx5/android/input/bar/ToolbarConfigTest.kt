@@ -226,7 +226,8 @@ class ToolbarConfigTest {
         val many = Layout(listOf(More), listOf(Emoji, Handwriting, Voice, Hide, Undo, Redo, CursorMove, Clipboard, Theme, Habits))
         assertEquals(ToolbarConfig.Slots(13, 55, listOf(More), emptyList()), many.slots(715, 110))
         assertEquals("not laid out yet", ToolbarConfig.Slots(0, 110, layout.toolbar, emptyList()), layout.slots(0, 110))
-        // every slot's x: the menu key's 0, the right's the last ones', from the bar's end; the same open or shut
+        // the slots fill the bar, what is left over less than a pixel a slot: each as wide as it can be (R26 F8471; R26
+        // F8260: the slots' x, open or shut, are the view's, not Slots'; this checks only the widths)
         val s = layout.slots(1080, 110)
         assertTrue("all fit", s.count * s.cellPx <= 1080 && 1080 - s.count * s.cellPx < s.count)
     }

@@ -48,7 +48,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
-import java.io.IOException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
@@ -136,16 +135,14 @@ class KotlinHostTest {
     fun anInputMethodWithNoPageHasNoOptionsAndALanguageWithNoMapNoPunctuation() = runBlocking {
         assertNull(fcitx.imOptions("keyboard-xx"))
         assertEquals(emptyList<PunctuationMapEntry>(), fcitx.punctuationMap("ja_JP"))
-        fcitx.setPunctuationMap("ja_JP", listOf(PunctuationMapEntry(",", "、", "")))
-        assertEquals(emptyList<PunctuationMapEntry>(), fcitx.punctuationMap("ja_JP"))
     }
 
     // the keyboard's punctuation popups read it so (PunctuationManager.load); the built-in table is an
-    // app asset, not on the JVM's classpath: a save gives one (no page saves since 0.6.1, tests do)
+    // app asset, not on the JVM's classpath: a user's file there is what is read (none is saved since 0.6.1)
     @Test
-    fun thePunctuationMapSavedReadsBack() = runBlocking {
+    fun theUsersTableIsTheMapRead() = runBlocking {
         val table = listOf(PunctuationMapEntry("(", "（", ""), PunctuationMapEntry(",", "，", ""))
-        fcitx.setPunctuationMap(ZH_CN, table)
+        fcitx.putPunctuationTable(home, table)
         assertEquals("（", fcitx.punctuationMap(ZH_CN).first { it.key == "(" }.mapping)
     }
 
@@ -185,8 +182,9 @@ class KotlinHostTest {
 
     /**
      * A file the host keeps that it cannot read this run: [file] holds [text],
-     * the user is told [notice], [shown] is what the run has instead, and what [edit] saves from it
-     * leaves the file as it was; [after] checks anything more once the file reads again.
+     * the user is told [notice], [shown] is what the run has instead, and what [edit] saves from it (a row whose file
+     * has no setter to save through leaves it out) leaves the file as it was; [after] checks anything more once the
+     * file reads again.
      */
     private class Unreadable(
         val why: String,
@@ -194,7 +192,7 @@ class KotlinHostTest {
         val text: String,
         val notice: Int,
         val shown: suspend KotlinHost.() -> Unit,
-        val edit: suspend KotlinHost.() -> Unit,
+        val edit: suspend KotlinHost.() -> Unit = {},
         val after: suspend () -> Unit = {},
     )
 
@@ -228,10 +226,9 @@ class KotlinHostTest {
                 },
             ),
             Unreadable(
-                "an edited punctuation table: the built-in one typed with (an app asset not on the JVM's classpath: none here), the edit page's save not written over it",
+                "an edited punctuation table: the built-in one typed with (an app asset not on the JVM's classpath: none here), the file kept as it is",
                 { File(home, "data/punctuation/punc.mb.zh_CN") }, ", 、\n", R.string.user_data_unreadable,
                 shown = { assertEquals(emptyList<PunctuationMapEntry>(), punctuationMap("zh_CN")) },
-                edit = { assertTrue(runCatching { setPunctuationMap("zh_CN", listOf(PunctuationMapEntry("(", "（", ""))) }.exceptionOrNull() is IOException) },
             ),
         ),
         { it.why },
@@ -288,20 +285,15 @@ class KotlinHostTest {
                 },
             ),
             NotSettled(
-                "fcitx's data: the punctuation table saved is not written",
+                "fcitx's data: the user's punctuation table there read",
                 notice = R.string.user_data_unreadable,
-                prepare = {},
+                prepare = { File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(", 、\n") },
                 side = { scripted ->
                     object : KotlinHost.EngineSide by scripted {
                         override fun data() = HostConfig(File(home, "data"), writable = false, ConfigHome.Problem.EXTERNAL_AWAY)
                     }
                 },
-                check = {
-                    assertTrue(runCatching { setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", ""))) }.exceptionOrNull() is IOException)
-                    // refused, not used either
-                    assertEquals(emptyList<PunctuationMapEntry>(), punctuationMap("zh_CN"))
-                    assertFalse(File(home, "data/punctuation").exists())
-                },
+                check = { assertEquals(listOf(PunctuationMapEntry(",", "、", "")), punctuationMap("zh_CN")) },
             ),
         ),
         { it.why },
@@ -433,7 +425,7 @@ class KotlinHostTest {
     fun reloadConfigSendsTheStatusOnce() = runBlocking {
         fcitx.activate(1, "org.example")
         fcitx.focus(true)
-        fcitx.setPunctuationMap("zh_CN", listOf(PunctuationMapEntry(",", "、", "")))
+        fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", "")))
         fcitx.isEmpty()
         idle()
         val before = events.list().count { it is HostEvent.StatusArea }

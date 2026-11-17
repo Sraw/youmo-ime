@@ -17,7 +17,7 @@ import org.junit.Test
 
 /**
  * The keyboard reads the punctuation table on every focus: [PunctuationManager] keeps what it read
- * over JNI until the table is saved or fcitx reads its tables again.
+ * over JNI until fcitx reads its tables again (no table is saved since 0.6.1: R26 F8279).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PunctuationManagerTest {
@@ -46,15 +46,12 @@ class PunctuationManagerTest {
     }
 
     @Test
-    fun aTableReadIsKeptTillItIsSaved() = runTest {
+    fun aTableReadIsKept() = runTest {
         val fcitx = Tables()
         fcitx.change("zh_CN", comma)
         assertEquals(comma, PunctuationManager.load(fcitx, "zh_CN"))
         fcitx.change("zh_CN", both)
         assertEquals("kept, not read again", comma, PunctuationManager.load(fcitx, "zh_CN"))
-
-        PunctuationManager.save(fcitx, "zh_CN", both)
-        assertEquals(both, PunctuationManager.load(fcitx, "zh_CN"))
     }
 
     @Test
@@ -69,7 +66,7 @@ class PunctuationManagerTest {
     }
 
     @Test
-    fun aReadASaveOverlapsIsNotKept() = runTest {
+    fun aReadAForgetOverlapsIsNotKept() = runTest {
         val fcitx = Tables()
         fcitx.change("zh_CN", comma)
         val gate = CompletableDeferred<Unit>().also { fcitx.held = it }
@@ -77,8 +74,9 @@ class PunctuationManagerTest {
         runCurrent()
         fcitx.held = null
 
-        // the save lands while the read, holding the table from before it, is on its way back
-        PunctuationManager.save(fcitx, "zh_CN", both)
+        // fcitx reads its tables anew while the read, holding the table from before, is on its way back
+        fcitx.change("zh_CN", both)
+        PunctuationManager.forget()
         gate.complete(Unit)
         assertEquals("what it read", comma, read.await())
         assertEquals(both, PunctuationManager.load(fcitx, "zh_CN"))

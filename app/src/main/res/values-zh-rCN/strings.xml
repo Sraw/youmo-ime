@@ -668,10 +668,11 @@
     <string name="keyboard_custom">自定义布局</string>
     <string name="keyboard_custom_named">%1$s（自定义）</string>
     <string name="keyboard_custom_unread">%1$s（读不出，暂用 %2$s）</string>
+    <string name="keyboard_custom_unusable">%1$s（这里用不了，暂用 %2$s）</string>
     <string name="im_pinyin_keys18">拼音 · 18 键</string>
     <string name="im_shuangpin_keys14">双拼 · 14 键</string>
     <string name="learning_kind_keys18">拼音 18 键</string>
-    <string name="learning_kind_keys_own">拼音 主题键盘</string>
+    <string name="learning_kind_keys_own">拼音 自己的分组</string>
     <string name="learning_kind_shuangpin_keys14">双拼 14 键</string>
     <string name="english_keyboard">键盘</string>
     <string name="english_keyboard_summary">屏幕上打英文用的键盘。实体键盘仍按字母打。</string>
@@ -717,8 +718,6 @@
     <string name="im_candidate_reading_off">关闭</string>
     <string name="im_candidate_reading_pinyin">拼音</string>
     <string name="im_candidate_reading_zhuyin">注音符号</string>
-    <string name="hw_reading_key_on">%1$s，已开</string>
-    <string name="hw_reading_key_off">%1$s，已关</string>
     <string name="char_card_readings">读音</string>
     <string name="char_card_radical">部首</string>
     <string name="char_card_strokes">%1$d 画</string>
@@ -1083,7 +1082,7 @@
     <string name="home_input_methods_summary">添加、排序，每种输入法自己的选项</string>
     <string name="home_shared_input_summary">各输入法共用：联想、表情、滑行、模糊音</string>
     <string name="home_words_summary">你的词、导入的词库、自定义短语</string>
-    <string name="home_look_summary">主题、键盘大小，单手 / 分体 / 悬浮</string>
+    <string name="home_look_summary">主题、布局、键盘大小，单手 / 分体 / 悬浮</string>
     <string name="home_keys_summary">长按、划动、空格键、键上的字符</string>
     <string name="home_sound_summary">按键音、振动</string>
     <string name="home_clipboard_summary">剪贴板历史、表情肤色</string>
@@ -1367,6 +1366,7 @@
     <string name="shortcut_card_count">%1$d/%2$d</string>
     <string name="long_press_card">长按菜单</string>
     <string name="long_press_card_summary">首选 %1$s · 共 %2$d 个</string>
+    <string name="long_press_card_summary_no_first">无首选 · 共 %1$d 个</string>
     <string name="long_press_card_summary_none">长按不弹出字符</string>
     <string name="long_press_card_read_only">只读</string>
     <string name="long_press_card_line">点一个字符选中它，再调整</string>

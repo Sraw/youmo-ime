@@ -216,6 +216,9 @@ class KeyboardCanvasView(
     /** The keys of the scene drawn last ([current]): not made again for what changed since (glide typing's, strokes'). */
     val shownKeys: List<KeyNode> get() = current?.keys.orEmpty()
 
+    /** The scene drawn last ([current]), as [shownKeys]: what a press reads, not one made anew for a change not drawn yet. */
+    val shownScene: Scene? get() = current
+
     /** The scene as the keyboard is now: made again after [invalidateScene], or at another size (drawing, and tests). */
     @get:VisibleForTesting
     val scene: Scene?

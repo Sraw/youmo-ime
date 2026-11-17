@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
@@ -136,8 +137,9 @@ class EngineOptionsTest {
         assertEquals(2, EngineOptions().toSettings().strokeSingles)
         assertEquals(0, EngineOptions().apply { load("StrokeSingles=0\n") }.toSettings().strokeSingles)
         assertEquals(5, EngineOptions().apply { load("StrokeSingles=5\n") }.toSettings().strokeSingles)
-        for (bad in listOf("9", "x", "-1", "")) {
-            assertEquals(bad, 2, EngineOptions().apply { load("StrokeSingles=$bad\n") }.toSettings().strokeSingles)
+        val bad = listOf("9" to "above 5", "x" to "not a number", "-1" to "below 0", "" to "empty")
+        assertRows(bad, { (value, why) -> "StrokeSingles=$value, $why: 2" }) { (value, _) ->
+            assertEquals(2, EngineOptions().apply { load("StrokeSingles=$value\n") }.toSettings().strokeSingles)
         }
     }
 

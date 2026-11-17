@@ -10,6 +10,8 @@ import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.os.Vibrator
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.widget.TextView
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -32,6 +34,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.learning.UndoChip
+import org.fcitx.fcitx5.android.scene.Op
+import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -126,33 +130,36 @@ class FloatingUatTest {
         h.close()
         // 横屏 its own place (061-floating-resize §2.6, the user's ②): never placed there, the one place 0.6.0 kept, here
         // none, so the bottom; left at the top right there, the top left is 竖屏's still
-        RuntimeEnvironment.setQualifiers("+land")
-        KeyboardHarness().use { k ->
-            k.start()
-            k.after(1000)
-            val w = k.service.resources.displayMetrics.widthPixels
-            val ht = k.service.resources.displayMetrics.heightPixels
-            val box = k.box(k.board)
-            assertTrue("+land, never placed: at the bottom, $box in $w x $ht", box.left > w * 0.1 && box.bottom > ht * 0.7)
-            k.drag(KeyboardHarness.find<FloatingHandle>(k.inputView)!!, w.toFloat(), 0f)
-            k.after(1000)
-            val now = k.box(k.board)
-            assertTrue("+land, left at the top right: $now in $w x $ht", now.right > w * 0.9 && now.top < ht * 0.2)
+        try {
+            RuntimeEnvironment.setQualifiers("+land")
+            KeyboardHarness().use { k ->
+                k.start()
+                k.after(1000)
+                val w = k.service.resources.displayMetrics.widthPixels
+                val ht = k.service.resources.displayMetrics.heightPixels
+                val box = k.box(k.board)
+                assertTrue("+land, never placed: at the bottom, $box in $w x $ht", box.left > w * 0.1 && box.bottom > ht * 0.7)
+                k.drag(KeyboardHarness.find<FloatingHandle>(k.inputView)!!, w.toFloat(), 0f)
+                k.after(1000)
+                val now = k.box(k.board)
+                assertTrue("+land, left at the top right: $now in $w x $ht", now.right > w * 0.9 && now.top < ht * 0.2)
+            }
+            RuntimeEnvironment.setQualifiers("+port")
+            KeyboardHarness().use { k ->
+                k.start()
+                k.inTheCorner("+port")
+            }
+            RuntimeEnvironment.setQualifiers("+land")
+            KeyboardHarness().use { k ->
+                k.start()
+                k.after(1000)
+                val w = k.service.resources.displayMetrics.widthPixels
+                val now = k.box(k.board)
+                assertTrue("+land again, at its own top right: $now in $w", now.right > w * 0.9 && now.top < k.service.resources.displayMetrics.heightPixels * 0.2)
+            }
+        } finally {
+            RuntimeEnvironment.setQualifiers("+port")
         }
-        RuntimeEnvironment.setQualifiers("+port")
-        KeyboardHarness().use { k ->
-            k.start()
-            k.inTheCorner("+port")
-        }
-        RuntimeEnvironment.setQualifiers("+land")
-        KeyboardHarness().use { k ->
-            k.start()
-            k.after(1000)
-            val w = k.service.resources.displayMetrics.widthPixels
-            val now = k.box(k.board)
-            assertTrue("+land again, at its own top right: $now in $w", now.right > w * 0.9 && now.top < k.service.resources.displayMetrics.heightPixels * 0.2)
-        }
-        RuntimeEnvironment.setQualifiers("+port")
     }
 
     // the floating keyboard is cut to its outline as the device draws it (a software draw does not
@@ -165,8 +172,8 @@ class FloatingUatTest {
     // the keyboard's background as its scene draws it behind the keys (`@floating keyboard`'s radius): its corners
     private fun drawnRadius(k: KeyboardHarness): Double {
         val scene = checkNotNull(KeyboardHarness.boardCanvas(k.inputView)?.scene)
-        val back = scene.base.filterIsInstance<org.fcitx.fcitx5.android.scene.Op.Fill>().first()
-        return ((back.shape as org.fcitx.fcitx5.android.scene.Shape.Rect).radii).max()
+        val back = scene.base.filterIsInstance<Op.Fill>().first()
+        return ((back.shape as Shape.Rect).radii).max()
     }
 
     @Test
@@ -209,7 +216,7 @@ class FloatingUatTest {
         h.relayout()
         assertFalse(floating)
         assertFalse(floatingNow())
-        TestStyles.set(KeyboardStyle.FLOATING)
+        prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         h.after(1000)
         h.relayout()
@@ -256,7 +263,7 @@ class FloatingUatTest {
         h.close()
         prefs.setStyle(KeyboardStyle.FLOATING)
         val on = size()
-        TestStyles.clear()
+        prefs.setStyleDefault()
         assertEquals(on, size(), 0.01f)
     }
 
@@ -629,8 +636,8 @@ class FloatingUatTest {
     @Test
     @Uat("TB-63")
     fun talkBacksBiggerAndSmallerATenthEachAndSaidAtTheLimit() {
-        val am = h.service.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
-        org.robolectric.Shadows.shadowOf(am).setEnabled(true)
+        val am = h.service.getSystemService(AccessibilityManager::class.java)
+        shadowOf(am).setEnabled(true)
         prefs.setStyle(KeyboardStyle.FLOATING)
         // where it first floats, at the bottom: bigger all the same (it grows up there)
         h.start()
@@ -643,8 +650,8 @@ class FloatingUatTest {
         }
         val first = h.widthDp()
         val bottom = h.box(h.keyboard).bottom
-        fun said() = org.robolectric.Shadows.shadowOf(am).sentAccessibilityEvents
-            .filter { it.eventType == android.view.accessibility.AccessibilityEvent.TYPE_ANNOUNCEMENT }.map { it.text.joinToString() }
+        fun said() = shadowOf(am).sentAccessibilityEvents
+            .filter { it.eventType == AccessibilityEvent.TYPE_ANNOUNCEMENT }.map { it.text.joinToString() }
         assertTrue(act(R.string.floating_keyboard_bigger))
         assertEquals("a tenth bigger from the bottom", first * 1.1f, h.widthDp(), 1.5f)
         assertEquals("still at the bottom", bottom, h.box(h.keyboard).bottom)

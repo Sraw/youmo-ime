@@ -360,7 +360,9 @@ class PinyinDecoderTest {
     @Test
     fun buildingOnTheLastDecodeChangesNothingInLetters() {
         // few pieces, so that ren, m, a come one after another from the start
-        buildsOnTheLast(PinyinSegmenter(), listOf("ren", "m", "a", "re", "n", "i"), Random(19), steps = 6000, atLeast = 411) // a quarter of the 1645 it goes on
+        // it goes on a good part of the steps, not a count one build and seed made (review F8350: 411, a quarter of 1645)
+        val steps = 6000
+        buildsOnTheLast(PinyinSegmenter(), listOf("ren", "m", "a", "re", "n", "i"), Random(19), steps = steps, atLeast = steps / 10)
     }
 
     // the nine keys with 简拼: a key is three or four letters, each a syllable begun, at every position
@@ -368,7 +370,9 @@ class PinyinDecoderTest {
     fun buildingOnTheLastDecodeChangesNothingOnTheNineKeys() {
         // 64 ni, 426 hao, 62 ma, 924 zai, 5426 jian, 96 wo, 94664 zhong, 482 hua, 736 ren, 6466 min and a key, 73 re, and keys alone
         val pieces = listOf("64", "426", "62", "924", "5426", "96", "94664", "482", "736", "6466", "73", "6", "4", "9", "5", "2", "7", "'")
-        buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), atLeast = 168) // a quarter of the 672 it goes on
+        // a tenth of the steps, as letters' (review F8350: 168, a quarter of 672)
+        val steps = 3000
+        buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), steps = steps, atLeast = steps / 10)
     }
 
     /**

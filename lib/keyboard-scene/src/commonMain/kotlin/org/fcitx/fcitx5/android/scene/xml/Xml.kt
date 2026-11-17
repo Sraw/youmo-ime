@@ -46,6 +46,14 @@ object Xml {
     const val MAX_CHARS = 1_000_000
     const val MAX_DEPTH = 32
 
+    /**
+     * Whether [c] is a character of XML 1.0 (§2.2): not a C0 control but tab, LF and CR, nor NUL, U+FFFE or U+FFFF. A
+     * value is only ever of these, whichever way it was written (a control or U+FFFF in a name the page and the app
+     * would show): one written as it is dropped (a file 0.6.0 wrote or read with one still reads, R26 F8187), a
+     * reference to one refused; the writers leave them out.
+     */
+    fun allows(c: Char): Boolean = !(c < ' ' && c != '\t' && c != '\n' && c != '\r' || c == '\uFFFE' || c == '\uFFFF')
+
     /** The root element of [source], or why not; [offsets]: each element with its [XmlOffsets]. */
     fun parse(source: String, offsets: Boolean = false): Parsed<XmlElement> =
         if (source.length > MAX_CHARS) {
@@ -225,12 +233,11 @@ private class Reader(private val s: String, private val offsets: Boolean) {
 
     private fun chars(end: Char, attribute: Boolean = false): String {
         val start = i
-        while (i < s.length && !plainEnds(s[i], end, attribute)) {
+        while (i < s.length && !plainEnds(s[i], end, attribute) && Xml.allows(s[i])) {
             if (s[i] == '<') fail("'<' in a value")
-            if (notXml(s[i])) fail("a character XML does not allow")
             advance(1)
         }
-        // no reference in it (most values): the text as it is, not copied a character at a time
+        // no reference or character to drop in it (most values): the text as it is, not copied a character at a time
         if (i >= s.length || s[i] == end) return s.substring(start, i)
         val b = StringBuilder().appendRange(s, start, i)
         while (i < s.length && s[i] != end) {
@@ -241,18 +248,13 @@ private class Reader(private val s: String, private val offsets: Boolean) {
                     b.append(' ')
                     advance(if (c == '\r' && s.getOrNull(i + 1) == '\n') 2 else 1)
                 } else {
-                    if (notXml(c)) fail("a character XML does not allow")
-                    b.append(c)
+                    if (Xml.allows(c)) b.append(c)
                     advance(1)
                 }
             }
         }
         return b.toString()
     }
-
-    // written as it is, what a reference to it is refused for (NUL too): a value of the file is only ever XML's
-    // characters, whichever way it was written (a control or U+FFFF in a name the page and the app would show)
-    private fun notXml(c: Char): Boolean = c.code == 0 || c.code in NOT_XML
 
     private fun reference(): String {
         val end = s.indexOf(';', i)
@@ -269,7 +271,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
 
     private fun codePoint(c: Int?): String {
         if (c == null || c !in 1..MAX_CODE_POINT) fail("a character reference to no character")
-        if (c in SURROGATES || c in NOT_XML) fail("a character reference to no character")
+        if (c in SURROGATES || c < SUPPLEMENTARY && !Xml.allows(c.toChar())) fail("a character reference to no character")
         if (c < SUPPLEMENTARY) return c.toChar().toString()
         val v = c - SUPPLEMENTARY
         return charArrayOf((HIGH_SURROGATE + (v shr TEN_BITS)).toChar(), (LOW_SURROGATE + (v and LOW_MASK)).toChar()).concatToString()
@@ -277,9 +279,6 @@ private class Reader(private val s: String, private val offsets: Boolean) {
 
     private companion object {
         const val BREAKS = "\t\n\r"
-
-        // XML 1.0 §2.2: the C0 controls but tab, LF and CR, and U+FFFE and U+FFFF, are not characters
-        val NOT_XML = ((0x1..0x8) + listOf(0xB, 0xC) + (0xE..0x1F) + listOf(0xFFFE, 0xFFFF)).toSet()
 
         val PREDEFINED = mapOf("lt" to "<", "gt" to ">", "amp" to "&", "quot" to "\"", "apos" to "'")
         const val MAX_REFERENCE = 12

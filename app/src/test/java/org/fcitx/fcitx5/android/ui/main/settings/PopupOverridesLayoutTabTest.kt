@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -33,6 +34,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import java.io.File
 
@@ -61,7 +63,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
 
     @After
     fun asItWas() {
-        CustomKeyboards.dir = dirWas
+        forgetTheTestsLayouts(dirWas)
         EngineState.shuangpinScheme = schemeWas
         SceneBoard.forgetScenes()
     }
@@ -146,6 +148,57 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         assertFalse(texts().toString(), "我的 17 键" in texts())
         val full = KeyboardHarness.all(st.activity.window.decorView).first { it.tag == "view:keys/board/${KeyShortcutPages.Full.form}" }
         assertTrue(full.isSelected)
+    }
+
+    // a key of a name of its own two layouts in use have (the 17 keys' 哈, a 26 keys saved from it keeping its name): 共用,
+    // and edited on its layout, its default its own (嘿), not on the app's board, which has no such key (R26 F8160: the
+    // editor opened as a key with no long press, its OK saving a list without the layout's own on both)
+    @Test
+    fun aKeyOfItsOwnNameTwoLayoutsShareIsEditedOnItsLayout() {
+        k17()
+        val qwerty = BuiltInLayouts(st.activity).text("qwerty")!!.replaceFirst("id=\"qwerty\" name=\"26 键\"", "id=\"my-qw\" name=\"我的 26 键\" based-on=\"qwerty\"")
+            .replaceFirst("  <row>\n    <key id=\"symbols\"", "  <row><key id=\"ha\" label=\"哈\" send=\"commit:哈\" shortcut=\"my-k17/ha\"><popup from=\"list\"><item text=\"嘿\"/></popup></key></row>\n  <row>\n    <key id=\"symbols\"")
+        assertTrue("my-k17/ha" in qwerty)
+        File(dir, "my-qw.xml").writeText(qwerty)
+        CustomKeyboards.forget("my-qw")
+        assertTrue(CustomKeyboards.choice("my-qw")!!.drawn)
+        // put back after (PrefsRule)
+        prefs.set(keyboard.pinyinKeyboard, keyboard.pinyinKeyboard.getValue())
+        prefs.set(keyboard.pinyinKeyboardLayout, "")
+        prefs.set(keyboard.englishKeyboard, keyboard.englishKeyboard.getValue())
+        prefs.set(keyboard.englishKeyboardLayout, "")
+        keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-k17")
+        keyboard.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, "my-qw")
+        openPage()
+        clickName("我的 17 键")
+        val shared = st.s(R.string.shortcut_shared_tag)
+        assertTrue(keyCalled("哈").contentDescription.toString(), keyCalled("哈").contentDescription.endsWith(", $shared"))
+        val ha = dialogOf("哈")
+        val items = KeyboardHarness.all(ha.window!!.decorView).mapNotNull { it.contentDescription?.toString() }.toList()
+        assertTrue(items.toString(), "嘿" in items)
+        ha.dismiss()
+        st.idle()
+    }
+
+    // a name that breaks makes every card's name two lines high, the app's short ones too, so the cards of a row are
+    // as high as one another (R26 F8159: the rule, not ChoiceCard's setter). Native graphics: the names are measured,
+    // and the legacy Paint's measure is a character a pixel, no name ever breaking
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aLongNameMakesEveryCardTwoLinesHigh() {
+        val long = "我的十七键布局名字长得一行写不下的那种样子"
+        assertTrue(long.length <= 24)
+        k17 { it.replace("name=\"我的 17 键\"", "name=\"$long\"") }
+        prefs.set(keyboard.pinyinKeyboard, keyboard.pinyinKeyboard.getValue())
+        prefs.set(keyboard.pinyinKeyboardLayout, "")
+        keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-k17")
+        openPage()
+        // the cards' names: the layout's, and one of the app's
+        val cells = KeyboardHarness.all(st.activity.window.decorView).filter { it.tag?.toString()?.startsWith("view:keys/board/") == true }
+        val names = cells.flatMap { KeyboardHarness.all(it).filterIsInstance<TextView>() }
+            .filter { it.text.toString() == long || it.text.toString() == st.s(R.string.shortcut_page_g18) }.toList()
+        assertEquals(names.map { it.text }.toString(), 2, names.size)
+        assertTrue(names.all { it.minLines == 2 })
     }
 
     @Test

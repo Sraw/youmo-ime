@@ -391,7 +391,8 @@ class EditingSessionCodeTest {
             e.calls.clear()
             s.backspace(EditorTraits())
         }
-        val backspace = Rig("AB").apply { type("n", "ni"); s.backspace(EditorTraits()) }
+        var deletedHere = true
+        val backspace = Rig("AB").apply { type("n", "ni"); deletedHere = s.backspace(EditorTraits()) }
         assertRows(
             "a commit replaces it" to { assertEquals("AB你好", committed.e.text); assertFalse(committed.s.codeInField) },
             "the code emptied (its last letter deleted): taken away, proven" to { assertEquals("AB", cleared.e.text); assertFalse(cleared.s.codeInField) },
@@ -405,7 +406,10 @@ class EditingSessionCodeTest {
             "a Backspace the engine passed on with a stale code: taken away, proven, before it deletes" to {
                 val leave = backspace.e.calls.indexOf("deleteSurroundingText(2, 0, inCodePoints=false)")
                 assertTrue(backspace.e.calls.toString(), leave >= 0 && backspace.e.calls[leave - 1] == "finishComposingText()")
-                assertTrue(backspace.e.text, backspace.e.text.startsWith("A") && "n" !in backspace.e.text)
+                // R26 F8122: the code alone gone; the deletion is the caller's key event (no direct deletion here), so
+                // the app's B is still there: a session that deleted it as well is the §0 regression
+                assertEquals("AB", backspace.e.text)
+                assertFalse(deletedHere)
             },
         )
     }

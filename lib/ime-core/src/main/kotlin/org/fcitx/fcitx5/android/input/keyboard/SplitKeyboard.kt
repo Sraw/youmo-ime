@@ -29,7 +29,7 @@ object SplitKeyboard {
 
     /**
      * Where the boards other than the letters go while they are split: the number pad, the nine
-     * keys, handwriting, the symbols and emoji, the clipboard. Across the whole of a wide screen the
+     * keys, the symbols and emoji, the clipboard. Across the whole of a wide screen the
      * keys at its middle are out of either thumb's reach; one thumb's width at a side, as Gboard's
      * one-handed mode has its keyboard, they are under it.
      */

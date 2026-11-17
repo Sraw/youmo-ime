@@ -173,7 +173,9 @@ object CustomLayouts {
             if (!done) temp.delete()
         }
         kept.remove(target.path)
-        CustomKeyboards.changed(dir)
+        // a layout's: the keyboards listed anew. Not the record's (CustomLayoutFiles.CONVERTED), which is no layout: the
+        // list forgotten for it, KeyboardPicker.offers had none till listed again (R26 F8226)
+        if (CustomLayoutFiles.idOf(target.name) != null) CustomKeyboards.changed(dir)
     }
 
     /** Layout [id] taken out of [dir]: whether it is gone. The settings under its keys' names stay (§4.4, Q8). */

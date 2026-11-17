@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.phrase.TextVariables
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
@@ -15,6 +16,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyClock
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
@@ -63,6 +65,8 @@ class TextVariablesUatTest {
     private fun time(day: Int, hour: Int, minute: Int, second: Int = 0) =
         Calendar.getInstance(SimpleTimeZone(OFFSET, "t")).apply { clear(); set(2026, Calendar.NOVEMBER, day, hour, minute, second) }.timeInMillis
 
+    // every test here runs on a set clock but the one of the real clock's wiring (anItemOfVariablesShowsAndTypesToday):
+    // its values are known, none turns while the test runs
     private fun setClock(at: Long) = SetClock(at).also { KeyClock.clock = it }
 
     // [template] filled in now; [typed] one of its values about now (a minute may turn while the test runs)
@@ -93,16 +97,17 @@ class TextVariablesUatTest {
         assertTypedNow(date, value, h.field.text.toString())
     }
 
+    // the minute it is swiped, not the one the keyboard came up in
     @Test
     @Uat("KB-94")
     fun aSwipesTextOfVariablesTypesTheTimeItIsSwiped() {
-        val time = "\${fullhour}:\$minute"
+        val clock = setClock(time(14, 9, 4))
         prefs.setWays(up = true, down = true)
-        slot("full/w", up = false, SwipeSlot.Text(time, variables = true))
+        slot("full/w", up = false, SwipeSlot.Text("\${fullhour}:\$minute", variables = true))
         h.start()
-        val before = now(time)
+        clock.at = time(14, 9, 5)
         h.swipe(h.key("w"), 0f, h.key("w").height * 1.3f)
-        assertTypedNow(time, before, h.field.text.toString())
+        assertEquals("09:05", h.field.text.toString())
     }
 
     // KB-95: not marked, typed as written; marked, never in capitals nor turned into Chinese punctuation
@@ -110,11 +115,12 @@ class TextVariablesUatTest {
     @Uat("KB-95")
     fun withoutTheMarkAsWrittenWithItAsFilledIn() {
         val dotted = "x\$month.\$day"
+        setClock(time(14, 9, 5))
         prefs.setList("full/q", listOf("\$year", dotted, "1"), marks = mapOf(dotted to ItemMark.Variables))
         h.start()
         h.chinesePunctuation()
         h.relayout()
-        val value = now(dotted)
+        val value = "x11.14"
         h.longPress(h.key("q"), pick = "\$year").let { assertTrue(it.toString(), it.containsAll(listOf("\$year", value))) }
         assertEquals("\$year", h.field.text.toString())
         h.field.setText("")
@@ -122,18 +128,20 @@ class TextVariablesUatTest {
         h.tap(h.describedKey("Shift"))
         val shifted = h.longPress(h.key("Q"), pick = value)
         assertTrue(shifted.toString(), "\$YEAR" in shifted && value in shifted)
-        assertTypedNow(dotted, value, h.field.text.toString())
+        assertEquals(value, h.field.text.toString())
     }
 
+    // the day it is swiped, not the one the keyboard came up on
     @Test
     @Uat("KB-97")
     fun anItemOfVariablesFirstIsTypedBySwipingUp() {
+        val clock = setClock(time(14, 12, 0))
         prefs.setList("full/q", listOf("1", date), first = date, marks = mapOf(date to ItemMark.Variables))
         prefs.setWays(up = true, down = true)
         h.start()
-        val before = now(date)
+        clock.at = time(15, 0, 1)
         h.swipe(h.key("q"), 0f, -h.key("q").height * 1.3f)
-        assertTypedNow(date, before, h.field.text.toString())
+        assertEquals("11月15日", h.field.text.toString())
     }
 
     // 061-text-variables §2.3: a long value in the long press shrunk to the least size, then cut with 「…」, said whole
@@ -142,9 +150,10 @@ class TextVariablesUatTest {
     fun aLongValueIsCutInItsCellAndSaidWhole() {
         // within the 64 characters an item is stored with
         val long = "\$year年\$month月\$day日 星期\$weekday_cn " + "很长的一段文字".repeat(4)
+        setClock(time(14, 9, 5))
         prefs.setList("full/q", listOf(long, "1"), marks = mapOf(long to ItemMark.Variables))
         h.start()
-        val value = now(long)
+        val value = "2026年11月14日 星期六 " + "很长的一段文字".repeat(4)
         val f = h.finger(h.key("q"), h.at(h.key("q")))
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
         val cells = KeyboardHarness.all(h.inputView).filterIsInstance<PopupSceneView>().filter { h.shown(it) }
@@ -167,29 +176,6 @@ class TextVariablesUatTest {
         val shown = h.longPress(h.key("q"), pick = "11月14日") { clock.at = time(15, 0, 0, 10) }
         assertEquals(listOf("11月14日", "1"), shown)
         assertEquals("11月15日", h.field.text.toString())
-    }
-
-    @Test
-    @Uat("KB-97")
-    fun aFirstOfVariablesSwipedUpTypesTheClocksDay() {
-        val clock = setClock(time(14, 12, 0))
-        prefs.setList("full/q", listOf("1", date), first = date, marks = mapOf(date to ItemMark.Variables))
-        prefs.setWays(up = true, down = true)
-        h.start()
-        clock.at = time(15, 0, 1)
-        h.swipe(h.key("q"), 0f, -h.key("q").height * 1.3f)
-        assertEquals("11月15日", h.field.text.toString())
-    }
-
-    @Test
-    @Uat("KB-94")
-    fun aTextSlotOfVariablesTypesTheClocksTime() {
-        setClock(time(14, 9, 5))
-        prefs.setWays(up = true, down = true)
-        slot("full/w", up = false, SwipeSlot.Text("\${fullhour}:\$minute", variables = true))
-        h.start()
-        h.swipe(h.key("w"), 0f, h.key("w").height * 1.3f)
-        assertEquals("09:05", h.field.text.toString())
     }
 
     // put away one day and shown the next: the corner the day it is shown, not the one it was last drawn
@@ -232,6 +218,24 @@ class TextVariablesUatTest {
         clock.at = time(15, 0, 0, 50)
         board.catchUpMinute()
         assertSame(drawn, q.canvas.scene)
+    }
+
+    // the keyboard's rows counted (KeyboardWindow.rowUnits, each InputView.updateKeyboardSize) draw nothing: keys drawn
+    // with variables' values of a minute gone are still made anew by the catch-up after it (review R26 F8366)
+    @Test
+    fun rowsCountedInANewMinuteLeaveTheCatchUpToDrawIt() {
+        val day = "\$day日"
+        val clock = setClock(time(14, 23, 59))
+        prefs.setList("full/q", listOf(day, "1"), marks = mapOf(day to ItemMark.Variables))
+        prefs.setWays(up = true, down = true)
+        h.start()
+        val q = h.key("q") as SceneShownKey
+        val board = generateSequence(q.canvas.parent) { it.parent }.filterIsInstance<BaseKeyboard>().first()
+        assertTrue(q.drawnTexts.toString(), "14…" in q.drawnTexts)
+        clock.at = time(15, 0, 0)
+        KeyboardWindow.rowUnits(board, ThemeManager.shownLook(TestThemes.PixelLight))
+        board.catchUpMinute()
+        assertTrue(q.drawnTexts.toString(), "15…" in q.drawnTexts)
     }
 
     private companion object {

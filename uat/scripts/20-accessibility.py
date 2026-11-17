@@ -155,14 +155,16 @@ def ax12(d):
 case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores")(lambda d: None)
 
 
-case("AX-17", needs="jvm:RareCharsPageUatTest.thePageHoldsBackAndLetsThrough")(lambda d: None)
+case("AX-17", needs="jvm:RareCharsPageUatTest.thePageHoldsBackAndLetsThrough、RareCharsTouchTest.aLongPressWithNoFingerIsNoDrag、"
+              "RareCharsTouchTest.newLettersAreAtTheirTop")(lambda d: None)
 case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreenReader")(lambda d: None)
 
 
 case("AX-15", needs="manual:TalkBack 读框里的拼音（设计页 M16）：手工听")(lambda d: None)
 case("AX-16", needs="manual:TalkBack 摸读音行、字行、返回行、上屏和复制，展开后焦点落在哪（JVM：CandidateMenuUatTest.talkBackReadsTheLineTheRowsAndTheWayBackAndIsTakenToWhatOpened 只断言节点和焦点调用）")(lambda d: None)
 
-case("AX-18", needs="jvm:HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff")(lambda d: None)
+case("AX-18", needs="jvm:HandwritingUatTest.theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff、"
+              "ToolButtonNodeTest.aButtonNamedForItsStateIsNoCheckableNode")(lambda d: None)
 case("AX-19", needs="manual:TalkBack 读竖屏、横屏键盘样式两项，单手、悬浮按当时的方向读开关，斜箭头读「退出单手模式」，双击单手后焦点在单手按钮上：真机手工听")(lambda d: None)
 
 

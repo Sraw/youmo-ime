@@ -48,6 +48,17 @@ class EnglishRunTest {
         assertEquals("zzz", result.misses.single().substringBefore('\t'))
     }
 
+    // review F8255: a digit of the text is typed as one, not as the nine keys' key of that digit (3 as d, e or f)
+    @Test
+    fun aDigitOfTheTextIsTypedAsADigitOnTheNineKeys() {
+        val result = EnglishRun(data, nineKeys = true).run(listOf("the 3 cat"), noise = 0.0, seed = 1, threads = 1)
+        // what 3 put in, not how the count reads it (R26 F8503): its commit is its own key's, before the space, so
+        // counted a miss now, a hit once the count reads it; either way no letter. The words around it as meant
+        val three = result.misses.map { it.split('\t') }.partition { it[0] == "3" }
+        assertEquals(emptyList<List<String>>(), three.second)
+        three.first.forEach { (_, _, committed) -> assertTrue(committed, committed.none(Char::isLetter)) }
+    }
+
     @Test
     fun cleanWordsAreCommittedAsMeantThoughPunctuationEndsThem() {
         // dont typed for don't, put back by the session; the comma and the full stop are no part of the word

@@ -11,7 +11,7 @@ object PunctuationManager {
     // what load read, by language: the keyboard reloads the table on every focus, over JNI
     private val kept = HashMap<String, List<PunctuationMapEntry>>()
 
-    // moved by every save and forget: a read it overlapped may hold the old table, and is not kept
+    // moved by every forget: a read it overlapped may hold the old table, and is not kept
     private var changes = 0
 
     suspend fun load(fcitx: HostApi, lang: String): List<PunctuationMapEntry> {
@@ -20,15 +20,6 @@ object PunctuationManager {
         val entries = fcitx.punctuationMap(lang)
         synchronized(this) { if (changes == seen) kept[lang] = entries }
         return entries
-    }
-
-    suspend fun save(fcitx: HostApi, lang: String, entries: List<PunctuationMapEntry>) {
-        try {
-            fcitx.setPunctuationMap(lang, entries)
-        } finally {
-            // a save cancelled on its way back has reached fcitx all the same
-            forget()
-        }
     }
 
     /** Drops what [load] kept, for when fcitx reads its tables again: it starts or reloads its config. */

@@ -89,10 +89,10 @@ class EnginesMergedTest : EnginesFixture() {
         // initials none of KEYS' letters starts, nor a key next to one reads (fuzzy, slips): checked below, the candidates the same
         val elsewhere = lines(ELSEWHERE, all.filter { it[0] in "bpfdtkqxcw" })
         fun additions(lines: List<String>) = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { lines.asSequence() })
-        val small = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(near) }, warmUps = { it.run() })
-        val big = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(near + elsewhere) }, warmUps = { it.run() })
+        // asked before either is made, and each made inside its use: closed whatever fails (review F8298)
         val cpu = ManagementFactory.getThreadMXBean()
         assumeTrue("the thread's CPU time", cpu.isCurrentThreadCpuTimeSupported)
+        fun engines(lines: List<String>) = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(lines) }, warmUps = { it.run() })
         fun Engines.typed(): List<List<String>> = KEYS.map { onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, it.code).candidates }
             .also { onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0) }
         fun Engines.perKey(): Double {
@@ -100,8 +100,8 @@ class EnginesMergedTest : EnginesFixture() {
             repeat(ROUNDS) { typed() }
             return (cpu.currentThreadCpuTime - start) / 1e6 / (ROUNDS * KEYS.length)
         }
-        small.use {
-            big.use {
+        engines(near).use { small ->
+            engines(near + elsewhere).use { big ->
                 assertEquals(small.typed(), big.typed())
                 val times = List(BATCHES) { b -> if (b % 2 == 0) small.perKey() to big.perKey() else big.perKey().let { small.perKey() to it } }
                 val without = times.map { it.first }.sorted()[BATCHES / 2]

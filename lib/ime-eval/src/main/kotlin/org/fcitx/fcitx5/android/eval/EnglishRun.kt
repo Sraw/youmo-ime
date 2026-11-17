@@ -123,7 +123,8 @@ internal class EnglishRun(
                 val c = tap.first
                 // not read: as 0.6.1 before, no place given
                 val touch = tap.second?.takeIf { readsTouch }
-                shown = session.apply(if (nineKeys) nineKey(c, touch, aimed[i].second.isUpperCase()) else Action.Key(c, touch = touch))
+                // a digit tapped() put for a letter is a key slipped to; one the text has is typed as a digit
+                shown = session.apply(if (nineKeys) nineKey(c, touch, aimed[i].second.isUpperCase(), slid = c != aimed[i].first) else Action.Key(c, touch = touch))
             }
             if (shown != null && word in shown.candidates.take(3)) result.top3++
             if (nineKeys && shown != null && word !in offeredBy(session)) result.absent++
@@ -158,10 +159,11 @@ internal class EnglishRun(
 
     private fun offeredBy(session: EnglishSession) = session.candidates(0, EnglishSession.SUGGESTED + 1).map { it.text }
 
-    // [c] as the nine keys type it: a letter its key, Shift on for a capital, a digit (a key slipped to) its key, Shift
-    // on where it was meant for one ([upper]); anything else as itself (1's apostrophe)
-    private fun nineKey(c: Char, touch: Touch? = null, upper: Boolean = c.isUpperCase()): Action {
-        if (c in '2'..'9') return Action.NineKey(c, upper, touch)
+    // [c] as the nine keys type it: a letter its key, Shift on for a capital, a key [slid] to its digit, Shift on where
+    // it was meant for one ([upper]); anything else as itself (1's apostrophe, a digit of the text's own, as 0.6.0
+    // typed it: told by the tap, not the character, review F8255)
+    private fun nineKey(c: Char, touch: Touch?, upper: Boolean, slid: Boolean): Action {
+        if (slid) return Action.NineKey(c, upper, touch)
         val digit = digitOf(c)
         return if (digit == null) Action.Key(c) else Action.NineKey(digit, c.isUpperCase(), touch)
     }

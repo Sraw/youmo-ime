@@ -297,10 +297,6 @@ open class InputEditorContractTest {
         )
     )
 
-    /**
-     * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
-     * positions in and out of range. Seeded, so a failure names a reproducible sequence.
-     */
     // the app's edits around the keyboard's composing text (061-code-in-field §8): where its span goes
     @Test
     fun appEdits() = run(
@@ -318,6 +314,10 @@ open class InputEditorContractTest {
         ),
     )
 
+    /**
+     * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
+     * positions in and out of range. Seeded, so a failure names a reproducible sequence.
+     */
     @Test
     fun randomSequences() {
         val random = kotlin.random.Random(20260923)

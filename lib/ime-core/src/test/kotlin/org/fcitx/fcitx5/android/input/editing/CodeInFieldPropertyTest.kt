@@ -75,7 +75,11 @@ class CodeInFieldPropertyTest {
 
         private fun session() = "ses ${s.composing} ${s.kind} '${s.composingText}' lat ${s.selection.latest} queued ${reports.size}"
 
-        private fun held() = assertEquals("run $run:\n${log.joinToString("\n")}", expected, appChars())
+        // the log joined only when it fails: joined at every step it was the most of the test's work (R26 F8173)
+        private fun held() {
+            val chars = appChars()
+            if (expected != chars) assertEquals("run $run:\n${log.joinToString("\n")}", expected, chars)
+        }
 
         private fun deliver() {
             val r = reports.removeFirst()

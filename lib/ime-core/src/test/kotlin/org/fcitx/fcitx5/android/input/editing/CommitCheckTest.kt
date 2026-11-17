@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.junit.Assert.assertEquals
@@ -67,7 +68,9 @@ class CommitCheckTest {
         r.s.judgeCommit()
         assertRows(
             "judged together, then the next added" to { assertEquals("你好吗", r.kept) },
-            "one read before the first of those that waited together, one as each wait ended" to { assertEquals(4, r.reads()) },
+            "two reads for the first of those that waited together, before it and right after, one as each wait ended" to {
+                assertEquals(6, r.reads())
+            },
         )
     }
 
@@ -248,8 +251,11 @@ class CommitCheckTest {
     @Test
     fun `anything else done to the field while a commit waits leaves it unjudged`() {
         // an editor that reports late: the commit went in, then was deleted or the cursor moved back
-        // before the wait is up, and a read finds the text before the cursor as it was before the commit
-        fun after(change: EditingSession.() -> Unit) = Rig().apply {
+        // before the wait is up, and a read finds the text before the cursor as it was before the commit.
+        // Made where the text before the cursor is known (你 landed), so not read right after either
+        fun after(change: EditingSession.() -> Unit) = Rig("说").apply {
+            s.commitText("你")
+            report()
             s.commitText("好")
             s.change()
             s.judgeCommit()
@@ -258,7 +264,7 @@ class CommitCheckTest {
         assertRows(
             "Backspace" to { assertEquals("", after { backspace(direct) }) },
             "a deletion fcitx asks for" to { assertEquals("", after { deleteSurrounding(1, 0, inCodePoints = true) }) },
-            "the cursor set back" to { assertEquals("", after { select(0, 0) }) },
+            "the cursor set back" to { assertEquals("", after { select(2, 2) }) },
             "the cursor moved by an offset" to { assertEquals("", after { applySelectionOffset(-1, -1) }) },
         )
     }
@@ -276,7 +282,7 @@ class CommitCheckTest {
         r.s.judgeCommit()
         assertRows(
             "the deletion ends the wait unjudged" to { assertFalse(waitingAfterTheDeletion) },
-            "the next commit reads for itself" to { assertEquals(1, readForIt) },
+            "the next commit reads for itself, before it and right after" to { assertEquals(2, readForIt) },
             "and is kept" to { assertEquals("好", r.kept) },
         )
     }
@@ -318,7 +324,9 @@ class CommitCheckTest {
         val readsBefore = r.reads()
         r.s.judgeCommit()
         assertRows(
-            "one read, before the first commit: the second's text before the cursor known" to { assertEquals(1, readsBefore) },
+            "reads before the first commit and right after it alone: the second's text before the cursor known" to {
+                assertEquals(2, readsBefore)
+            },
             "dropped, no report, the text before the cursor as the first left it: kept" to { assertEquals("好", r.kept) },
             "the field as the first left it" to { assertEquals("说：你", r.e.text) },
         )
@@ -326,6 +334,7 @@ class CommitCheckTest {
 
     @Test
     fun `read before a commit again where the field may not be as the last commit left it`() {
+        // read, a commit is read right after it too: two reads
         fun readsForSecond(between: Rig.() -> Unit, second: Rig.() -> Unit = { s.commitText("好") }) =
             Rig("说：").run {
                 s.commitText("你")
@@ -337,31 +346,32 @@ class CommitCheckTest {
             }
         assertRows(
             "nothing between: not read" to { assertEquals(0, readsForSecond({})) },
-            "the cursor put elsewhere by the user" to { assertEquals(1, readsForSecond({ e.setSelection(1, 1); report() })) },
-            "a deletion" to { assertEquals(1, readsForSecond({ s.deleteSurrounding(1, 0, inCodePoints = false); report() })) },
+            "the cursor put elsewhere by the user" to { assertEquals(2, readsForSecond({ e.setSelection(1, 1); report() })) },
+            "a deletion" to { assertEquals(2, readsForSecond({ s.deleteSurrounding(1, 0, inCodePoints = false); report() })) },
             "a code composing in the field, the commit replacing it" to {
-                assertEquals(1, readsForSecond({ code("hao"); report() }))
+                assertEquals(2, readsForSecond({ code("hao"); report() }))
             },
             "the last commit not a plain insertion (the cursor left inside it)" to {
-                assertEquals(1, Rig("说：").run { s.commitText("（）", 1); report(); val at = reads(); s.commitText("好"); reads() - at })
+                assertEquals(2, Rig("说：").run { s.commitText("（）", 1); report(); val at = reads(); s.commitText("好"); reads() - at })
             },
-            "another field" to { assertEquals(1, readsForSecond({ s.commits.forget() })) },
+            "another field" to { assertEquals(2, readsForSecond({ s.commits.forget() })) },
             "the cursor away and back where the last commit left it" to {
-                assertEquals(1, readsForSecond({ e.setSelection(1, 1); report(); e.setSelection(3, 3); report() }))
+                assertEquals(2, readsForSecond({ e.setSelection(1, 1); report(); e.setSelection(3, 3); report() }))
             },
             "the app's rewrite in place, of the same length, reported at the same cursor" to {
-                assertEquals(1, readsForSecond({ e.appReplace(0, 1, "讲"); report() }))
+                assertEquals(2, readsForSecond({ e.appReplace(0, 1, "讲"); report() }))
             },
             "a commit judged and kept between" to {
-                assertEquals(1, readsForSecond({ e.dropsWrites = true; s.commitText("好"); s.judgeCommit(); e.dropsWrites = false }))
+                assertEquals(2, readsForSecond({ e.dropsWrites = true; s.commitText("好"); s.judgeCommit(); e.dropsWrites = false }))
             },
-            "checking turned off and on again" to { assertEquals(1, readsForSecond({ s.commits.on = false; s.commits.on = true })) },
+            "checking turned off and on again" to { assertEquals(2, readsForSecond({ s.commits.on = false; s.commits.on = true })) },
         )
     }
 
     @Test
     fun `the known text before the cursor is what a read there would give`() {
         // [text] before the cursor; a commit that lands, then one the field drops: kept, and the reads made
+        // before the judging (the first commit read before it and right after)
         fun keptAfterLanded(text: String, limit: Int = Int.MAX_VALUE) = Rig(text).run {
             e.revealLimit = limit
             s.commitText("你")
@@ -386,13 +396,46 @@ class CommitCheckTest {
             kept to reads
         }
         assertRows(
-            "40 units before the cursor: the last 32 known" to { assertEquals("好" to 1, keptAfterLanded("a".repeat(40))) },
+            "40 units before the cursor: the last 32 known" to { assertEquals("好" to 2, keptAfterLanded("a".repeat(40))) },
             "a pair cut at the 32nd unit back, as a read cuts it" to {
-                assertEquals("好" to 1, keptAfterLanded("x😀" + "a".repeat(30)))
+                assertEquals("好" to 2, keptAfterLanded("x😀" + "a".repeat(30)))
             },
-            "commits judged together: known after them all" to { assertEquals("呢" to 1, merged) },
+            "commits judged together: known after them all" to { assertEquals("呢" to 2, merged) },
             "an editor that gives less before the cursor than asked: read each time, still kept" to {
-                assertEquals("好" to 2, keptAfterLanded("a".repeat(40), limit = 10))
+                assertEquals("好" to 4, keptAfterLanded("a".repeat(40), limit = 10))
+            },
+        )
+    }
+
+    @Test
+    @Uat("LC-36")
+    fun `a field that uses the text and puts its buffer back is not said to have dropped it`() {
+        // R26 F8168: a terminal's, a remote desktop's field takes the text, sends it on and empties itself
+        // in the same batch edit; the cursor ends where it was, so no report, and a read at the wait's
+        // end gives what was there before. The read right after the write saw it go in
+        fun used(text: String) = Rig(text).apply {
+            s.commitText("ls")
+            e.appSetsText(text)
+            s.judgeCommit()
+        }
+        val empty = used("")
+        val prompt = used("> ")
+        // one that takes it away within the write itself reads the same right after: cannot be told
+        // from one that drops it, kept; but no more than KEPT_MAX units of it, a pair not cut
+        val first = "😀".repeat(100)
+        val second = "x" + "😀".repeat(100)
+        val within = Rig().apply {
+            e.rewriter = { "" }
+            s.commitText(first)
+            s.judgeCommit()
+            s.commitText(second)
+            s.judgeCommit()
+        }
+        assertRows(
+            "emptied: nothing kept" to { assertEquals("", empty.kept); assertEquals("", empty.e.text) },
+            "put back to its prompt: nothing kept" to { assertEquals("", prompt.kept) },
+            "taken away within the write: kept, its end, starting at a whole pair" to {
+                assertEquals((first + second).takeLast(CommitCheck.KEPT_MAX - 1), within.kept)
             },
         )
     }

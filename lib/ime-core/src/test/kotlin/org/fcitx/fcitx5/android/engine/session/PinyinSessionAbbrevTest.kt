@@ -197,8 +197,10 @@ class PinyinSessionAbbrevTest {
             s.pick("xm", "先")
         }
         assertEquals("可以", s.page("ky").first())
-        // unpinned, it is a word not typed for 30 typing days as any other
-        s.type("ky").let { s.apply(Unpin(it.candidates.indexOf("可以"))) }
+        // unpinned, it is a word not typed for 30 typing days as any other: at once, the keys read again with
+        // the words collected anew (review F8340: the decoder kept those of the key before, 可以 still there)
+        val unpinned = s.type("ky").let { s.apply(Unpin(it.candidates.indexOf("可以"))) }
+        assertTrue("${unpinned.candidates}", "可以" !in unpinned.candidates)
         s.apply(Reset)
         assertTrue("可以" !in s.page("ky"))
     }

@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
+import org.fcitx.fcitx5.android.utils.letGoOfFocusedField
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
@@ -142,6 +143,9 @@ class SwipeSlotSection(private val ctx: Context, off: Boolean, initial: SwipeSlo
 
     private fun pick(button: RadioButton) {
         radios.forEach { it.isChecked = it === button }
+        // the field hidden with the keyboard on it: put away, or its keys go on typing into it, and pick the text again
+        // (R26 F8183)
+        if (button !== textButton) field.letGoOfFocusedField()
         // the field and what goes with it shown while the text is chosen, the variables' help while they are on too
         field.isVisible = textButton.isChecked
         variables.isVisible = textButton.isChecked

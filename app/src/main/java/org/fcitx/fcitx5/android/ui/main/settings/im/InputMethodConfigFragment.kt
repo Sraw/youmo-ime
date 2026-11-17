@@ -46,6 +46,9 @@ class InputMethodConfigFragment : HostPreferenceFragment() {
         super.onViewCreated(view, savedInstanceState)
         if (retired) {
             view.post {
+                // the page left before this runs (popped in the same frame, the state saved): no NavController to ask
+                // (R26 F8404), as SearchHighlight.showIn's post
+                if (!isAdded) return@post
                 findNavController().popBackStack()
                 findNavController().navigateWithAnim(SettingsRoute.now(args))
             }

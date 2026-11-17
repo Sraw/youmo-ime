@@ -117,11 +117,17 @@ class TuningTest {
         val lines = out.lines().filter { it.isNotBlank() }
         assertEquals(1 + Tuning.GRID.size * Tuning.GRID.size + 3 + Tuning.KEY_GRID.size + 6, lines.size)
         assertTrue(lines.any { it.startsWith("neighbour (tune)") && "key/0" in it })
+        // a point the extra penalty and the slip's whole cost, a place-less slip's -2 under it (review F8142)
+        assertTrue(lines.toString(), lines.any { it.startsWith("-1.0 (-3.0 a slip)") })
         assertTrue(lines[0], lines[0].startsWith("fuzzy typo (tune)"))
         val heldOut = lines[1 + Tuning.GRID.size * Tuning.GRID.size]
         // 中国 falls in the held-out half: the sizes say so
         assertTrue(heldOut, heldOut.startsWith("held-out") && "clean/1" in heldOut && "clean/0" in lines[0])
         // 中国 is in one half only: the other shows no rates rather than NaN
         assertTrue(lines.none { "NaN" in it })
+        // every row's rates under its header's names: one label width, the columns 17 wide (R26 F8474: a slip's label
+        // wider than the column put its rates a place or two right)
+        val tables = lines.filterNot { it.startsWith("chosen:") }
+        assertEquals(tables.joinToString("\n"), 1, tables.map { it.length % 17 }.toSet().size)
     }
 }

@@ -198,7 +198,7 @@ class BackupUatTest {
     }
 
     @Test
-    @Uat("PR-10")
+    @Uat("PR-10", "PR-62")
     fun aBackupRestoredReplacesSettingsAndPhrasesItsPunctuationTableDropped() {
         val old = install("old")
         val config = File(old.config, "conf").apply { mkdirs() }

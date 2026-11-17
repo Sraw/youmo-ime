@@ -130,8 +130,8 @@ internal class KeySwipes(
     /** What the preview shows of [shortcut]: a command's name, a text as it is (fitted to the bubble by [org.fcitx.fcitx5.android.input.popup.PopupComponent]). */
     private fun shortcutLabel(shortcut: KeyShortcut): String = when (shortcut) {
         is KeyShortcut.Command -> board.context.getString(KeyShortcutLooks.of(shortcut.command).label)
-        // one of variables as it would type now (061-text-variables §2.4)
-        is KeyShortcut.Text -> shortcut.typed(KeyClock.calendar())
+        // one of variables as it would type now (061-text-variables §2.4); the clock read only then: this runs each Move
+        is KeyShortcut.Text -> if (shortcut.variables) shortcut.typed(KeyClock.calendar()) else shortcut.text
         KeyShortcut.None -> ""
     }
 

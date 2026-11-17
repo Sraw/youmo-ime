@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
-import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.floating.FloatingHandle
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
@@ -545,7 +544,7 @@ class KeyHandwritingUatTest {
         assertTrue(h.api.calls.toString(), keysSent().isNotEmpty())
     }
 
-    // kept across input methods (§15): English types its letters, no 手写 on its bar (Q3); back in pinyin it writes
+    // kept across input methods (§15): English types its letters, 手写 greyed on its bar; back in pinyin it writes
     @Uat("HW-44", "HW-47")
     @Test
     fun anotherInputMethodAndBackTheToggleIsKept() {
@@ -558,7 +557,8 @@ class KeyHandwritingUatTest {
         until("read after 123") { inks().isNotEmpty() }
         h.after(2_000)
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        assertFalse("no 手写 in English", toolbarHandwritingShown())
+        // English writes nothing: 手写 stays on the bar greyed, said so (061-handwriting-toolbar Q2), not lit nor gone
+        h.assertHandwritingGreyed("in English")
         h.api.calls.clear()
         touchTap(h.key("q"))
         h.idle()
@@ -608,6 +608,29 @@ class KeyHandwritingUatTest {
         assertTrue("glided: ${h.api.calls}", "offerGlide" in h.api.calls)
     }
 
+    // 笔画筛选 on the keys, 手写 on (HW-50): a line across the letters is ink, no stroke sent to filter by; a tap is one
+    // more stroke of it, no letter typed (nothing typed, nothing to filter); a swipe up on w is ink, not its corner
+    @Uat("HW-50")
+    @Test
+    fun strokeFilteringWaitsWhileHandwritingIsOn() {
+        prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.StrokeFilter)
+        harness()
+        val end = h.box(h.key("p"))
+        h.api.calls.clear()
+        h.drag(h.key("t"), end.exactCenterX(), end.exactCenterY())
+        until("read") { inks().isNotEmpty() }
+        assertEquals("no stroke, no key: ${h.api.calls}", emptyList<String>(), keysSent())
+        val strokes = board().keyInkForTest!!.pad.strokes.size
+        touchTap(h.key("q"))
+        h.idle()
+        assertEquals("the tap one more stroke", strokes + 1, board().keyInkForTest!!.pad.strokes.size)
+        assertEquals("no letter: ${h.api.calls}", emptyList<String>(), keysSent())
+        h.api.calls.clear()
+        draw(h.key("w"), down = -0.6f)
+        until("the swipe up read") { inks().isNotEmpty() }
+        assertEquals("no corner: ${h.api.calls}", emptyList<String>(), keysSent())
+    }
+
     // landscape's split keyboard: a stroke may start in the gap between its halves
     @Uat("HW-52")
     @Test
@@ -623,7 +646,4 @@ class KeyHandwritingUatTest {
         until("read") { inks().isNotEmpty() }
         assertEquals(emptyList<String>(), keysSent())
     }
-
-    private fun toolbarHandwritingShown() = KeyboardHarness.all(h.inputView).filterIsInstance<ToolButton>()
-        .any { h.shown(it) && it.contentDescription == h.service.getString(R.string.handwriting) }
 }

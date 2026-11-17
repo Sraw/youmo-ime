@@ -123,6 +123,9 @@ class KeyboardStyleMigrationAppTest {
             putString("split_keyboard", "Always")
             putString("keyboard_style_landscape", "SPLIT")
         }
+        // ThemeManager's prefs outlive the test: both styles put back as they were (R26 F8400)
+        val portraitWas = prefs.keyboardStylePortrait.getValue()
+        val landscapeWas = prefs.keyboardStyleLandscape.getValue()
         prefs.keyboardStylePortrait.setValue("FLOATING")
         prefs.keyboardStyleLandscape.setValue("")
         try {
@@ -132,7 +135,8 @@ class KeyboardStyleMigrationAppTest {
             // not stored here, not stored there: its default by the width before the unlock too
             assertFalse(device.contains("keyboard_style_landscape"))
         } finally {
-            prefs.keyboardStylePortrait.setValue("")
+            prefs.keyboardStylePortrait.setValue(portraitWas)
+            prefs.keyboardStyleLandscape.setValue(landscapeWas)
         }
     }
 }

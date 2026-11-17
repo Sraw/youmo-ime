@@ -152,8 +152,9 @@ class VoiceDataPluginTest {
         assertEquals((localFiles + VoiceDataPlugin.BPE_MODEL).toSet(), listed)
         val notices = root.resolve("app/${VoiceDataPlugin.NOTICE_DIR}")
         assertTrue(notices.resolve("LICENSE-CC-BY-SA-4.0.txt").readText().startsWith("Attribution-ShareAlike 4.0 International"))
-        // the directory is the notices the pack takes, no more (one added there would not be packed)
-        assertEquals(VoiceDataPlugin.NOTICE_FILES.toSet(), notices.list()!!.toSet())
+        // the directory is the notices the pack takes, no more (one added there would not be packed); a Mac's .DS_Store
+        // and an editor's backup, not committed, are none (R26 F8328)
+        assertEquals(VoiceDataPlugin.NOTICE_FILES.toSet(), notices.list()!!.filterNot { it.startsWith(".") || it.endsWith("~") }.toSet())
     }
 
     // youmo.voiceModelDir: ~/ taken as home (a home with a $ in it kept as it is), an absolute path kept

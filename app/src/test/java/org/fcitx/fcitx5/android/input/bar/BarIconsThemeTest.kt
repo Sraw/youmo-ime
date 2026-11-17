@@ -15,6 +15,7 @@ import android.widget.TextView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
@@ -63,6 +64,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -229,15 +231,57 @@ class BarIconsThemeTest {
         assertEquals(0f, menu.iconRotation)
     }
 
+    // the app's ⌄ drawn for the menu key, turned as ever (-90 folded, +90 open), however the theme has none drawn; each
+    // row its own pack and bar
     @Test
     @Uat("ST-130")
-    fun noMenuIconOfTheThemesTurnsTheAppsAsEver() {
-        val h = shown(pack("undo"))
-        val menu = h.button(R.string.expand_toolbar)
-        assertEquals(-90f, menu.iconRotation)
-        h.expand()
-        assertEquals(90f, menu.iconRotation)
-        assertFalse(menu.iconDrawable.themed)
+    fun menuIconsNoneDrawnTurnTheAppsAsEver() {
+        fun turnsAsEver(h: KeyboardHarness) {
+            val menu = h.button(R.string.expand_toolbar)
+            assertFalse(menu.iconDrawable.themed)
+            assertEquals(-90f, menu.iconRotation)
+            h.expand()
+            assertEquals(90f, menu.iconRotation)
+            assertFalse(menu.iconDrawable.themed)
+        }
+
+        // the two by name, their files broken (a restored backup's pack, no import's checks)
+        fun broken(): Theme.Pack {
+            val mine = pack("toolbar-expand", "toolbar-collapse")
+            val icons = PackIcons.of(mine)
+            for (name in listOf("toolbar-expand", "toolbar-collapse")) File(icons.file(name)!!).writeText("<svg><script/></svg>")
+            ScenePainter.forgetIcons()
+            return mine
+        }
+
+        fun row(make: () -> KeyboardHarness): () -> Unit = {
+            try {
+                turnsAsEver(make())
+            } finally {
+                harness?.close()
+                harness = null
+            }
+        }
+        assertRows(
+            "no menu icon of the theme's" to row { shown(pack("undo")) },
+            "the two that fail, the two states told apart (R26 F8310)" to row { shown(broken()) },
+            // made while they were being read (counted the theme's then, upright), failed once read: turned at once,
+            // not upright till the toolbar is first opened (R26 F8451)
+            "the two that fail read after the bar is made" to row {
+                val mine = broken()
+                val queued = ArrayList<Runnable>()
+                ThemeAssets.runner = { queued += it }
+                try {
+                    shown(mine).also {
+                        assertEquals(0f, it.button(R.string.expand_toolbar).iconRotation)
+                        while (queued.isNotEmpty()) queued.removeAt(0).run()
+                        it.idle()
+                    }
+                } finally {
+                    ThemeAssets.runner = { it.run() }
+                }
+            },
+        )
     }
 
     // hide-keyboard's own images differ (▾ on the bar, the keyboard with ⌄ on a key): each its own till a theme writes it
@@ -256,7 +300,7 @@ class BarIconsThemeTest {
 
     // the app's image drawn at its own size elsewhere first (another bar, a panel, an earlier case): a vector's raster
     // only ever grows, shared by every drawable of the resource, so the button's smaller icon came out sharper than
-    // drawn alone (the low landscape bar's emoji, at random in a full run)
+    // drawn alone (the low landscape bar's emoji, at random in a full run; fixed in 332983c57)
     @Test
     fun aButtonsIconIsDrawnAlikeWhateverDrewTheSameImageBefore() {
         val image = ctx.getDrawable(ToolbarButtonLooks.drawable(BarIcons.EMOJI.fallback))!!

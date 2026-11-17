@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.WordLayers
@@ -147,6 +148,11 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2"), // clean or slip
             arrayOf("pinyin", "d", "s", "r", "--touch", "dvorak:s0.2:clean"), // no such keyboard
             arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2:clean", "--taps", "sigma0.2:1", "--scheme", "g14"), // not both
+            arrayOf("pinyin", "d", "s", "r", "--touch", "qwerty:s0.2:clean:x"), // a seed is a number (review F8254)
+            arrayOf("pinyin", "d", "s", "r", "--touched", "t.tsv"), // the set --touch tapped: none
+            // read as given, not the app's floor reported as asked (review F8254)
+            arrayOf("table-slips", "d", "s", "--floor", "low"),
+            arrayOf("table-slips", "d", "s", "--topping-floor", "NaN"),
             arrayOf("pinyin", "d", "s", "r", "--threads", "0"),
             arrayOf("pinyin", "d", "s", "r", "--stale"), // stale is a merged dictionary's
             arrayOf("pinyin", "d", "s", "r", "--beam", "x"),
@@ -209,6 +215,22 @@ class MainTest {
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))
+    }
+
+    // review F8111: table-slips' --touched is its own taps, its preset left out (plain) or not; only pinyin's needs --touch
+    @Test
+    fun tableSlipsWritesItsTouchedSetWithoutAPreset() {
+        val table = CodeTable.Builder()
+            .header("键码", "abcdefghijklmnopqrstuvwxyz")
+            .header("码长", "4")
+            .entry("abr", "甲").entry("cd", "丁")
+            .build().toByteArray()
+        val tableFile = tmp.newFile("t.data").apply { writeBytes(table) }
+        val set = tmp.newFile("s.tsv").apply { writeText("x\t甲丁\tdaily\n") }
+        val touched = File(tmp.root, "touched.tsv")
+        assertEquals(0, exit("table-slips", tableFile.path, set.path, "--touched", touched.path))
+        // a few keys, short of a line's 60: written all the same (review F8207)
+        assertTrue(touched.readText(), touched.readLines().any { it.isNotBlank() })
     }
 
     @Test

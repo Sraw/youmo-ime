@@ -221,6 +221,11 @@ class TableSlipRun(
         val lines = ArrayList<String>()
         val keys = StringBuilder()
         val touches = ArrayList<String>()
+        fun flush() {
+            lines += "$keys\t-\tslips\t\t${touches.joinToString(" ")}"
+            keys.setLength(0)
+            touches.clear()
+        }
         for (u in units) {
             u.input.forEachIndexed { k, c ->
                 keys.append(c)
@@ -235,12 +240,10 @@ class TableSlipRun(
                     touches += "-"
                 }
             }
-            if (keys.length >= perSample) {
-                lines += "$keys\t-\tslips\t\t${touches.joinToString(" ")}"
-                keys.setLength(0)
-                touches.clear()
-            }
+            if (keys.length >= perSample) flush()
         }
+        // the last words, short of a line: typed too (review F8207)
+        if (keys.isNotEmpty()) flush()
         return lines
     }
 

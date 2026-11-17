@@ -281,6 +281,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }) else ({})
     )
 
+    /** The last commit's check ([CommitCheck.kept]: what the field dropped), for a test to read without the session. */
+    @get:VisibleForTesting
+    internal val commitCheck: CommitCheck get() = editingSession.commits
+
     /** The IME's view of the cursor; owned by [editingSession]. */
     private val selection get() = editingSession.selection
 
@@ -1015,9 +1019,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
      * Brackets and quotes typed in pairs, where the user wants it -- not in a password, where
      * what is typed is all there is, nor where the editor takes key events only.
      */
-    private val pairing get() = currentInputEditorInfo.let {
-        fieldPolicy.pairs(autoPairs, rawKeys = it.isTypeNull(), phone = it.toEditorTraits().number == NumberKind.PHONE)
-    }
+    private val pairing get() = fieldPolicy.pairs(autoPairs, rawKeys = currentInputEditorInfo.isTypeNull(), phone = phoneField)
+
+    // the field input started in last is a phone number's (onStartInput): read per commit and per Backspace (its 50 ms
+    // repeat too), not worth the traits made anew each time
+    private var phoneField = false
 
     /** What the user typed, a key or the engine's commit: a bracket or quote may go in paired. */
     private fun commitTyped(text: String, cursor: Int = -1) {
@@ -1202,10 +1208,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun commitOverEngine(text: String, replacing: String = "", voice: Boolean = false, typed: Boolean = false): Job {
         val address = inAddressField
         val asked = PostedCommit(startedWith, replacing, text)
-        if (voice) voiceAsk.posting()
+        val talk = if (voice) voiceAsk.posting() else 0
         return postFcitxJob {
             if (!stillIn(asked, text)) {
-                if (voice) lifecycleScope.launch(Dispatchers.Main) { voiceAsk.landed(inField = false) }
+                if (voice) lifecycleScope.launch(Dispatchers.Main) { voiceAsk.landed(talk, inField = false) }
                 return@postFcitxJob
             }
             commitAndReset(address)
@@ -1215,15 +1221,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             // whose host calls answered before it waited ran this in place (Main.immediate), first: `.你` for 你.
             lifecycleScope.launch(Dispatchers.Main) {
                 if (!stillIn(asked, text)) {
-                    if (voice) voiceAsk.landed(inField = false)
+                    if (voice) voiceAsk.landed(talk, inField = false)
                     return@launch
                 }
                 if (!voice) {
                     val field = if (typed && replacing.isEmpty() && text.length == 1) typedField else postedField
                     return@launch lastPosted.putIn(asked, field, selection)
                 }
-                voiceAsk.voice { lastPosted.putIn(asked, postedField, selection) }
-                voiceAsk.landed(inField = true)?.let(::tellVoiceSaid)
+                voiceAsk.voice(talk) { lastPosted.putIn(asked, postedField, selection) }
+                voiceAsk.landed(talk, inField = true)?.let(::tellVoiceSaid)
             }
         }
     }
@@ -1267,7 +1273,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     // [text] went in while the engine follows voice's text: told, and what its edit asks shown once the field
-    // reads as the engine has it (review M6); the window shut, nothing more reported
+    // reads as the engine has it (review M6); the window shut, nothing more reported. The field read only while it is
+    // still the one [text] went in (the window not moved on: onFinishInput resets it) and not a password's (checklist 5:
+    // a field left meanwhile may be one); its code in it (061-code-in-field §7.9) not read as text
     private fun reportVoicePut(text: String) {
         val window = voiceAsk.current
         postFcitxJob {
@@ -1278,13 +1286,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             val read = withContext(Dispatchers.Main) {
                 if (!reply.open) voiceAsk.shut(window)
                 val ic = currentInputConnection
-                if (ask == null || ic == null) null
-                else ic.getTextBeforeCursor(ContextChars, 0)?.toString() to ic.getTextAfterCursor(ContextChars, 0)?.toString()
+                if (ask == null || ic == null || !voiceFieldStill(window)) null
+                else editingSession.beforeCode(ic.getTextBeforeCursor(ContextChars, 0))?.toString() to
+                    editingSession.afterCode(ic.getTextAfterCursor(ContextChars, 0))?.toString()
             } ?: return@postFcitxJob
             val confirmed = voiceConfirm(read.first, read.second) ?: return@postFcitxJob
-            withContext(Dispatchers.Main) { askVoiceWord(confirmed) }
+            withContext(Dispatchers.Main) { if (voiceFieldStill(window)) askVoiceWord(confirmed) }
         }
     }
+
+    // the field voice's [window] was opened in still focused, and one that may be read
+    private fun voiceFieldStill(window: Int) = voiceAsk.current == window && startedWith != null && !fieldPolicy.sensitive
 
     // 「让语音记住『徐婧』？」 with 记住; or, once, how to have a word remembered (Q3)
     private fun askVoiceWord(ask: VoiceEdits.Ask) {
@@ -1886,6 +1898,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastPosted.forget()
         resetComposingState()
         val traits = attribute.toEditorTraits()
+        phoneField = traits.number == NumberKind.PHONE
         codeInField.startInput(traits, restarting)
         editingSession.inlineCompletion = traits.isUri || traits.isEmail
         syncCodePlace()
@@ -2092,18 +2105,24 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
                 tellContextLater()
             }
-            is EditingSession.CursorUpdate.MovePreeditCursor -> postFcitxJob {
-                // onUpdateSelection can lag behind when the user types quickly enough, eg. long
-                // press backspace; only the latest report moves the cursor
-                if (update.updateIndex != editingSession.cursorUpdateIndex) return@postFcitxJob
-                Timber.d("handleCursorUpdate: move fcitx cursor to ${update.codePointPosition}")
-                moveCursor(update.codePointPosition)
-                // the code in the field: its cursor where the engine has it, a tap it did not take (in
-                // what is chosen, 你 of 你hao) put back (061-code-in-field §4.3)
-                withContext(Dispatchers.Main) {
-                    // the panel placed last, on this thread: one taken on fcitx's may be a key behind it
-                    val panel = placedPanel
-                    if (panel.code && editingSession.codeInField) editingSession.writeCode(panel.preedit) { it.toSpannedString(highlightColor) }
+            is EditingSession.CursorUpdate.MovePreeditCursor -> {
+                // the code in the field as the tap moved the cursor (this thread's): only then is a hop back here
+                // worth the keys queued behind it on fcitx's
+                val codeInField = editingSession.codeInField
+                postFcitxJob {
+                    // onUpdateSelection can lag behind when the user types quickly enough, eg. long
+                    // press backspace; only the latest report moves the cursor
+                    if (update.updateIndex != editingSession.cursorUpdateIndex) return@postFcitxJob
+                    Timber.d("handleCursorUpdate: move fcitx cursor to ${update.codePointPosition}")
+                    moveCursor(update.codePointPosition)
+                    if (!codeInField) return@postFcitxJob
+                    // the code in the field: its cursor where the engine has it, a tap it did not take (in
+                    // what is chosen, 你 of 你hao) put back (061-code-in-field §4.3)
+                    withContext(Dispatchers.Main) {
+                        // the panel placed last, on this thread: one taken on fcitx's may be a key behind it
+                        val panel = placedPanel
+                        if (panel.code && editingSession.codeInField) editingSession.writeCode(panel.preedit) { it.toSpannedString(highlightColor) }
+                    }
                 }
             }
             EditingSession.CursorUpdate.FocusOutIn -> {
@@ -2247,7 +2266,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else if (editingSession.composing.isNotEmpty() && !editingSession.provisional) {
             finishComposing()
         }
-        voiceAsk.voice { commitText(text) }
+        voiceAsk.voice(voiceAsk.talkNow) { commitText(text) }
     }
 
     /**

@@ -87,8 +87,9 @@ object KeyDefaults {
     fun of(id: KeyId?, variant: KeyboardVariant, node: NodeFacts, caps: Boolean = false): DefaultList? {
         if (id != null && id.isFunction) return function(id.key)
         // a first written on a key of no list (a user's layout's new key typing `commit:` text, 061-custom-layout §9):
-        // that first alone, not none
-        val made = made(id, variant, node, caps) ?: return node.layoutFirst?.let { NO_LIST.withFirst(it) }?.takeIf { it.first != null }
+        // that first alone, not none; a `<popup from="none"/>` written is none whatever else is (R26 F8345)
+        val made = made(id, variant, node, caps)
+            ?: return node.layoutFirst?.takeIf { node.popup?.from != "none" }?.let { NO_LIST.withFirst(it) }?.takeIf { it.first != null }
         return node.layoutFirst?.let { made.withFirst(it) } ?: made
     }
 

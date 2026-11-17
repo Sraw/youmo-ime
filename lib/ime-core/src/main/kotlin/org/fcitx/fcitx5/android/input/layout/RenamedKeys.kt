@@ -26,7 +26,9 @@ object RenamedKeys {
         var out = lists
         for ((old, new) in renames) {
             val list = lists[KeyId(old)]
-            if (list != null && out[KeyId(new)] == null) out = out.with(KeyId(new), list, null)
+            // as it is: `with` compares with a default, and with none drops an `off` (no setting where the key
+            // has no list anyway), while the new name's key may have one (a letter's): review R26 F8143
+            if (list != null && out[KeyId(new)] == null) out = KeyLists.of(out.lists + (KeyId(new) to list))
         }
         return out.takeIf { it != lists }?.serialize()
     }

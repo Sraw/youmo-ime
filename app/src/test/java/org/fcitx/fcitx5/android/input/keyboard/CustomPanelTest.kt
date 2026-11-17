@@ -60,7 +60,7 @@ class CustomPanelTest {
     @After
     fun asItWas() {
         h.close()
-        CustomKeyboards.dir = dirWas
+        forgetTheTestsLayouts(dirWas)
         SceneBoard.forgetScenes()
         prefs.numberKeyboardLayout.setValue("")
         prefs.symbolsPanelLayout.setValue("")

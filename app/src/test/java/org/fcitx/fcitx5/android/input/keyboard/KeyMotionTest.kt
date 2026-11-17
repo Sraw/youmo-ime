@@ -10,11 +10,8 @@ import android.os.PowerManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.theme.BuiltinThemeFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -32,10 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.ByteArrayOutputStream
 import java.time.Duration
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /**
  * 060-render-p3 A1: a theme's keys moving on the canvas. The pressed face shown whole at once, let go
@@ -55,21 +49,7 @@ class KeyMotionTest {
     fun phone() = phoneStorage()
 
     // a user's pack (motion is never a built-in theme's): material's file, named its own, [styles] put last; its light version
-    private fun theme(vararg styles: String): Theme {
-        val text = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_material)
-            .replace("name=\"material\"", "name=\"moving\"")
-            .replace("</theme>", styles.joinToString("\n", postfix = "\n</theme>"))
-        val zip = ByteArrayOutputStream().also { bytes ->
-            ZipOutputStream(bytes).use {
-                it.putNextEntry(ZipEntry("theme.xml"))
-                it.write(text.encodeToByteArray())
-            }
-        }.toByteArray()
-        val opened = ThemeFilesManager.openTheme(zip.inputStream(), ThemeManager.getAllThemes()).getOrThrow() as ThemeFilesManager.Opened.Pack
-        val versions = opened.commit().getOrThrow()
-        ThemeManager.packPlaced(versions[0].file)
-        return versions.first { !it.isDark }
-    }
+    private fun theme(vararg styles: String): Theme = materialPack("moving", *styles)
 
     private val moving by lazy {
         theme(

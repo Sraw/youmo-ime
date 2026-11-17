@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.keyboard.KeyClock
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
@@ -131,7 +132,11 @@ object KeyCaps {
         } else {
             // a key alone (no board): its slots' marks, no first
             val spots = swipeSpots()
-            SceneMarks.settings(slots, swipeWays(), spots.symbol, spots.shortcut, charShortcuts, listOfNotNull(shortcut?.name?.let { KeyId.of(it).name }), emptyMap())
+            // the keyboard's clock (KeyClock), not the system's: a variable's value as the keyboard would show it (R26 F8250)
+            SceneMarks.settings(
+                slots, swipeWays(), spots.symbol, spots.shortcut, charShortcuts, listOfNotNull(shortcut?.name?.let { KeyId.of(it).name }), emptyMap(),
+                now = KeyClock::calendar,
+            )
         }
     }
 
@@ -144,7 +149,7 @@ object KeyCaps {
      * its `:` (a scheme typing `;`'s: the item every keyboard but that one skips, §2).
      */
     fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.board(ctx, layout)?.let {
-        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.base).form, nineLetters(), semicolon = true))
+        SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.fallback).form, nineLetters(), semicolon = true))
     }
 
     /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
@@ -160,10 +165,12 @@ object KeyCaps {
     }
 
     // [layout]'s rows as the keyboard counts them (KeyboardWindow.rowUnits); upright, at no size: the built-in boards'
-    // rows do not depend on it
-    private fun rowsOf(ctx: Context, layout: String): Double = SceneLayouts.board(ctx, layout)?.let {
-        KeyboardHeightCap.rowUnits(it.layout, it.fragments, Env(1.0, 1.0, ctx.resources.displayMetrics.density.toDouble()))
-    } ?: KeyboardHeightCap.DEFAULT_ROWS
+    // rows do not depend on it. Once a turn, as [thisTurn] promises, not twice a cap (R26 F8324)
+    private fun rowsOf(ctx: Context, layout: String): Double = thisTurn(listOf(ROWS, layout)) {
+        SceneLayouts.board(ctx, layout)?.let {
+            KeyboardHeightCap.rowUnits(it.layout, it.fragments, Env(1.0, 1.0, ctx.resources.displayMetrics.density.toDouble()))
+        } ?: KeyboardHeightCap.DEFAULT_ROWS
+    }
 
     // the keyboard upright on this display, as the page's notes have it (SwipeFates), whatever way the page is turned
     private fun upright(ctx: Context) = thisTurn(UPRIGHT to Configuration(ctx.resources.configuration)) { KeyboardArea.screens(ctx).first }
@@ -172,6 +179,8 @@ object KeyCaps {
     const val NO_IM = ""
 
     private const val UPRIGHT = "upright"
+
+    private const val ROWS = "rows"
 
     // what one main-looper turn (a page rebuilt, a dialog's list drawn) works out once for all its caps, not per cap:
     // the upright screen (KeyboardArea.screens asks the window manager, a binder call, and a secure setting) and each
@@ -194,7 +203,7 @@ object KeyCaps {
      */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val screen = upright(ctx)
-        val base = SceneLayouts.board(ctx, layout)?.base ?: layout
+        val base = SceneLayouts.board(ctx, layout)?.fallback ?: layout
         val size = SwipeFates.size(screen, base, CODE_ROWS[base] ?: ImKeyboards.Layout.TEXT, rowsOf(ctx, layout))
         // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
         // first's way draws nothing); the marks drawn are the resolver's (onBoard)

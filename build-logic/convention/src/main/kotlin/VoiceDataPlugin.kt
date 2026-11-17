@@ -160,7 +160,7 @@ class VoiceDataPlugin : Plugin<Project> {
         }
         val localDir = target.providers.gradleProperty(LOCAL_PROPERTY)
         // the version AssetPacksPlugin packs under (app/packs.properties)
-        val version = packsProperty(target, "voice.version")
+        val version = packsProperty(packsProperties(target), "voice.version")
         target.tasks.register<CopyVoiceModels>(COPY_TASK) {
             // nothing downloaded for the model without it: copy() then fails, saying where it comes from
             if (localDir.isPresent) {

@@ -66,7 +66,8 @@ change to how keys are laid out or marked (not with `-PskipExhaustive`: the excl
 - Prefer fakes over mockk. `FakeEditor` (ime-core `testFixtures`) stands in for an
   `InputConnection` and is held to the real `BaseInputConnection` by a contract test. Its app-side
   actions (`appSetsText`, `appReplace`, `appDropSpan`, `appSelect`: an app's own edits, a `TextWatcher`'s,
-  a selection) are held there too (`InputEditorContractTest.appEdits`); its `rewriter` (an `InputFilter`
+  a selection): `appReplace` and `appDropSpan` are held there too (`InputEditorContractTest.appEdits`),
+  `appSetsText` and `appSelect` not yet; its `rewriter` (an `InputFilter`
   upper-casing or cutting the whole text) and `isAvailable = false` (a connection the framework closed
   after the app finished the text) are the fake's alone: a closed connection's dropped calls are the
   framework's wrapper, not `BaseInputConnection`'s, and were measured on devices (061-code-in-field M2, M3).
@@ -445,7 +446,7 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
-`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to 2,100,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser at 1280 and 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
+`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to 2,100,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser in a 1400 px wide window (`cdp.mjs`) and at 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
 
 ### The engine in the page (060-render-p3 W1)
 

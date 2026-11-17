@@ -90,8 +90,11 @@ class BuiltInLayouts(private val context: Context) : LayoutSource {
 
 /**
  * A keyboard's layout and the fragments it includes (a shared bottom row), by their ids: what [SceneBuilder][org.fcitx.fcitx5.android.scene.engine.SceneBuilder.build] takes.
- * [base]: the app's board it is drawn as where it cannot be, and whose marks and defaults it has (061-custom-layout §5.3):
- * its own id but for a layout of the user's, its `based-on=`.
+ * [base]: the board whose marks, defaults and theme styles it has (061-custom-layout §5.3, §10): its own id but for a
+ * layout of the user's, its own `based-on=`, whatever family that is (R26 F8117). [fallback]: the app's board drawn in
+ * its place where it cannot be: [base] but for a user's layout on another family's board, its own family's
+ * (CustomKeyboards.baseOf: a grouped layout on qwerty falls back to k18, as it is held to its keys); the 14 or 18 keys'
+ * defaults that go by the keys' shape (corners, 18's L with its `:`) are [fallback]'s too (R26 F8437).
  */
 class SceneLayout(
     val id: String,
@@ -99,12 +102,19 @@ class SceneLayout(
     val fragments: Map<String, Fragment>,
     val base: String = id,
     private val appBoard: ((String) -> SceneLayout?)? = null,
+    val fallback: String = base,
 ) {
+    /**
+     * The board whose theme styles it takes besides its own id's, the env's `base` (061-custom-layout §10): a user's
+     * layout's [base], none for the app's. The keyboard (SceneBoard) and a settings cap of its key (SceneKeyCell) both.
+     */
+    val stylesOf: String? get() = base.takeIf { it != id }
+
     /**
      * Its named keys with what their nodes tell their long press (KeyResolver's), read when first asked: a user's
      * layout's ([appBoard] given: the app's boards by id) of the app's names the app's boards' (DefaultMarks.ownNodes;
      * L6 review S2: a key of the app's name is the app's key, whatever letters it writes), found from [base] as KeyData
-     * found its data (CustomKeyboards.baseOf, verifier R-N2).
+     * found its data (its own based-on, R26 F8117).
      */
     val nodes: List<Pair<String, NodeFacts>> by lazy {
         appBoard?.let { board -> DefaultMarks.ownNodes(layout, fragments, base) { id -> board(id)?.let { it.layout to it.fragments } } }
@@ -125,8 +135,11 @@ class CustomLayoutSource(private val id: String, private val stamp: String) : La
 
     override fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? = CustomKeyboards.refusal(this.id, stamp, layout)
 
-    /** The app's board it is drawn as where it cannot be: its own family's, whatever its `based-on` says (L3 review S2). */
-    fun base(layout: Layout): String = CustomKeyboards.baseOf(layout) ?: id
+    /**
+     * The app's board it is drawn as where it cannot be: its own family's, whatever its `based-on` says (L3 review S2).
+     * Only that: its styles, marks and keys' data are its own based-on's ([SceneLayout.base], R26 F8117).
+     */
+    fun fallback(layout: Layout): String = CustomKeyboards.baseOf(layout) ?: id
 
     override val keyData: KeyData.Mode get() = KeyData.Mode.Own
 
@@ -252,12 +265,15 @@ object SceneLayouts {
             return null.also { Timber.e("scene layout %s of %s not taken: %s", id, source.key, why) }
         }
         // a theme pack's board is of its own id, whatever based-on= it writes (refuses holds it to that one); a layout of
-        // one's own is of the board it is based on
-        val own = (source as? CustomLayoutSource)?.base(layout)
-        val base = own ?: id
-        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, own) }
-            ?: return SceneLayout(id, layout, fragments, base)
+        // one's own is of the board it is based on, as the web's maker draws it (R26 F8117: a grouped layout on qwerty took
+        // k18's styles and marks here, qwerty's there), but falls back to its own family's
+        val own = source as? CustomLayoutSource
+        val basedOn = own?.let { layout.basedOn }
+        val base = basedOn ?: id
+        val instead = own?.fallback(layout) ?: id
+        val held = source.keyData?.let { KeyData.of(id, layout, fragments, it, basedOn, shape = instead) }
+            ?: return SceneLayout(id, layout, fragments, base, fallback = instead)
         // the app's boards a user's layout's keys of their names are of: read as the resolver first asks, on the main thread
-        return SceneLayout(id, held.layout, held.fragments, base, appBoard = if (own != null) { b -> readFrom(back, b, back) } else null)
+        return SceneLayout(id, held.layout, held.fragments, base, appBoard = if (own != null) { b -> readFrom(back, b, back) } else null, fallback = instead)
     }
 }

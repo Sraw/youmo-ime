@@ -339,7 +339,7 @@ test('the crop is the biggest box of the keyboard\'s ratio, zoomed and moved ins
   assert.deepEqual(F.cropRect(1000, 3000, 2), [0, 1250, 1000, 1750]);
   assert.deepEqual(F.cropRect(4000, 3000, 2, 2, 0, 0), [0, 0, 2000, 1000], 'moved past the edge: kept inside');
   assert.deepEqual(F.cropRect(4000, 3000, 2, 2, 1, 1), [2000, 2000, 4000, 3000]);
-  assert.deepEqual(P.background.ops.ratio({ w: 1080, h: 2340, density: 2.625, landscape: false }), 1080 / Math.round(267 * 2.625));
+  assert.deepEqual(P.background.ops.ratio(E, { w: 1080, h: 2340, density: 2.625, landscape: false }), 1080 / Math.round(267 * 2.625));
 });
 
 test('the cascade check names the style the engine says each value comes from', () => {

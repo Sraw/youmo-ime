@@ -31,6 +31,13 @@ import org.fcitx.fcitx5.android.core.CoreLog
  * cursor ([reported]) leaves what was read before it and what it committed ([known]), and the next
  * commit made at that cursor, with nothing composing, takes that instead. Anything else done to the
  * field ([moved], [forget]) and a commit that is not a plain insertion at the cursor forget it.
+ *
+ * A field that uses the text and puts its buffer back as it was in the same batch edit (a terminal's, a
+ * remote desktop's, a scanner's command line) reports no cursor and reads at the wait's end as it did
+ * before: it would look like one that dropped the text. So a commit read before, not known, is read
+ * once more right after it: the text there then, gone by the wait's end, was used, not dropped. One that
+ * takes it away within the write itself cannot be told from one that drops it; [kept] is held to its last
+ * [KEPT_MAX] units, so a tap on it writes no more than that again.
  */
 class CommitCheck(private val editor: InputEditor) {
 
@@ -71,7 +78,8 @@ class CommitCheck(private val editor: InputEditor) {
     // commits no report has come after: the text before the cursor read before the first, when ([clock]),
     // and what they committed since
     // and the cursor they were to leave, where the text before it is then known ([known]); -1 where not
-    private class Waiting(val before: String, var text: String, val since: Long, var at: Int)
+    // and whether a read right after the first showed it in the field ([seen]: landed, whatever came of it after)
+    private class Waiting(val before: String, var text: String, val since: Long, var at: Int, val seen: Boolean)
 
     private var waiting: Waiting? = null
 
@@ -79,6 +87,9 @@ class CommitCheck(private val editor: InputEditor) {
     private class Known(val at: Int, val text: String)
 
     private var known: Known? = null
+
+    // [before]'s last answer was read from the editor, not [known]: the commit after it is read right after too
+    private var read = false
 
     /** Whether a commit waits for the editor's report: the service calls [judge] once its wait is up. */
     val isWaiting: Boolean get() = waiting != null
@@ -97,15 +108,18 @@ class CommitCheck(private val editor: InputEditor) {
      * nothing composing in the field ([plain]).
      */
     fun before(text: String, at: Int = -1, plain: Boolean = false): CharSequence? {
+        read = false
         if (!on || text.isEmpty() || waiting != null) return null
         known?.let { if (plain && it.at == at) return it.text }
+        read = true
         return editor.textBeforeCursor(READ)
     }
 
     /**
      * [text] was committed, [before] read before it ([before]'s answer), to leave the cursor at [at]
      * after it: a plain insertion at the cursor, nothing composing replaced; -1 for any other. A
-     * commit while another waits is judged with it, from the first one's read.
+     * commit while another waits is judged with it, from the first one's read. A first commit whose
+     * [before] was read, not known, is read again here, right after the write ([seen]).
      */
     fun committed(text: String, before: CharSequence?, at: Int = -1) {
         if (!on || text.isEmpty()) return
@@ -116,7 +130,11 @@ class CommitCheck(private val editor: InputEditor) {
         }
         known = null
         // an editor that would not say what is before the cursor is not one to judge
-        waiting = Waiting(before?.toString() ?: return, text, clock(), at)
+        val was = before?.toString() ?: return
+        // where it was known, the field has shown before that it takes what is written: no read
+        val seen = read && editor.textBeforeCursor(READ)?.toString().let { it != null && it != was }
+        read = false
+        waiting = Waiting(was, text, clock(), at, seen)
         changed?.invoke()
     }
 
@@ -158,6 +176,11 @@ class CommitCheck(private val editor: InputEditor) {
         val asked = waiting ?: return false
         waiting = null
         known = null
+        // in the field right after the write: used, though the field may since have put its text back as it was
+        if (asked.seen) {
+            if (!toWrite) kept = ""
+            return false
+        }
         val now = editor.textBeforeCursor(READ)?.toString()
         // the same text before the cursor, and not what was committed already there (a word finished
         // in place, 哈 after a row of 哈): nothing went in
@@ -168,7 +191,12 @@ class CommitCheck(private val editor: InputEditor) {
             return false
         }
         CoreLog.d { "a commit of ${asked.text.length} chars read back not in the field: kept" }
-        kept += asked.text
+        kept = (kept + asked.text).let { all ->
+            var from = maxOf(0, all.length - KEPT_MAX)
+            // not half a pair at the start
+            if (from > 0 && Character.isLowSurrogate(all[from])) from++
+            all.substring(from)
+        }
         return true
     }
 
@@ -192,6 +220,13 @@ class CommitCheck(private val editor: InputEditor) {
 
         /** How long the service waits for the editor's report before [judge], in ms. */
         const val WAIT_MS = 800L
+
+        /**
+         * The most UTF-16 units [kept], its end: a few sentences typed into a dead field before the user
+         * noticed, while a field misjudged as one (it takes the text away within the write) is not given
+         * back more than this at a tap.
+         */
+        const val KEPT_MAX = 256
 
         private const val NANOS_PER_MS = 1_000_000L
     }

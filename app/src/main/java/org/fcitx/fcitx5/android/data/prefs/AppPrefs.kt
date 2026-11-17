@@ -826,6 +826,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     // resetHiddenSettings ran in this process: a category registered after it is reset as it registers
     private var hiddenResetInProcess = false
 
+    /**
+     * Waits for the settings written so far to be on disk: a setting's write (apply) is written later on another thread,
+     * and a commit, even of nothing, is written after them. Not on the main thread. For what copies the settings' files
+     * over (a restore) after a write of another thread (R26 F8423).
+     */
+    fun awaitWritten() {
+        sharedPreferences.edit(commit = true) {}
+    }
+
     fun <T : ManagedPreferenceProvider> registerProvider(
         providerF: (SharedPreferences) -> T
     ): T {

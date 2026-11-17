@@ -80,13 +80,14 @@ class IdleUi(
     private val packIcons = PackIcons.of(theme)
 
     // the app's menu key is one ⌄ turned to say the state; a theme's icon of either state (061-toolbar-icons Q3) has
-    // each state drawn as its own, none turned, the one it does not write the app's ⌄ turned as ever
-    private val menuTurns = BarIcons.menuStates.none { BarIconDrawables.themed(packIcons, it) }
+    // each state drawn as its own, none turned, the one it does not write the app's ⌄ turned as ever. As drawn, not as
+    // named: a file that failed is the app's ⌄. Asked each time: a file not read yet counts as drawn (R26 F8451)
+    private val menuTurns get() = BarIcons.menuStates.none { BarIconDrawables.drawsOwn(packIcons, it) }
 
     private val menuOpen get() = currentState == Display.Toolbar
 
     private fun menuRotation(open: Boolean): Float = when {
-        BarIconDrawables.themed(packIcons, BarIcons.menu(open)) -> 0f
+        BarIconDrawables.drawsOwn(packIcons, BarIcons.menu(open)) -> 0f
         open -> 90f * translateDirection
         else -> -90f * translateDirection
     }
@@ -112,6 +113,20 @@ class IdleUi(
         // updateState keeps this current, but is not called for the initial state; without
         // this the button starts out unlabelled
         updateMenuButtonContentDescription()
+        followMenuIcons()
+    }
+
+    // a menu icon not read yet is turned as the theme's (none); one that failed once read is the app's ⌄, turned for the
+    // state drawn now, not left upright till the next state's (R26 F8451). A read pending at a forget is told and followed
+    // anew; one in already is not told of it (PackIcons.forget tells the waiting alone), drawn as read till the next
+    // state's: the pack in use written over is told as changed (ThemeManager.filesChanged), the keyboard drawn anew (R26 F8510)
+    private fun followMenuIcons() {
+        for (state in BarIcons.menuStates) packIcons.file(state.name)?.let { packIcons.outline(it, ::menuIconRead) }
+    }
+
+    private fun menuIconRead() {
+        if (!menuDrawnMore) menuButton.iconRotation = menuRotation(menuDrawnOpen)
+        followMenuIcons()
     }
 
     /**

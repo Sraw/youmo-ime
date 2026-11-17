@@ -165,9 +165,11 @@ class PopupEditorTest {
         e.add("x".repeat(70), ItemMark.Variables)
         assertEquals("x".repeat(64), e.items.last())
         assertEquals(ItemMark.Variables, e.marks["x".repeat(64)])
-        // nothing but blanks: nothing added
+        // nothing but blanks: nothing added, and true, as false is only "some did not fit" (add's KDoc): nothing was
+        // turned away for want of room, so the box is not told the list is full (R26 F8410)
+        val before = e.items.toList()
         assertTrue(e.add("  ", ItemMark.Variables))
-        assertEquals(3, e.items.size)
+        assertEquals(before, e.items)
     }
 
     // 061-no-cn-punct Q3: the marks of them that can have it, the others added as ever

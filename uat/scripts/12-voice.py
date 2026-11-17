@@ -348,6 +348,17 @@ def vo14(d):
     return f"框里「{t}」"
 
 
+# 20bbb03e0: a hotword begun (酒店式公寓) but not finished at a segment's end adds nothing; no JVM test, the native
+# recognizer's
+@case("VO-56", base="B0-设置", mutates=True, needs=EV)
+def vo56(d):
+    script("13-words").add_word(d, "酒店式公寓")
+    d.open_page("text")
+    _, t = dictate(d, "jiujian")
+    check("九键" in t and not t.startswith("酒店"), f"加了用户词「酒店式公寓」后说「九键输入法」，框里「{t}」")
+    return f"框里「{t}」"
+
+
 # also on the JVM (VoiceHomophonesTest); this one, the real recognizer's 徐静 made the user's 徐婧
 @case("VO-38", base="B0-设置", mutates=True, needs=EV)
 def vo38(d):
@@ -411,7 +422,19 @@ CHROME = "com.android.chrome"
 def vo50(d):
     # the test page first: served and reversed to the device (ensure_fixtures), the keyboard up
     d.open_page("text")
-    if "package:" not in d.sh(f"pm path {CHROME}"):
+    chrome = "package:" in d.sh(f"pm path {CHROME}")
+    try:
+        return vo50_in(d, chrome)
+    finally:
+        if chrome:
+            # Chrome's debug app and command line undone: the snapshot's later cases and runs see it as it was
+            d.sh("am clear-debug-app")
+            d.sh("rm -f /data/local/tmp/chrome-command-line")
+            d.sh(f"am force-stop {CHROME}")
+
+
+def vo50_in(d, chrome):
+    if not chrome:
         where = "这台没有 Chrome：测试页的 WebView 浏览器"
     else:
         d.sh(f"am set-debug-app --persistent {CHROME}")

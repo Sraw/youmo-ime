@@ -239,7 +239,6 @@ internal class LoadingReader(
     }
 }
 
-/** The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. */
 /**
  * Nothing written on the keys can be read, the recognizer or handwriting's session given up: the toolbar's 手写
  * turned off (061-handwriting-toolbar §3.4), not left on drawing ink that reads nothing; what failed is told
@@ -247,6 +246,10 @@ internal class LoadingReader(
  */
 internal fun handwritingCannotLoad() = AppPrefs.getInstance().internal.handwritingOpen.setValue(false)
 
+/**
+ * The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. Internal, not
+ * private: HandwritingUatTest's reader that fails tells the user as this one does ([told]).
+ */
 internal object AssetRecognizer {
 
     fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(

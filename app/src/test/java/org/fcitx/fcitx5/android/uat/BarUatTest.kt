@@ -173,7 +173,9 @@ class BarUatTest {
     fun aStatusSentAsThePanelOpensIsNotTakenBackByItsOwnOlderRead() {
         val h = harness().start()
         val simplified = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-inactive", "", false))
-        // the read finds no input method focused yet; the status comes while the panel asks its next question
+        // the read finds no input method focused yet; the status comes while the panel asks its next question.
+        // Load-bearing: StatusAreaWindow.onAttached reads statusArea() before learning(Saving). Were the two swapped,
+        // the read would find the new status and this would pass without the race (review R26 F8317)
         h.api.statusAreaCached = emptyList()
         h.api.whileLearning = { op ->
             if (op == LearningOp.Saving) {

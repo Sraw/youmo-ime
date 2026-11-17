@@ -117,8 +117,10 @@ object KeyboardArea {
     private var displayKept: Pair<Configuration, Display>? = null
 
     private fun display(ctx: Context): Display {
-        val key = Configuration(ctx.resources.configuration)
-        displayKept?.takeIf { it.first == key }?.let { return it.second }
+        // compared as it is, copied only to be kept: a measure pass asks this several times (R26 F8365)
+        val now = ctx.resources.configuration
+        displayKept?.takeIf { it.first == now }?.let { return it.second }
+        val key = Configuration(now)
         val real = realSizeOf(ctx)
         val density = ctx.resources.displayMetrics.density
         val d = Display(real.x, real.y, statusBar(ctx), imeNav(ctx, minOf(real.x, real.y), density))

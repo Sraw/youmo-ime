@@ -11,7 +11,6 @@ import android.view.KeyEvent
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.host.HostEvent
-import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -43,8 +42,7 @@ class CommitReadAfterKeyTest {
         return KeyEvent(now, now, action, KeyEvent.KEYCODE_SPACE, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD)
     }
 
-    private val KeyboardHarness.commits: CommitCheck
-        get() = (FcitxInputMethodService::class.java.getDeclaredField("editingSession").apply { isAccessible = true }.get(service) as EditingSession).commits
+    private val KeyboardHarness.commits: CommitCheck get() = service.commitCheck
 
     /** A hardware space, down and up, sent to fcitx; the timestamps they carry there, down's first. */
     private fun KeyboardHarness.space(): List<Int> {
@@ -90,7 +88,9 @@ class CommitReadAfterKeyTest {
         // the space's report held back: only the key handed back says the field changed
         h.selectionLags = true
         h.handedBack(up = false, sent[0])
-        assertEquals(1, h.readsCommitting())
+        // the commit after the key's down is read before it and right after it, as the text before the cursor was not
+        // known (R26 F8168)
+        assertEquals(2, h.readsCommitting())
         assertEquals("你好 吗", h.field.text.toString())
     }
 

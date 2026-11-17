@@ -77,6 +77,29 @@ class KeyMarksUatTest {
         h.idle()
     }
 
+    private fun place(shortcuts: KeyMarkPosition, symbols: KeyMarkPosition) {
+        at(shortcuts)
+        symbolsAt(symbols)
+    }
+
+    // the keyboard turned on its side for [block], upright again after it whether it passed or not; turned by h.turn()
+    // (the input started again, as a turn that remakes the view does), not KeyboardHarness.inLandscape's onConfigurationChanged
+    private fun inLandscapeRestarted(block: () -> Unit) {
+        RuntimeEnvironment.setQualifiers("+land")
+        h.turn()
+        try {
+            block()
+        } catch (e: Throwable) {
+            // turned back all the same, but a turn failing on a harness the row broke is added to the row's failure,
+            // not put in its place (review R26 F8476)
+            RuntimeEnvironment.setQualifiers("+port")
+            runCatching { h.turn() }.exceptionOrNull()?.let(e::addSuppressed)
+            throw e
+        }
+        RuntimeEnvironment.setQualifiers("+port")
+        h.turn()
+    }
+
     @Test
     @Uat("KB-66")
     fun eachWhereItsSettingSays() {
@@ -120,39 +143,41 @@ class KeyMarksUatTest {
     @Uat("KB-89")
     fun theTopIsTheTopEdgesMiddle() {
         h.start()
+        // each row sets both places and its own screen: none stands on another's (review R26 F8131)
         assertRows(
             "下滑 at 顶部: the shortcut top centre, 恢复 too" to {
-                at(KeyMarkPosition.Top)
+                place(shortcuts = KeyMarkPosition.Top, symbols = KeyMarkPosition.TopRight)
                 assertEquals("z TC TR", marksOf("z"))
                 assertEquals("TR,TC", backspaceMarks())
             },
             "上滑 at 顶部: the symbol over the letter, 清除 too" to {
-                at(KeyMarkPosition.BottomLeft)
-                symbolsAt(KeyMarkPosition.Top)
+                place(shortcuts = KeyMarkPosition.BottomLeft, symbols = KeyMarkPosition.Top)
                 assertEquals("z BL TC", marksOf("z"))
                 assertEquals("TC,BL", backspaceMarks())
             },
             "上滑 at 顶部, 下滑 at 底部: one at each edge's middle" to {
-                at(KeyMarkPosition.Bottom)
+                place(shortcuts = KeyMarkPosition.Bottom, symbols = KeyMarkPosition.Top)
                 assertEquals("z BC TC", marksOf("z"))
                 assertEquals("TC,BC", backspaceMarks())
             },
             "the same in landscape: the symbol top right, the shortcut bottom right" to {
-                RuntimeEnvironment.setQualifiers("+land")
-                h.turn()
-                assertEquals("z BR TR", marksOf("z"))
-                assertEquals("TR,BR", backspaceMarks())
+                place(shortcuts = KeyMarkPosition.Bottom, symbols = KeyMarkPosition.Top)
+                inLandscapeRestarted {
+                    assertEquals("z BR TR", marksOf("z"))
+                    assertEquals("TR,BR", backspaceMarks())
+                }
             },
             "swapped in landscape (上滑 底部, 下滑 顶部): each its own edge's right corner, the shortcut top right and the symbol bottom right, as 退格's ways (review 061-small S5)" to {
-                symbolsAt(KeyMarkPosition.Bottom)
-                at(KeyMarkPosition.Top)
-                assertEquals("z TR BR", marksOf("z"))
+                place(shortcuts = KeyMarkPosition.Top, symbols = KeyMarkPosition.Bottom)
+                inLandscapeRestarted { assertEquals("z TR BR", marksOf("z")) }
             },
             "下滑 alone at 顶部 in landscape, 上滑 at 右上: the top's other corner, 左上 (review 061-small N8; 右下 before)" to {
-                symbolsAt(KeyMarkPosition.TopRight)
-                assertEquals("z TL TR", marksOf("z"))
-                // ⌫'s own icon moved down for them on its narrow key: read as a mark at the bottom too
-                assertTrue(backspaceMarks(), backspaceMarks().endsWith("TR,TL"))
+                place(shortcuts = KeyMarkPosition.Top, symbols = KeyMarkPosition.TopRight)
+                inLandscapeRestarted {
+                    assertEquals("z TL TR", marksOf("z"))
+                    // ⌫'s own icon moved down for them on its narrow key: read as a mark at the bottom too
+                    assertTrue(backspaceMarks(), backspaceMarks().endsWith("TR,TL"))
+                }
             },
         )
     }
@@ -278,9 +303,7 @@ class KeyMarksUatTest {
         symbolsAt(KeyMarkPosition.Bottom)
         h.start()
         assertEquals("q - BC", marksOf("q"))
-        RuntimeEnvironment.setQualifiers("+land")
-        h.turn()
-        assertEquals("q - TR", marksOf("q"))
+        inLandscapeRestarted { assertEquals("q - TR", marksOf("q")) }
     }
 
     private fun KeyboardHarness.keyboardShown(): View =

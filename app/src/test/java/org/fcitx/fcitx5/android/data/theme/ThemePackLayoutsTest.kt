@@ -136,12 +136,19 @@ class ThemePackLayoutsTest {
         File(pack.dir, "layouts/qwerty.xml").appendText("\n")
         repeat(2) { assertEquals(listOf("mine"), ThemeFilesManager.listPacks().map { it.file }.distinct()) }
         assertEquals(1, ThemePackFiles.blankChecks)
+        // a stamp of an earlier blank-key rule (an app update that changed the rule, the boards the same): checked again,
+        // once, then stamped anew (R26 F8421). The update's a process of its own: none of this one's checks asked
+        val source = File(pack.dir, ThemePackFiles.THEME_XML).readText()
+        File(pack.dir, ".checked").writeText(ThemePackFiles.stampOf(File(pack.dir), source, rule = BlankKeys.RULE - 1))
+        ThemePackFiles.forgetListings()
+        repeat(2) { ThemeFilesManager.listPacks() }
+        assertEquals(2, ThemePackFiles.blankChecks)
         // the app's boards changed (an update): checked again, once
         val was = ThemePackFiles.builtInHash
         try {
             ThemePackFiles.builtInHash = { "another build's" }
             repeat(2) { ThemeFilesManager.listPacks() }
-            assertEquals(2, ThemePackFiles.blankChecks)
+            assertEquals(3, ThemePackFiles.blankChecks)
         } finally {
             ThemePackFiles.builtInHash = was
         }
@@ -188,7 +195,7 @@ class ThemePackLayoutsTest {
         val made = ThemeLayoutsToList.convert(packLayouts(mapOf("k14.xml" to k14)), "mine", null).single().second as PackLayouts.Converted.Done
         val layout = (LayoutReader.layout(made.text) as Parsed.Ok).value
         assertEquals("k14", layout.basedOn)
-        assertEquals(Form.Grouped14, KeyboardVariants.of(layout, InputMethodCatalog.PINYIN, EngineState.shuangpinScheme, base = "k14").form)
+        assertEquals(Form.Grouped14, KeyboardVariants.of(layout, InputMethodCatalog.PINYIN, EngineState.shuangpinScheme, shape = "k14").form)
     }
 
     // a pack's layouts written in a folder of their own, as an import would leave them

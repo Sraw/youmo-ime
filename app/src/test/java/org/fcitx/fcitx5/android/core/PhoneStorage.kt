@@ -40,8 +40,9 @@ internal fun dirsUnder(
     data: File = File(external, ConfigHome.DATA.old),
     theme: File = File(external, ConfigHome.THEME.old),
     settled: Boolean = true,
+    sharedPrefs: File = File(root, "shared_prefs"),
 ) = UserDataManager.Dirs(
-    sharedPrefs = File(root, "shared_prefs"),
+    sharedPrefs = sharedPrefs,
     dataBases = File(root, "databases"),
     external = external,
     recentlyUsed = File(root, "recently_used"),

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -264,15 +265,16 @@ class KeyboardHarness(
 
     /**
      * The app's screen made anew (a configuration it handles by recreating, a theme change): the old
-     * field's connection closed first, then a new field, its id and kind the old one's, starting input
-     * with the old one's text and selection as its saved state brings them (no composing span).
+     * field's connection closed first, then a new field, its id and kind the old one's (its options, a
+     * terminal's TYPE_NULL: the field's info told it, a field of its own type or not), starting input with the old one's text and selection as its saved state brings
+     * them (no composing span).
      */
     fun recreate() {
         val text = field.text.toString()
         val (start, end) = field.selectionStart to field.selectionEnd
         val type = field.inputType
         closeConnection()
-        start(inputType = type, packageName = info.packageName, fieldId = info.fieldId) {
+        start(inputType = type, imeOptions = field.imeOptions, packageName = info.packageName, fieldId = info.fieldId, terminal = info.inputType == InputType.TYPE_NULL) {
             it.setText(text)
             it.setSelection(start, end)
         }
@@ -1048,4 +1050,30 @@ class KeyboardHarness(
             if (v is ViewGroup) for (i in 0 until v.childCount) yieldAll(all(v.getChildAt(i)))
         }
     }
+}
+
+/**
+ * [block] with the screen turned on its side (the service told of the new configuration, as the system tells it),
+ * upright again after it whether it passed or not; [relayout]: laid out again once upright. A turn back failing on a
+ * harness [block] broke is added to its failure, not put in its place (review R26 F8476; one copy, F8511; KeyMarksUatTest turns by restarting the input instead). Outside the
+ * class, as its size allows (detekt's LargeClass).
+ */
+fun KeyboardHarness.inLandscape(relayout: Boolean = false, block: () -> Unit) {
+    fun turnTo(qualifiers: String) {
+        RuntimeEnvironment.setQualifiers(qualifiers)
+        service.onConfigurationChanged(Configuration(service.resources.configuration))
+        idle()
+    }
+    fun upright() {
+        turnTo("+port")
+        if (relayout) relayout()
+    }
+    try {
+        turnTo("+land")
+        block()
+    } catch (e: Throwable) {
+        runCatching { upright() }.exceptionOrNull()?.let(e::addSuppressed)
+        throw e
+    }
+    upright()
 }

@@ -104,6 +104,13 @@ class InkOver(
     }
 
     private fun ink(action: Action.Ink): Snapshot {
+        // a reading of a piece ended already (put in by a letter, taken back: the pad's word on it came late)
+        // writes nothing, and the handwriting drops it: what [session] shows stays, its input not put in by
+        // it nor its 联想 gone (review F8186: 中 written, a hardware n typed, 中's late reading put n's first in)
+        // (an Ink of no piece shows what was held: never late itself)
+        if (!inking && action.piece != HandwritingSession.NO_PIECE && action.piece <= handwriting().ended) {
+            return still(handwriting().apply(action))
+        }
         // what [session] has typed put in first, as space would: the stroke is the next character's
         val put = if (typing) putTyped() else null
         if (!inking) {
@@ -116,6 +123,9 @@ class InkOver(
         val written = inkApply(action)
         return put?.let { then(it, written) } ?: written
     }
+
+    // [session]'s last snapshot shown again, nothing written anew by it; [dropped]'s where it has none
+    private fun still(dropped: Snapshot): Snapshot = inner?.copy(commit = "", deleteBefore = 0, picked = false) ?: dropped
 
     // a letter typed while the handwriting shows: its best sentence put in, then the letter [session]'s
     private fun letter(action: Action): Snapshot {

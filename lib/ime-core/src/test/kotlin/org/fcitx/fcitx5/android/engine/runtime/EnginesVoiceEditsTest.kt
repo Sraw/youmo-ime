@@ -94,23 +94,19 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         val dir = MemoryFiles()
         Engines(::load, dir, warmUps = inPlace).use { e ->
             e.context(PINYIN, "", said = true)
+            // the steps of one scenario, in order: each needs the one before (review F8112)
             val ask = e.retyped()
-            assertRows(
-                "asked, read as typed: voice's rules with it added would put it in" to {
-                    assertEquals("徐婧", ask?.word)
-                    assertEquals("xu jing", ask?.pinyin)
-                },
-                "记住: added by hand" to {
-                    assertNotNull(ask)
-                    assertTrue(e.voiceRemember(ask!!))
-                    assertEquals(listOf("徐婧"), added(e))
-                },
-                "撤销: off the added words, nothing forgotten in the learning record (review R1)" to {
-                    e.voiceForget("徐婧")
-                    assertEquals(emptyList<String>(), added(e))
-                    assertFalse(records(dir).any { it is LearnRecord.Forget && it.text == "徐婧" })
-                },
-            )
+            // asked, read as typed: voice's rules with it added would put it in
+            assertEquals("徐婧", ask?.word)
+            assertEquals("xu jing", ask?.pinyin)
+            // 记住: added by hand
+            assertNotNull(ask)
+            assertTrue(e.voiceRemember(ask!!))
+            assertEquals(listOf("徐婧"), added(e))
+            // 撤销: off the added words, nothing forgotten in the learning record (review R1)
+            e.voiceForget("徐婧")
+            assertEquals(emptyList<String>(), added(e))
+            assertFalse(records(dir).any { it is LearnRecord.Forget && it.text == "徐婧" })
         }
     }
 
@@ -120,16 +116,12 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
             e.context(PINYIN, "", said = true)
             val ask = e.retyped("我找单静", keys = "shanjing", word = "单婧")
-            assertRows(
-                "单 typed shan: asked, read shan jing (its readings, dan and shan, leave it open)" to {
-                    assertEquals("单婧", ask?.word)
-                    assertEquals("shan jing", ask?.pinyin)
-                },
-                "added so" to {
-                    assertTrue(e.voiceRemember(ask!!))
-                    assertEquals(listOf("shan jing"), e.userWords(UserWord.Kind.ADDED).map { it.pinyin })
-                },
-            )
+            // 单 typed shan: asked, read shan jing (its readings, dan and shan, leave it open)
+            assertEquals("单婧", ask?.word)
+            assertEquals("shan jing", ask?.pinyin)
+            // then 记住: added so
+            assertTrue(e.voiceRemember(ask!!))
+            assertEquals(listOf("shan jing"), e.userWords(UserWord.Kind.ADDED).map { it.pinyin })
         }
     }
 
@@ -143,14 +135,12 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             // the word deleted again and another of the same reading typed: voice judged without the first, ranked first
             repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
             val second = e.typedAgain("我找", "xujing", "徐靖")
-            assertRows(
-                "asked as replacing the first" to {
-                    assertEquals("徐靖", second?.word)
-                    assertEquals("徐婧", second?.replaces)
-                },
-                "记住: the second added" to { assertTrue(e.voiceRemember(second!!)) },
-                "the first taken off" to { assertEquals(listOf("徐靖"), added(e)) },
-            )
+            // asked as replacing the first
+            assertEquals("徐靖", second?.word)
+            assertEquals("徐婧", second?.replaces)
+            // 记住: the second added, the first taken off
+            assertTrue(e.voiceRemember(second!!))
+            assertEquals(listOf("徐靖"), added(e))
         }
     }
 
@@ -164,16 +154,12 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             e.addedUnrelated()
             e.context(PINYIN, "", said = true)
             val ask = e.retyped()
-            assertRows(
-                "asked, read as typed" to {
-                    assertEquals("徐婧", ask?.word)
-                    assertEquals("xu jing", ask?.pinyin)
-                },
-                "记住: added after it" to {
-                    assertTrue(e.voiceRemember(ask!!))
-                    assertEquals(listOf("许静", "徐婧"), added(e))
-                },
-            )
+            // asked, read as typed
+            assertEquals("徐婧", ask?.word)
+            assertEquals("xu jing", ask?.pinyin)
+            // 记住: added after it
+            assertTrue(e.voiceRemember(ask!!))
+            assertEquals(listOf("许静", "徐婧"), added(e))
         }
     }
 
@@ -186,16 +172,12 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             assertTrue(e.voiceRemember(e.retyped()!!))
             repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
             val second = e.typedAgain("我找", "xujing", "徐靖")
-            assertRows(
-                "asked as replacing the first" to {
-                    assertEquals("徐靖", second?.word)
-                    assertEquals("徐婧", second?.replaces)
-                },
-                "记住: the second in the first's stead, the unrelated one kept" to {
-                    assertTrue(e.voiceRemember(second!!))
-                    assertEquals(listOf("许静", "徐靖"), added(e))
-                },
-            )
+            // asked as replacing the first
+            assertEquals("徐靖", second?.word)
+            assertEquals("徐婧", second?.replaces)
+            // 记住: the second in the first's stead, the unrelated one kept
+            assertTrue(e.voiceRemember(second!!))
+            assertEquals(listOf("许静", "徐靖"), added(e))
         }
     }
 
@@ -207,10 +189,9 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             assertTrue(e.voiceRemember(e.retyped()!!))
             // read as nothing spells: not added
             val bad = VoiceEdits.Ask("徐靖", "xu", "徐静", replaces = "徐婧", hint = false, cells = emptySet())
-            assertRows(
-                "not added" to { assertFalse(e.voiceRemember(bad)) },
-                "the first still added" to { assertEquals(listOf("徐婧"), added(e)) },
-            )
+            // not added, and so the first still added
+            assertFalse(e.voiceRemember(bad))
+            assertEquals(listOf("徐婧"), added(e))
         }
     }
 
@@ -309,6 +290,38 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         },
         "a tone not the same, by the data's readings (Q2)" to {
             Engines(::load, MemoryFiles(), warmUps = inPlace).use { e -> assertNull(e.retyped("我找许静")) }
+        },
+    )
+
+    // a word asked about (the user's words read for it, voice's tables made), then the window closed by [closing]:
+    // what was read let go, not kept with the engines till the next window's (review F8342, R26 F8435/F8442)
+    private fun letGo(closing: Engines.() -> Unit) = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+        e.addedUnrelated()
+        e.context(PINYIN, "", said = true)
+        assertNotNull(e.retyped())
+        assertTrue("held while the window is open", e.voiceEditsHoldWords)
+        e.closing()
+        assertFalse(e.voiceEditsHoldWords)
+    }
+
+    @Test
+    fun `the user's words read for an edit are let go when its window closes`() = assertRows(
+        "input finished" to { letGo { voiceEditsEnd() } },
+        "the habits turned off (U-93)" to { letGo { useHabits = false } },
+        "a commit not learned from (answered)" to {
+            letGo {
+                type(PINYIN, "wo")
+                assertEquals("我", onEvent(PINYIN, EngineEvent.PICK, 0, false).commit)
+            }
+        },
+        "a context of a field cleared" to { letGo { context(PINYIN, "", cleared = true) } },
+        "a context not learned from" to { letGo { context(PINYIN, "我找徐婧", learning = false) } },
+        // the app's report of a paste closes the window without a word of the glue's: the next context lets go
+        "a paste, then the next context" to {
+            letGo {
+                assertFalse(voicePutIn("，").open)
+                context(PINYIN, "我找徐婧，")
+            }
         },
     )
 }

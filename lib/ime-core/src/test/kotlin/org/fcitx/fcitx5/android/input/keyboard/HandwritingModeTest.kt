@@ -81,7 +81,7 @@ class HandwritingModeTest {
     }
 
     @Test
-    fun fadedLettersAreTheirTextsAndIconsAtAThirdTheFaceAsItIs() {
+    fun fadedLettersAreTheirTextsAndIconsAtLettersFadedTheFaceAsItIs() {
         val black = Argb(0xFF000000.toInt())
         val half = Argb(0x80FF0000.toInt())
         val face = Op.Fill(Shape.Rect(Box(0.0, 0.0, 10.0, 10.0), listOf(0.0, 0.0, 0.0, 0.0)), black)

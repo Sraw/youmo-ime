@@ -78,6 +78,7 @@ class KotlinHostHandwritingTest {
         }
         EngineState.traditionalIms = null
         EngineNotices.sayer = null
+        EngineNotices.forgetToldOnce()
     }
 
     // 0.6.0's profile with its 手写 input method: [first] it, else after pinyin and English

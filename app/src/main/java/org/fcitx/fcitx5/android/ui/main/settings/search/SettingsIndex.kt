@@ -221,6 +221,12 @@ object SettingsIndex {
         fun text(@StringRes id: Int) = if (id == 0) "" else context.getString(id)
         fun setting(title: String, summary: String, key: String, via: String?) = Row(title, summary, key, via, path, "pref:$key", Kind.SETTING)
         for (item in items) when (item) {
+            // a table's keyboard is there only while a layout of the user's has the table's keys (InputMethodSettings
+            // .TableKeyboard): found then (R26 F8479), not else, where it would be five results 「键盘」 that open a page
+            // without it (R26 F8136). The index is built off the main thread, where the layouts may be read
+            is InputMethodSettings.TableKeyboard -> if (InputMethodSettings.tableKeyboardShown(context)) {
+                visit(setting(text(item.title), text(item.summary), item.key, item.via ?: via))
+            }
             is InputMethodSettings.Toggle -> visit(setting(item.title(context), text(item.summary), item.key, via))
             is InputMethodSettings.Flags -> {
                 visit(setting(text(item.title), "", item.path, via))

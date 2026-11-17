@@ -1878,9 +1878,10 @@ def reset(d, base, page):
 def handwriting(d, on, offered=True):
     """0.6.1: handwriting is the toolbar's 手写 toggle (pinned on a new install), kept across fields and
     restarts: lit for B0-手写, off for every other baseline (a case before may have left it on). Where it
-    is [offered] (every Chinese input method) a missing button is a failure, turning it off too: a case
-    left on would go unseen; English, a password field and a hardware keyboard have none (the toggle is kept for
-    the next field it is offered in)"""
+    is [offered] (every Chinese input method) a missing button blocks, turning it off too: a case left on
+    would go unseen (raised from a reset it blocks the case being reset, not the one that left it); English and
+    a password field grey it out (described 「手写，这里用不了」, not found by its name here) and a hardware
+    keyboard has none (the toggle is kept for the next field it is offered in)"""
     for _ in range(3):
         s = d.screen()
         b = s.find(desc="手写", where="ime")
@@ -2195,6 +2196,22 @@ def in_picker(d, timeout=8):
         d.wait(shown, timeout, step=0.2, what="the file picker")
     except Blocked:
         pass
+
+
+def to_downloads(d, s=None):
+    """下载 in the file picker: through its roots drawer, opened by its ☰ (DocumentsUI's drawer_open, found by what it says
+    to a screen reader: no fixed place, which held for one AVD only), or tapped where the roots are listed with no ☰ (a
+    wide window keeps them on screen, review R26 F8494); blocked where neither shows"""
+    s = s or d.screen()
+    menu = next((n for n in s.nodes if n.desc in ("显示根目录", "Show roots")), None)
+    if menu:
+        d.tap(menu.c, 1.0)
+        d.tap_text("下载", scroll=False, after=2.0)
+        return
+    root = next((n for n in s.nodes if n.pkg.endswith("documentsui") and n.text in ("下载", "Downloads")), None)
+    if not root:
+        raise Blocked("文件选择里找不到「显示根目录」（☰），也没有「下载」")
+    d.tap(root.c, 2.0)
 
 
 def unhost(d):
@@ -2993,9 +3010,9 @@ def import_packs_ui(d, files=None):
     in_picker(d)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"导入资源包没出文件选择：{d.top_activity()}")
-    if d.screen().find(text="近期的文件"):
-        d.tap((77, 148), 1.0)   # the drawer's ☰ at the top left (1080×2340, 440 dpi)
-        d.tap_text("下载", scroll=False, after=2.0)
+    s = d.screen()
+    if s.find(text="近期的文件"):
+        to_downloads(d, s)
     d.tap_text(name, scroll=False, after=1.0)
     s = d.wait(lambda x: x if x.find(contains="导入结果") or x.find(contains="已导入") else None,
                timeout=180, step=1.0, what="导入结果")
@@ -3284,7 +3301,7 @@ def junit_results(dirs):
                 state = "跳过" if tc.find("skipped") is not None else ("失败" if bad is not None else "通过")
                 msg = ((bad.get("message") or "").splitlines() or [""])[0][:200] if bad is not None else ""
                 # a multiplatform module's jvmTest (keyboard-scene) names its methods "name[jvm]"
-                key = (tc.get("classname"), re.sub(r"\[jvm\]$", "", tc.get("name")))
+                key = (tc.get("classname"), re.sub(r"\[jvm\]$", "", tc.get("name") or ""))
                 # the same test in two results (SDK 35's and 29's): the worse counts (a failure
                 # at one must not be hidden by the other read after it)
                 if key not in out or WORSE.index(state) < WORSE.index(out[key][0]):
