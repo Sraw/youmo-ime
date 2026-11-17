@@ -178,6 +178,10 @@ tasks.withType<AbstractTestTask>().configureEach {
     inputs.dir(layout.projectDirectory.dir("src/commonMain/themes"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("sceneThemes")
+    // and the layout page's examples (ExampleLayoutsTest, BasedOnStylesTest), from web/theme-maker/examples/layouts
+    inputs.dir(rootProject.file("web/theme-maker/examples/layouts"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("layoutExamples")
     if (recording) outputs.upToDateWhen { false }
 }
 

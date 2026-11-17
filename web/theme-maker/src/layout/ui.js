@@ -6,6 +6,7 @@
 
   const E = globalThis['youmo-engine'] && globalThis['youmo-engine'].YoumoEngine;
   const M = window.YoumoMaker;
+  const L = window.YoumoLib;
   const LM = window.YoumoLayoutMaker;
   const LE = window.YoumoLayoutEdit;
   const F = window.YoumoForm;
@@ -14,13 +15,18 @@
   const EXAMPLES = JSON.parse($('youmo-layout-examples').textContent);
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
   const FONTS = { key: '"Youmo Latin", "Youmo Han", sans-serif' };
+  // the theme file's format (youmo-format, the theme maker's): what a .theme opened is held to
+  const TFORMAT = JSON.parse($('youmo-format').textContent);
+  // the preview's theme where it is a .theme opened (§12.2): not one of E.themes(), so a draft kept with it restores the default
+  const OPENED = 'opened';
 
   let FORMAT = null; // the engine's layoutFormat()
   let history = null; // a document: M.doc(the layout's text)
   let env = Object.assign({}, LM.ENV);
   let edited = false; // the draft is kept only once the user has changed something
   let keeping = null;
-  let measurer = null;
+  let measurer = null; // {key: its fonts, m}
+  let opened = null; // a .theme opened: {name, theme, images, fonts}, its bitmaps and font faces let go when another is
   const themes = new Map(); // a built-in theme read, by id
   const store = (() => { try { return M.idbStore(window.indexedDB, 'youmo-layout-maker'); } catch (e) { return null; } })();
 
@@ -81,6 +87,7 @@
   // ---- the preview ----
 
   function themeOf(id) {
+    if (id === OPENED) return opened && opened.theme;
     if (!themes.has(id)) {
       const r = E.readTheme(E.themeSource(id), null, null);
       themes.set(id, r.ok ? r.theme : null);
@@ -90,12 +97,14 @@
 
   function preview() {
     const canvas = $('preview');
-    if (!measurer) {
-      const m = E.canvasMeasurer(canvas.getContext('2d'), FONTS);
-      measurer = m.ok ? m.measurer : E.fixedMeasurer();
+    const fonts = fontsNow();
+    const key = JSON.stringify(fonts);
+    if (!measurer || measurer.key !== key) {
+      const m = E.canvasMeasurer(canvas.getContext('2d'), fonts);
+      measurer = { key, m: m.ok ? m.measurer : E.fixedMeasurer() };
     }
     const xml = history.current.xml;
-    const r = LM.check(E, xml, env, themeOf(env.theme), measurer, FORMAT.version);
+    const r = LM.check(E, xml, env, themeOf(env.theme), measurer.m, FORMAT.version);
     showProblems(r.problems);
     fillShape(r.info && r.info.family);
     if (!r.scene) {
@@ -253,7 +262,7 @@
     const r = E.readOwnLayout(text);
     const theme = themeOf(env.theme);
     if (!r.ok || !theme) return [];
-    const s = E.buildScene(r.layout, theme, LM.envJson(E, env, r.layout.family, r.layout), measurer || E.fixedMeasurer());
+    const s = E.buildScene(r.layout, theme, LM.envJson(E, env, r.layout.family, r.layout), measurer ? measurer.m : E.fixedMeasurer());
     return s.ok ? s.scene.json().keys.map((k) => k.id) : [];
   }
 
@@ -299,7 +308,8 @@
     if (!shown) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    E.paint(shown.scene, ctx, { pressed: null, icons: ICONS, images: {}, fonts: FONTS });
+    const own = env.theme === OPENED && opened;
+    E.paint(shown.scene, ctx, { pressed: null, icons: ICONS, images: own ? opened.images : {}, fonts: fontsNow() });
     const p = parsed();
     const ids = new Set(sel.map((at) => LE.cellAt(p, at)).filter(Boolean).map((c) => c.a.id));
     if (fragmentKey) ids.add(fragmentKey.id);
@@ -755,7 +765,9 @@
       out.push(groupBar(), line('分组字母', field(a.letters, (v) => {
         const l = v.trim().toLowerCase();
         if (l && LE.lettersProblem(l.replace(/ /g, ''))) return toast(LE.lettersProblem(l.replace(/ /g, '')));
-        set1({ letters: l || null, lean: l ? now().lean : null });
+        // its face and, a key of the app's name, its name as LE.setLetters says; held-letters as the checker tells it
+        const held = (x) => E.checkLayout(x, FORMAT.version, null).warnings.filter((f) => f.key === 'held-letters').map((f) => f.line);
+        edit(LE.setAttrs(LE.setLetters(xmlNow(), at, l || null, held), at, { lean: l ? now().lean : null }));
       }, { 'aria-label': '分组字母', autocapitalize: 'off' })));
       if (a.letters) out.push(line('落点', choice([['', '默认'], ['on', '偏向按到的字母'], ['off', '不偏']], a.lean || '', (v) => set1({ lean: v || null }), { 'aria-label': 'lean' })));
     }
@@ -892,6 +904,9 @@
   async function openFile() {
     const f = await pick($('open-input'));
     if (!f) return false;
+    // a pack by its bytes, not its name: one saved as .zip or x.theme.zip is a theme still (review S3)
+    const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
+    if (/\.theme$/i.test(f.name) || (head[0] === 0x50 && head[1] === 0x4b)) return openTheme(f);
     try {
       // a file far past the limit is not read whole to be refused
       const bytes = new Uint8Array(await f.slice(0, FORMAT.limits.bytes + 1).arrayBuffer());
@@ -904,6 +919,100 @@
       toast('打不开 ' + f.name + '：' + (e.message || e));
       return false;
     }
+  }
+
+  // the preview's fonts: the page's, and where the theme is a .theme opened, its own by their names
+  function fontsNow() {
+    return Object.assign({}, FONTS, env.theme === OPENED && opened ? opened.fonts : {});
+  }
+
+  // a .theme (§12.2, §12.4): its theme the preview's, and its boards (layouts/ the app lists) offered to start from, made
+  // layouts of the user's as the app makes them on import
+  let opening = 0;
+  async function openTheme(f) {
+    let d;
+    let theme;
+    // two opened one after another: the later's, the earlier ending after it dropped (review N6)
+    const mine = ++opening;
+    try {
+      d = (await M.open(E, L, TFORMAT, new Uint8Array(await f.arrayBuffer()))).doc;
+      const r = E.readTheme(d.xml, null, null);
+      if (!r.ok) throw new L.ThemeError('bad', r.problems.map((p) => p.message).join('；'));
+      theme = r.theme;
+    } catch (e) {
+      toast('打不开 ' + f.name + '：' + M.openError(e));
+      return false;
+    }
+    if (!(await useTheme(d, theme, () => mine === opening))) return false;
+    const boards = LM.themeBoards(E, d, theme, [...FORMAT.bases], FORMAT.version);
+    $('theme-text').textContent = boards.length
+      ? '「' + theme.name + '」已用作预览的主题。它带 ' + boards.length + ' 块键盘，可以从其中一块开始（和 App 导入时转出来的一样）：'
+      : '「' + theme.name + '」已用作预览的主题。它没有带 App 列在布局里的键盘（26 键、14 键、18 键、九键、数字键盘、符号面板）。';
+    $('theme-boards').replaceChildren(...boards.map((b) => {
+      const li = document.createElement('li');
+      if (b.ok) {
+        const btn = Object.assign(document.createElement('button'), { type: 'button', textContent: '从「' + b.name + '」开始' });
+        btn.addEventListener('click', () => {
+          $('theme-panel').close();
+          set(b.text, { fresh: true });
+          edited = true;
+          keep();
+          toast('已打开「' + theme.name + '」带的 ' + (LM.BASE_LABEL[b.board] || b.board) + '（id ' + b.id + '）');
+        });
+        li.append(btn);
+      } else li.textContent = (LM.BASE_LABEL[b.board] || b.board) + '：转不出来（' + b.why + '）';
+      return li;
+    }));
+    $('theme-panel').showModal();
+    return true;
+  }
+
+  // [d]'s theme the preview's: its keys' images (those the app would take, as the theme maker decodes them; its picture
+  // not drawn here, not decoded: review S1) and fonts loaded
+  // ([current]: false once another is opened, this one's loaded then let go and false returned; it stays loaded till
+  // another is, the preview able to go back to it)
+  async function useTheme(d, theme, current) {
+    const images = {};
+    const fonts = {};
+    const faces = [];
+    const safe = new Set(M.decodableImages(L, TFORMAT, d, ['key']));
+    const families = {};
+    for (const [name, bytes] of Object.entries(d.files)) {
+      try {
+        if (safe.has(name)) {
+          const bmp = await createImageBitmap(new Blob([bytes]));
+          images[name] = { image: bmp, width: bmp.width, height: bmp.height };
+        } else if (/\.(ttf|otf)$/i.test(name)) {
+          const family = 'youmo-file-' + L.contentId(bytes);
+          const face = new FontFace(family, bytes);
+          await face.load();
+          document.fonts.add(face);
+          faces.push(face);
+          families[name] = family;
+        }
+      } catch (e) {
+        // one the browser cannot decode: drawn without it, as the app refuses it on import
+      }
+    }
+    if (!current()) {
+      for (const i of Object.values(images)) i.image.close();
+      for (const face of faces) document.fonts.delete(face);
+      return false;
+    }
+    for (const [font, file] of Object.entries(theme.info(env.dark).fonts || {})) if (families[file]) fonts[font] = families[file];
+    if (opened) {
+      for (const i of Object.values(opened.images)) i.image.close();
+      for (const face of opened.faces) document.fonts.delete(face);
+    }
+    opened = { name: theme.name, theme, images, fonts, faces };
+    const sel = $('env-theme');
+    for (const o of [...sel.options]) if (o.value === OPENED) o.remove();
+    sel.add(new Option(theme.name + '（打开的 .theme）', OPENED));
+    env.theme = OPENED;
+    fillEnv();
+    keep();
+    if (history) preview();
+    return true;
   }
 
   async function save() {

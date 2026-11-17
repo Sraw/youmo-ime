@@ -187,6 +187,16 @@ object Place {
         return bottoms[minOf(r + n - 1, bottoms.lastIndex)]
     }
 
+    /**
+     * How many keys a [RowSplit.Halves] row has to halve (its keys but those `split="after"`, its gaps not counted) where
+     * that is not 9 or 10: it cannot be halved, and is scaled when split. Null where it can be, or the row scales anyway.
+     */
+    fun unhalved(row: ExpandedRow): Int? {
+        if (row.split != RowSplit.Halves) return null
+        val n = row.items.count { it !is ExpandedGap && !(it is ExpandedKey && it.attrs.splitAfter == true) }
+        return n.takeIf { it != 2 * SplitKeyboard.HALF_KEYS && it != ODD_HALVES }
+    }
+
     private class Laid(val items: List<Triple<Item, Int, Width>>, val indent: Double, val endIndent: Double)
 
     // a row's items and widths split: (item, which copy, width), and its indents
@@ -198,8 +208,8 @@ object Place {
         val after = row.items.filter { it is ExpandedKey && it.attrs.splitAfter == true }
         val halves = row.items.filter { it !in after && it !is ExpandedGap }
         val n = SplitKeyboard.HALF_KEYS
-        if (halves.size != 2 * n && halves.size != ODD_HALVES) {
-            warnings.add(row.line, "split=\"halves\" with ${halves.size} keys here, not 9 or 10: the row is scaled")
+        unhalved(row)?.let {
+            warnings.add(row.line, "split=\"halves\" with $it keys here, not 9 or 10: the row is scaled")
             return scale
         }
         val left = halves.take(n)

@@ -30,7 +30,7 @@ class KeyDataTest {
     private fun pack(id: String, text: String, fragments: Map<String, Fragment> = emptyMap()) = KeyData.of(id, read(text), fragments, KeyData.Mode.Pack)
 
     // the 18 keys' the example 薄荷 17 键 has: H and JK one key, every group key writing its corner as alt= and swipe-up=
-    private val k17 by lazy { testData("../../../../../web/theme-maker/examples/k17-motion/layouts/k18.xml") }
+    private val k17 by lazy { testData("mint-k17/layouts/k18.xml") }
 
     @Test
     fun aKeyOfTheAppsNameTakesTheAppsWhateverTheThemeWrites() {

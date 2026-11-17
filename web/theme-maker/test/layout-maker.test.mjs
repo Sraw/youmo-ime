@@ -17,8 +17,9 @@ import { assemble, blockOf, ENGINE, LAYOUT_SRC, layoutExamplesJson, NO_ENGINE } 
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, '..', 'src');
-for (const f of ['form.js', 'maker.js', join('layout', 'layout-maker.js'), join('layout', 'layout-edit.js')]) vm.runInThisContext(readFileSync(join(src, f), 'utf8'), { filename: f });
+for (const f of ['lib.js', 'form.js', 'maker.js', join('layout', 'layout-maker.js'), join('layout', 'layout-edit.js')]) vm.runInThisContext(readFileSync(join(src, f), 'utf8'), { filename: f });
 const M = globalThis.YoumoMaker;
+const L = globalThis.YoumoLib;
 const LM = globalThis.YoumoLayoutMaker;
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
 const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
@@ -31,7 +32,9 @@ const fresh = (base = 'k18') => LM.fromBuiltin(E, base, 'my-' + base, '我的' +
 test('the page is made of src/layout/ and the shared scripts, runs only its own by their hashes, and the theme maker and it link each other', () => {
   const page = assemble(LAYOUT_SRC);
   assert.equal(blockOf(page, 'youmo-engine'), NO_ENGINE);
-  assert.equal(blockOf(page, 'youmo-lib'), null, 'no theme library: the layout maker reads no theme files');
+  // the theme library and the theme file's format: a .theme opened (§12.4) read as the theme maker reads it
+  assert.equal(blockOf(page, 'youmo-lib'), readFileSync(join(src, 'lib.js'), 'utf8').replace(/\n+$/, ''));
+  assert.equal(JSON.parse(blockOf(page, 'youmo-format')).limits.fileBytes > 0, true);
   for (const [id, file] of [['youmo-form', 'form.js'], ['youmo-maker', 'maker.js'], ['youmo-layout-maker', join('layout', 'layout-maker.js')], ['youmo-layout-edit', join('layout', 'layout-edit.js')], ['youmo-ui', join('layout', 'ui.js')]]) {
     assert.equal(blockOf(page, id), readFileSync(join(src, file), 'utf8').replace(/\n+$/, ''), id);
   }
@@ -39,7 +42,7 @@ test('the page is made of src/layout/ and the shared scripts, runs only its own 
   assert.ok(page.includes(readFileSync(join(src, 'style.css'), 'utf8').replace(/\n+$/, '') + '\n' + readFileSync(join(LAYOUT_SRC, 'style.css'), 'utf8').replace(/\n+$/, '')));
   const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(page)[1];
   const run = [...page.matchAll(/<script(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-  assert.equal(run.length, 6);
+  assert.equal(run.length, 7);
   assert.match(csp, /default-src 'none'/);
   assert.ok(!/unsafe-inline'[^;]*;/.test(/script-src [^;]*;/.exec(csp)[0]));
   assert.deepEqual(/script-src ([^;]*);/.exec(csp)[1].split(' '), run.map((t) => "'sha256-" + createHash('sha256').update(t).digest('base64') + "'"));
@@ -326,11 +329,47 @@ test("a draft's environment is taken only as the bar offers it: another device, 
   for (const [v] of LM.SHIFTS) assert.equal(LM.restoreEnv({ shift: v }, [], []).shift, v);
 });
 
+// L8 (§12.4): a .theme opened, its boards the app lists made layouts of the user's as the app makes them on import
+test("a theme pack's boards are offered made layouts of the user's, as the app's import makes them", async () => {
+  const data = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data');
+  const k18 = readFileSync(join(data, 'mint-k17', 'layouts', 'k18.xml'), 'utf8');
+  const xml = readFileSync(join(data, 'mint-k17', 'theme.xml'), 'utf8').replace('<colors>', '<meta author="小明" license="CC-BY-4.0"/>\n  <colors>');
+  // a pack as the page opens it: zipped, its zhuyin.xml (a board the app still has replaced) and a broken number.xml beside
+  const tf = JSON.parse(readFileSync(join(here, '..', 'generated', 'youmo-format.json'), 'utf8'));
+  const enc = new TextEncoder();
+  const zip = L.writeZip([['theme.xml', enc.encode(xml)], ['layouts/k18.xml', enc.encode(k18)], ['layouts/zhuyin.xml', enc.encode(E.layoutSource('zhuyin'))], ['layouts/number.xml', enc.encode('<keyboard')]]);
+  const d = (await M.open(E, L, tf, zip)).doc;
+  const theme = E.readTheme(d.xml, null, null).theme;
+  const boards = LM.themeBoards(E, d, theme, [...FORMAT.bases], FORMAT.version);
+  assert.deepEqual(boards.map((b) => [b.board, b.ok]), [['k18', true], ['number', false]], 'the listed boards it has, in their order; 注音 not one');
+  const made = E.convertPackLayout('薄荷 17 键', { author: '小明', license: 'CC-BY-4.0' }, 'k18', k18, null, '0.6.1');
+  assert.equal(boards[0].text, made.text, 'the app\'s import\'s');
+  // the JVM's own (PackConvertTest's snapshot)
+  assert.equal(boards[0].text, readFileSync(join(data, 'convert', 'k17-motion.layout'), 'utf8'));
+  assert.equal(boards[0].name, '薄荷 17 键 · 17 键');
+  assert.equal(boards[0].id, made.id);
+  assert.equal(boards[1].why, '读不出来', 'in words, not PackLayouts\' own (review S2)');
+  // every why PackLayouts gives, in words (review R3)
+  assert.equal(LM.refusal("the app's k18 does not read"), 'App 自带的 k18 读不出来');
+  assert.equal(LM.refusal('made one that does not take: a letters board lacks the keys x'), '转出来的布局检查不过：a letters board lacks the keys x');
+  assert.equal(LM.refusal('its fragment grouped-bottom does not read'), '它用的片段 grouped-bottom 读不出来');
+  assert.deepEqual(LM.saveCheck(E, boards[0].text, FORMAT.version, theme).errors, []);
+  // the pack's own fragment written in, as the app's import does
+  const bottom = E.layoutSource('grouped-bottom').replace('<fragment', '<!-- mine -->\n<fragment');
+  const withBottom = M.doc(d.xml, {}, { 'k18.xml': k18, 'grouped-bottom.xml': bottom });
+  assert.equal(LM.themeBoards(E, withBottom, theme, [...FORMAT.bases], FORMAT.version)[0].text,
+    E.convertPackLayout('薄荷 17 键', { author: '小明', license: 'CC-BY-4.0' }, 'k18', k18, { 'grouped-bottom': bottom }, '0.6.1').text);
+  // none: nothing offered
+  assert.deepEqual(LM.themeBoards(E, M.doc(d.xml), theme, [...FORMAT.bases], FORMAT.version), []);
+});
+
 // as the engine's (format.test.mjs): just above what it is, so it grows only on purpose (the engine is most of it)
 test('the layout maker built is no bigger than its budget', () => {
   const page = assemble(LAYOUT_SRC, ENGINE);
-  // 0.6.1 L6/L7/W3: raised once with room for the custom-layout stages (user 11-16)
-  assert.ok(Buffer.byteLength(page) <= 2_000_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
+  // 0.6.1 L6/L7/W3: raised once with room for the custom-layout stages (user 11-16); L8: the theme library (youmo-lib,
+  // 55 KB) and the theme file's format (7 KB) for a .theme opened, past that room, and L6's engine (061-pending-decisions
+  // L8a: the user holds the size no matter)
+  assert.ok(Buffer.byteLength(page) <= 2_100_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
   assert.ok(statSync(ENGINE).size < Buffer.byteLength(page));
 });
 
@@ -518,6 +557,76 @@ test('letter keys merged into a group key: the board grouped, every letter a gro
   const six = [0, 1, 2, 3, 4, 5].map((index) => ({ row: 0, index }));
   assert.deepEqual(LE.merge(xml, six), { error: '分组字母是 1–5 个 a–z 或 ;' });
   assert.match(LE.MERGED, /^变成分组键盘：只有拼音能用/);
+});
+
+// L8: {group:} takes one or two letters (LayoutReader's GROUP_ARG); three or more are written out, as the 17 键 example's HJK
+test('a group of three letters or more is written out in capitals, the reader taking it', () => {
+  assert.equal(LE.groupLabel('qw'), '{group:qw}');
+  assert.equal(LE.groupLabel('l;'), '{group:l;}');
+  assert.equal(LE.groupLabel('hjk'), 'HJK');
+  const xml = fresh('qwerty');
+  assert.equal(LE.letterKey(xml, 'hjk'), '<key id="hjk" label="HJK" letters="hjk" shortcut="my-qwerty/hjk"/>');
+  const r = LE.merge(xml, [{ row: 1, index: 5 }, { row: 1, index: 6 }, { row: 1, index: 7 }]);
+  assert.match(r.xml, /<key id="hjk" label="HJK" letters="hjk" shortcut="my-qwerty\/hjk" width="3"\/>/);
+  assert.doesNotMatch(r.xml, /\{group:[a-z;]{3,}\}/);
+  assert.deepEqual(errorsOf(r.xml), []);
+  assert.equal(engineIds(r.xml)[1], 'a s d f g hjk l semicolon star');
+  // five, the most a key takes
+  const five = LE.merge(xml, [0, 1, 2, 3, 4].map((index) => ({ row: 0, index })));
+  assert.match(five.xml, /<key id="qwert" label="QWERT" letters="qwert"/);
+  assert.deepEqual(errorsOf(five.xml), []);
+  // a group key added to a board: checked clean as well
+  const gone = LE.remove(r.xml, { row: 1, index: 5 });
+  assert.deepEqual(errorsOf(LE.addRow(gone, 0, LE.letterKey(gone, 'hjk'))), []);
+  // by rows, the face of the letters
+  assert.equal(LE.groupLabel('h jk'), 'HJK');
+  assert.equal(LE.groupLabel('q w'), '{group:qw}');
+});
+
+// the 分组字母 box (review S4, N9): the face follows the letters where it is the group's own, a key of the app's name
+// with letters not the app key's named its own
+test('group letters set: the face the group\'s own follows them, a face written over stays, an app key\'s named its own', () => {
+  const k18 = fresh('k18');
+  const h = { row: 1, index: 3 };
+  const a = (x) => LE.cellAt(LE.parse(x), h).a;
+  const held = (x) => [...E.checkLayout(x, FORMAT.version, null).warnings].filter((f) => f.key === 'held-letters').map((f) => f.line);
+  // H made HJK: its face HJK, its name (g18/h, the app's H) its own, the checker telling nothing
+  const hjk = LE.setLetters(k18, h, 'hjk', held);
+  assert.deepEqual([a(hjk).label, a(hjk).letters, a(hjk).shortcut], ['HJK', 'hjk', 'my-k18/hjk'], 'named as the app names a pack\'s (L6)');
+  assert.deepEqual(held(hjk), []);
+  assert.deepEqual(held(LE.setLetters(k18, h, 'hjk')), [LE.parse(k18).rows[1].cells[3].line], 'not named: told');
+  // its own already: not renamed again; letters the app key's: kept the app's
+  assert.equal(a(LE.setLetters(hjk, h, 'hj', held)).shortcut, 'my-k18/hjk');
+  assert.equal(a(LE.setLetters(k18, h, 'h', held)).shortcut, 'g18/h');
+  // a name of those letters another key has for other letters: -2; the ; of l; left out
+  const taken = LE.setAttrs(k18, { row: 0, index: 0 }, { shortcut: 'my-k18/hjk' });
+  assert.equal(a(LE.setLetters(taken, h, 'hjk', held)).shortcut, 'my-k18/hjk-2');
+  const l = { row: 1, index: 5 };
+  assert.equal(LE.cellAt(LE.parse(LE.setLetters(k18, l, 'kl;', held)), l).a.shortcut, 'my-k18/kl');
+  // only a ; (no letter a–z): `keys`, as PackLayouts names it (review R1)
+  assert.equal(LE.cellAt(LE.parse(LE.setLetters(k18, l, ';', held)), l).a.shortcut, 'my-k18/keys');
+  // the name a <variant> (its key's other letters) or a <defaults> (none) has: taken too (review R2)
+  const inVariant = k18.replace(/(<key id="r1c1"[^>]*)\/>/, '$1><variant when="landscape" shortcut="my-k18/hjk"/></key>');
+  assert.notEqual(inVariant, k18);
+  assert.equal(a(LE.setLetters(inVariant, h, 'hjk', held)).shortcut, 'my-k18/hjk-2');
+  const inDefaults = k18.replace('<row>', '<row>\n    <defaults shortcut="my-k18/hjk"/>');
+  assert.notEqual(inDefaults, k18);
+  assert.equal(a(LE.setLetters(inDefaults, h, 'hjk', held)).shortcut, 'my-k18/hjk-2');
+  // a variant of the key itself, of its letters: its own name, kept
+  const own = hjk.replace(/(<key id="r2c4"[^>]*)\/>/, '$1><variant when="landscape" shortcut="my-k18/hjk"/></key>');
+  assert.notEqual(own, hjk);
+  assert.equal(a(LE.setLetters(own, h, 'hjk', held)).shortcut, 'my-k18/hjk');
+  // a {group:hjk} of the page before L8 (refused by the reader): followed, and so made right
+  const old = LE.setAttrs(hjk, h, { label: '{group:hjk}' });
+  assert.equal(a(LE.setLetters(old, h, 'hjkl', held)).label, 'HJKL');
+  // letters by rows: the face followed after, and again
+  const rows = LE.setLetters(hjk, h, 'h jk', held);
+  assert.deepEqual([a(rows).label, a(rows).letters], ['HJK', 'h jk']);
+  assert.equal(a(LE.setLetters(rows, h, 'hj', held)).label, '{group:hj}');
+  // a face written over: kept
+  assert.equal(a(LE.setLetters(LE.setAttrs(hjk, h, { label: '好' }), h, 'hj', held)).label, '好');
+  // taken out: no letters, the face as it was
+  assert.deepEqual([a(LE.setLetters(hjk, h, null, held)).letters, a(LE.setLetters(hjk, h, null, held)).label], [undefined, 'HJK']);
 });
 
 test('rows: added, moved, taken out; their height and indent; the app\'s bottom row made the layout\'s own', () => {

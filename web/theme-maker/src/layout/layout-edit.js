@@ -295,8 +295,58 @@
       return el('key', { id, label: semicolon ? ';' : '{case:' + letters + '}', send: letters, shortcut: name });
     }
     const id = freeId(xml, letters.replace(/;/g, 'ing') || 'g', null, source);
-    return el('key', { id, label: '{group:' + letters + '}', letters, shortcut: i.id + '/' + id });
+    return el('key', { id, label: groupLabel(letters), letters, shortcut: i.id + '/' + id });
   }
+
+  /**
+   * The face of a group key of [letters]: `{group:…}` (cased as 拼音键字母大小写 says) for one or two, the reader's limit
+   * (LayoutReader's GROUP_ARG, docs/layout-format.md); three or more written out in capitals (`HJK`), as the 17 键
+   * example has it.
+   */
+  function groupLabel(letters) {
+    // by rows (`h jk`) or not, the face is of the letters
+    const l = letters.replace(/ /g, '');
+    return l.length <= 2 ? '{group:' + l + '}' : l.toUpperCase();
+  }
+
+  /**
+   * [xml] with the key at [at]'s group letters [letters] (the 分组字母 box; null: taken out). Its face follows them where
+   * it is the group's own: none, a `{group:…}` (one a page before L8 wrote of three letters too, which the reader
+   * refuses) or the capitals of its letters, by rows or not; a face written over stays (review S4). A key of the app's
+   * name its letters are then not the app key's ([held]: the lines of LayoutCheck's held-letters in an xml) is named
+   * its own, its long press then its letters' (review N9): `<layout id>/<its letters>` as the app names a theme pack's
+   * such key (PackLayouts, L6: a–z only; a key of that name with other letters taken, -2, -3…), keys of one group one name.
+   */
+  function setLetters(xml, at, letters, held = null) {
+    const c = cellAt(parse(xml), at);
+    if (!c) return xml;
+    const a = c.a;
+    const own = !a.label || /^\{group:[a-z;]*\}$/.test(a.label) || a.label === groupLabel(a.letters || '');
+    let out = retag(xml, c, { letters: letters || null, ...(own && letters ? { label: groupLabel(letters) } : {}) });
+    if (!letters || !held) return out;
+    const now = cellAt(parse(out), at);
+    const i = LM.info(out) || {};
+    if (now && i.id && held(out).includes(now.line)) out = retag(out, now, { shortcut: groupName(out, i.id, letters) });
+    return out;
+  }
+
+  // `<layout id>/<letters>` (a–z; none, `keys`), unless a name of [xml] has it for other letters: a key's, its
+  // <variant>s' (the key's letters), a <defaults>' (none); then -2, -3… (PackLayouts.renameKeys, review R1, R2)
+  function groupName(xml, id, letters) {
+    const flat = (l) => (l || '').replace(/ /g, '');
+    const base = id + '/' + (flat(letters).replace(/[^a-z]/g, '') || 'keys');
+    const keys = F.elements(xml, 'key').map((k) => ({ ...k, a: attrs(k) }));
+    const names = [
+      ...keys.map((k) => [k.a.shortcut, flat(k.a.letters)]),
+      ...F.elements(xml, 'variant').map((v) => [attrs(v).shortcut, flat((keys.find((k) => v.start > k.start && v.start < k.end) || { a: {} }).a.letters)]),
+      ...F.elements(xml, 'defaults').map((d) => [attrs(d).shortcut, null]),
+    ];
+    const others = (name) => names.some(([n, l]) => n === name && l !== flat(letters));
+    let name = base;
+    for (let n = 2; others(name); n++) name = base + '-' + n;
+    return name;
+  }
+
 
   /** What is wrong with [letters] as a key's group, null for nothing. */
   function lettersProblem(letters) {
@@ -392,10 +442,10 @@
     let out = xml;
     for (const c of cells.slice(1).reverse()) out = cut(out, c.start, c.end);
     const id = freeId(out, group.replace(/;/g, 'ing'), cells[0].a.id, source);
-    out = put(out, cells[0].start, cells[0].end, el('key', { id, label: '{group:' + group + '}', letters: group, shortcut: i.id + '/' + id, width }));
+    out = put(out, cells[0].start, cells[0].end, el('key', { id, label: groupLabel(group), letters: group, shortcut: i.id + '/' + id, width }));
     for (const r of parse(out).rows.slice().reverse()) {
       for (const c of r.cells.slice().reverse()) {
-        if (c.name === 'key' && !c.a.letters && lettersOf(c)) out = retag(out, c, { letters: c.a.send, label: '{group:' + c.a.send + '}', send: null });
+        if (c.name === 'key' && !c.a.letters && lettersOf(c)) out = retag(out, c, { letters: c.a.send, label: groupLabel(c.a.send), send: null });
       }
     }
     out = LM.setKeyboard(dropEmpty(out), 'family', 'grouped');
@@ -521,8 +571,8 @@
 
   root.YoumoLayoutEdit = {
     PROBE, MERGED, ACTION_TYPES, ACTIONS, FN_LABEL,
-    parse, cellAt, setAttrs, setRow, insert, remove, move, step, addRow, removePart, movePart, partOfRow, ownRows, includeOf, locate, atLine,
-    freeId, letterKey, lettersProblem, charKey, functionKeys, withFreeId, lettersOf, merge, coverage,
+    parse, cellAt, setAttrs, setLetters, setRow, insert, remove, move, step, addRow, removePart, movePart, partOfRow, ownRows, includeOf, locate, atLine,
+    freeId, letterKey, groupLabel, lettersProblem, charKey, functionKeys, withFreeId, lettersOf, merge, coverage,
     labelParts, labelProblem, labelText, actionParts, actionText, sharedName, popupOf, setPopup, snap, num, widthOf,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

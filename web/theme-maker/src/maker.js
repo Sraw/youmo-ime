@@ -187,8 +187,9 @@
    * Which of [d]'s files the page may decode: only images the theme names, each within its role's sides (the
    * picture's source, its cuts, a key's image: youmo-lib's decodeCaps), and all of them within DECODE_BUDGET, the
    * first named first. A pack's bytes are not trusted: a decode past the browser's memory takes the tab down.
+   * [only]: those roles alone (the layout page draws no picture: its keys' images only, the budget theirs).
    */
-  function decodableImages(L, format, d) {
+  function decodableImages(L, format, d, only = null) {
     const xml = uncommented(d.xml);
     const roles = new Map();
     const name = (n, role) => { if (!roles.has(n)) roles.set(n, role); };
@@ -199,6 +200,7 @@
     let spent = 0;
     const out = [];
     for (const [n, role] of roles) {
+      if (only && !only.includes(role)) continue;
       const bytes = d.files[n];
       const size = bytes && /\.(png|jpe?g|webp)$/i.test(n) ? L.imageSize(bytes) : null;
       if (!size || !L.decodable(size, L.decodeCaps(format, role))) continue;
@@ -207,6 +209,19 @@
       out.push(n);
     }
     return out;
+  }
+
+  // a file refused (youmo-lib's ThemeError codes) in words that say what to do: the theme maker's and the layout page's
+  function openError(e) {
+    switch (e && e.code) {
+      case 'limit': return '文件太大或文件太多，超过了 App 的限制';
+      case 'newer': return '它是更新版本的幽默输入法做的（' + e.detail + '），先刷新这个网页再试';
+      case 'older': return '它是很旧的版本（' + e.detail + '），先导入 App 再从 App 导出';
+      case 'not-theme': return '这不是主题文件（.theme 或 theme.xml）';
+      case 'missing': return '主题里写到的文件 ' + e.detail + ' 包里没有';
+      case 'bad': return '主题文件有错：' + e.detail;
+      default: return (e && e.message) || String(e);
+    }
   }
 
   const decode = (bytes) => new TextDecoder().decode(bytes);
@@ -759,6 +774,6 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, openError, open, save, same, History, keepDraft, draft, dropDraft, idbStore, envJson, check, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

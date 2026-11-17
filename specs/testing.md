@@ -419,14 +419,15 @@ Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with 
 `panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
 held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
 `page.html`, `style.css`, `ui.js`), and `examples/` (`examples.json` and a folder of each example, put in the
-maker's `youmo-examples` block); and `layout/index.html`, the layout maker (061-custom-layout §12; `src/layout/`: its `page.html`, `style.css`, `layout-maker.js`, `layout-edit.js`, `ui.js`, with the maker's engine, `form.js` and `maker.js`), its examples `examples/layouts/` (`layouts.json` and a `.layout` each, put in its `youmo-layout-examples` block as they are, with `name=` as the label; `ExampleLayoutsTest` in keyboard-scene checks each clean and holds its scenes, upright, turned, compact and split, the number one in each of its pads, to `src/commonTest/data/example-layouts/` on the JVM and in node). The maker and classic run `src/lib.js` (everything the tests hold to the app's
-3.0 rules and zip). Neither page is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
-both from their sources (`web/theme-maker/.gitignore` keeps them out): the sources put in, each page's
+maker's `youmo-examples` block); and `layout/index.html`, the layout maker (061-custom-layout §12; `src/layout/`: its `page.html`, `style.css`, `layout-maker.js`, `layout-edit.js`, `ui.js`, with the maker's engine, `lib.js`, the theme file's format, `form.js` and `maker.js`: a `.theme` opened is read as the maker reads it), its examples `examples/layouts/` (`layouts.json` and a `.layout` each, put in its `youmo-layout-examples` block as they are, with `name=` as the label; `ExampleLayoutsTest` in keyboard-scene checks each clean and holds its scenes, upright, turned, compact and split, the number one in each of its pads, to `src/commonTest/data/example-layouts/` on the JVM and in node). The maker, classic and the layout maker run `src/lib.js` (everything the tests hold to the app's
+3.0 rules and zip). None of the three pages is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
+them from their sources (`web/theme-maker/.gitignore` keeps them out): the sources put in, each page's
 generated blocks read from `generated/<id>.json` (each carries only the ones its `page.html` has a slot
 for: the maker `youmo-format`, `youmo-engine-icons` and `youmo-examples` (from `examples/`), classic
-`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine), and the
-Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker, two on classic;
-nothing else runs, a script not hashed is refused). The page's test assembles both in memory and fails
+`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine, the layout maker `youmo-layout-examples`, `youmo-format`,
+`youmo-engine-icons` and the engine), and the
+Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker, two on classic, seven on the layout maker;
+nothing else runs, a script not hashed is refused). The pages' tests (`maker.test.mjs`, `layout-maker.test.mjs` for the layout page) assemble them in memory and fails
 when a generated block is missing or the CSP's hashes are not its scripts'. Commit `src/` and
 `generated/`; CI, the tests and `dev/serve.mjs` assemble the pages.
 `test/maker.test.mjs` (node, needs the built engine; CI runs it with the other two): a document
@@ -444,7 +445,7 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
-`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine and its size to 2,000,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser at 1280 and 360 px: new from a base and from each example, editing, save, help.
+`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to 2,100,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser at 1280 and 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
 
 ### The engine in the page (060-render-p3 W1)
 
@@ -511,13 +512,26 @@ What holds the library to the app:
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 
+## Custom layouts (061-custom-layout L1–L8)
+
+The `.layout` format and its check are keyboard-scene's, held alike on the JVM and in JS: `LayoutReaderTest`,
+`LayoutWriterTest`, `LayoutCheckTest` (every finding's key, by `LayoutCheck.KEYS`, said by the app's strings and the
+page's table), `LayoutCheckThreadsTest`, `ScaledRowsTest` (`split-scaled`), `PackConvertTest` (a theme pack's board made
+a layout of the user's), `ExampleLayoutsTest` (the page's examples). ime-core holds what the app decides with them:
+`LayoutImportTest` and `LayoutImportGroupedTest` (an import, its warnings and refusals), `LayoutCheckHeightsTest`,
+`CustomLayoutFilesTest`, `CustomLayoutChoicesTest`, `ImKeyboardsTest`, `PanelLayoutsTest`, `KeyShortcutPagesTest`,
+`RenamedKeysTest`, `ThemeLayoutSwitchTest`. The app's: `CustomLayoutsTest`, `CustomKeyboardTest`, `BackupLayoutsTest`,
+`PopupOverridesLayoutTabTest`, `SceneLayoutsTest`, `ThemeLayoutsToListTest`, `LayoutTextsTest`, `LayoutAddMenuTest`
+(and At29). The layout page: `test/layout-maker.test.mjs` (node: its edits, the page assembled and its budget), with
+`test/layout-smoke.mjs` driving it in a browser. Devices: uat ST-150–188, PY-153–155, SP-51.
+
 ## The keys' golden table (060-keys-unify)
 
 Every key's long press, first and marks on every keyboard is one reviewed table,
 `lib/ime-core/src/test/resources/keys-golden.tsv`: columns `keyid board state items first up down`; in `items` a
 bare text is `AsKey`, a `=` suffix `AsIs`, `#N` `Keypad(N)`, `@action` an `Action`, the row and the symbols split by `|`.
 The boards (`board`, as `KeyResolverGoldenTest.boards` names them) are pinyin full, nine, 14, 18, 双拼 nine and 18 (微软),
-English full and nine, a theme's own groups (`theme-k18`: the k17-motion example's `layouts/k18.xml`), both 注音,
+English full and nine, a theme's own groups (`theme-k18`: 0.6.0's theme maker example 薄荷 17 键's `layouts/k18.xml`, keyboard-scene's test data `mint-k17` since L8), both 注音,
 the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded candidates; the states
 `default`, `shift`, `zh` (Chinese punctuation) and `roots` (a table's roots).
 
@@ -531,7 +545,7 @@ the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded
 - `GeneratorParityTest` (app test sources) held the long-press generators moved into keyboard-scene `keys/` to the old
   ones key by key while both existed; it went with the old code in S6.
 - The format and the migration: `KeyListsFormatTest` (every rule of the grammar), `KeyIdRoundTripTest` (every name the
-  built-in layouts and the k17-motion example give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
+  built-in layouts and 0.6.0's 17 keys example pack (`mint-k17`) give, and odd orphan names, through `serialize → parse`), `KeyListsWithTest`
   (when a line is dropped; the `@3` marks), `DowngradeTo060Test` (0.6.0's own reading of `key_lists` and `key_swipes`,
   frozen: a marked list its defaults never written over, a `vtext:` slot its default, the rest kept), `KeyResolverMarksTest`
   (an item of variables filled in and filled in again as picked, an item as it is only where punctuation converts it),

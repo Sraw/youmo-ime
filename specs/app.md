@@ -965,8 +965,8 @@ id on that board), a group key's corner place the app's key's of its name; what 
 place, look, tap, group letters, role, name, `repeat=` and `swipe-axis=` stay the pack's. The boards 0.6.1 moves to
 custom layouts (`KeyData.LISTED`) keep what they write on a name the app has not. `SceneLayouts.of` drops what was
 read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
-the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `18 键（主题：17 键）`, the name cut
-at 24 characters; not where T9b draws the app's instead, 双拼 on own groups, which it does not log for them); ids stay as the theme format names the boards (`k14/r1c1`,
+the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `注音（主题：大字注音）`, the name cut
+at 24 characters; since 0.6.1 only 注音's two boards can be a pack's, the others' being layouts of the user's, `PackLayouts.replaces`); ids stay as the theme format names the boards (`k14/r1c1`,
 `ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
@@ -1023,7 +1023,7 @@ leaves them (sticky). The field's composing text (English's word) is no such cod
 Anything else is refused, logged with why, and the app's own layout drawn instead (`SceneLayouts.builtIn`):
 groups that make no keyboard, the other built-in keyboard's groups, and any grouping of its own on 双拼's
 keyboards (`GroupedKeyboardOwnGroupsTest`, `KeyboardCustomTest`). The theme's board stays `k14`/`k18`.
-A pack layout refused so is drawn as the app's own (`SceneBoard.ownLayout`) and typed as it: the built-in groups'
+A layout of the user's refused so (a file of an older build's rules; a pack's in the tests, `SceneLayouts.of` still taking one) is drawn as its base, the app's own (`SceneBoard.ownLayout`), and typed as it: the built-in groups'
 letters, codes, `wire` and leaning (`GroupedKeyboard` by the layout drawn, `BaseKeyboard.drawnLayout`, the settings
 preview's `shownAs` too); the pack's groups are not told the engine (`onAttach` only where the pack's own is drawn;
 a fallback found after attaching takes back what it told, `ownKeys` null; `PackLayoutRefusedTest`).
@@ -1290,7 +1290,8 @@ older stamp's dropped, `KeyboardNames.stale`; the other pads' of the same stamp 
 pref is in `remakeKeyboardsPrefs`. The symbol panel is made once per input view: `PickerWindow` asks the choice as it
 is made and at each `onAttached`, `PickerLayout.drawKeys(id@stamp)` putting a new board in place of the one drawn when
 it changed (its `categories` and `grid` slots placed as the app's). The layout's own pad checks (`pads=`, each pad's
-scene, `pad-lacks`, `bottom-left`) are `LayoutCheck`'s at import (L1); as it is read only `LayoutCheck.loaded`. 外观 →
+scene, `pad-lacks`, `bottom-left`) are `LayoutCheck`'s at import (L1), as is `split-scaled` (L8: an `on-split="split"`
+board's `split="halves"` row with other than 9 or 10 keys to halve in a scene, scaled when split, `ScaledRows`) and the held warnings (`held`, `held-letters`, `held-popups`, below); the layout page shows the same findings, LayoutCheck run in JS (its 分组字母 box naming a key whose letters leave the app key's `<layout id>/<letters>`, `LayoutEdit.setLetters`, as `merge` and `PackLayouts` do); as it is read only `LayoutCheck.loaded`. 外观 →
 布局: a number or symbols card, the app's too, tapped offers 数字键盘用这个 / 符号面板用这个 (one refused under this
 version's rules: why, not set), the one in use says 用在：数字键盘 (the app's where none is chosen; `layout_used_by_unread`
 where it does not read, a file that does not read at all listed under the panel that chose it,
@@ -1299,7 +1300,7 @@ where it does not read, a file that does not read at all listed under the panel 
 said so), a delete puts each panel using it back on the app's. A restore takes no number board a pad of which lacks
 what a field of it types (`lacks pad=…`, `CustomLayoutFiles.restorable`): as it is read no pad's scene is built again.
 
-Their key names (061-custom-layout §9, §19.4, L6). 按键字符和快捷键 adds a card per letters layout of the user's in use
+Their key names (061-custom-layout §9, §19.4, L6). 按键字符和快捷键 adds a card per layout of the user's an input method draws (letters, nine or grouped; one with no key of a character's name none)
 (`ImKeyboards.inUse`: the slots' `shown(…).custom`, drawn ones, each once) before 功能键: ime-core's
 `KeyShortcutPages.of` makes its page from the layout (every named key and own-named variant whatever its `when=`, no
 `fn/` names, each once; a built-in name its built-in tab's label, unless a group key's letters differ, an own name the

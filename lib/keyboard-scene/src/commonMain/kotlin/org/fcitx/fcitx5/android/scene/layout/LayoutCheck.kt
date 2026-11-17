@@ -126,6 +126,7 @@ object LayoutCheck {
         "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars", "command",
         // warnings
         "no-way", "narrow", "commits", "theme-blank", "unnamed", "held", "held-letters", "held-popups", "gap-look", "pad-lacks", "bottom-left",
+        "split-scaled",
     )
 
     const val MAX_ID = 32
@@ -169,6 +170,7 @@ object LayoutCheck {
         base?.let { b -> unnamed(layout, b, baseFragments(b, sources)).forEach { warnings += it } }
         warnings += heldData(layout, fragments, sources, baseId(layout, sources))
         shown.padLacks.forEach { warnings += it }
+        warnings += ScaledRows.find(layout, fragments, scenes(layout, ims, pads))
         if (strict) {
             gapLooks(source).forEach { warnings += it }
             shown.bottomLeft?.let { warnings += it }

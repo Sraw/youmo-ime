@@ -62,6 +62,7 @@ object LayoutTexts {
         "gap-look" to R.string.layout_finding_gap_look,
         "pad-lacks" to R.string.layout_finding_pad_lacks,
         "bottom-left" to R.string.layout_finding_bottom_left,
+        "split-scaled" to R.string.layout_finding_split_scaled,
     )
 
     private fun words(ctx: Context, f: LayoutCheck.Finding): String {

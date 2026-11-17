@@ -57,8 +57,8 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
     private val keyboard get() = prefs.keyboard
     private val builtIn by lazy { BuiltInLayouts(appContext) }
 
-    // the example pack's 17 keys (web/theme-maker/examples/k17-motion): groups of its own, 拼音's alone
-    private val k17 = File("../web/theme-maker/examples/k17-motion/layouts/k18.xml").readText()
+    // the 0.6.0 example pack's 17 keys (lib/keyboard-scene/src/commonTest/data/mint-k17): groups of its own, 拼音's alone
+    private val k17 = File("../lib/keyboard-scene/src/commonTest/data/mint-k17/layouts/k18.xml").readText()
     private fun qwerty(name: String = "主题 26 键") = builtIn.text("qwerty")!!.replace("name=\"26 键\"", "name=\"$name\"")
     private fun k18(name: String) = builtIn.text("k18")!!.replace("name=\"18 键\"", "name=\"$name\"")
 

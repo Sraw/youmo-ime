@@ -619,7 +619,7 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
 // a theme pack's layout made one of the user's (PackLayouts.convert, 061-custom-layout §2.3): the page's is the app's, the
 // text the JVM's own test holds (commonTest/data/convert)
 test("a pack's layout made one of the user's is the JVM's, byte for byte", () => {
-  const k18 = read(here, '..', 'examples', 'k17-motion', 'layouts', 'k18.xml');
+  const k18 = read(data, 'mint-k17', 'layouts', 'k18.xml');
   const c = E.convertPackLayout('薄荷 17 键', { author: '小明', license: 'CC-BY-4.0' }, 'k18', k18, null, '0.6.1');
   assert.ok(c.ok, c.why);
   assert.equal(c.text, read(data, 'convert', 'k17-motion.layout'));

@@ -137,7 +137,7 @@ export function assemble(src = join(root, 'src'), engine = null, fonts = join(ro
   const seen = new Map();
   for (const m of page.matchAll(/\{\{([\w-]+)\}\}/g)) seen.set(m[1], (seen.get(m[1]) || 0) + 1);
   const text = { css: read(join(src, 'style.css')), ui: read(join(src, 'ui.js')), fonts: fontFaces(fonts) };
-  // the library (youmo-lib): the theme makers' (the layout maker reads no theme files of its own)
+  // the library (youmo-lib): the theme makers', and the layout maker's (a .theme opened, §12.4)
   if (seen.has('lib')) text.lib = read(lib);
   // a page of a folder of src/ (layout/) has the maker's style.css under its own
   if (seen.has('base-css')) text['base-css'] = read(join(root, 'src', 'style.css'));

@@ -24,7 +24,7 @@ class ThemeLayoutSwitchTest {
     private val g18 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
     private val g14 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
 
-    // k17-motion's: 17 groups of its own, pinyin's alone
+    // the 0.6.0 example pack's 17 keys (keyboard-scene's test data mint-k17): 17 groups of its own, pinyin's alone
     private val g17 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jkl", "z", "xc", "v", "bn", "m")
 
     private fun made(pack: String, board: String, family: String, groups: List<String> = emptyList(), drawn: Boolean = true, tableExtras: Boolean = false) =

@@ -6,10 +6,12 @@
 // actions (a shared name's read-only), keys merged into a group, the app's bottom row made the layout's own, rows,
 // 整块, 信息, the page at a phone's 360 px; by the keyboard (Delete, the arrows, Ctrl+Z in a field the field's), a field
 // kept focused over its commit, the selection following its key over an undo, a finger's tap and swipe; 新建 from an
-// example (W3) and at 360 px, the help. CI runs it with the runner's Chrome, as panels-smoke.mjs.
+// example (W3) and at 360 px, the help; a .theme opened (L8): the preview's theme, a board of it to start from. CI runs it with the runner's Chrome, as panels-smoke.mjs.
 // Run: node web/theme-maker/test/layout-smoke.mjs [chromium]   (SHOT=<file.png>: the page's picture saved there)
 // Exit 0 all kept, 1 not, 2 not run (no Chromium).
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { serve } from '../dev/serve.mjs';
 import { browser, chromium } from './pixel-smoke.mjs';
 
@@ -450,6 +452,30 @@ async function main() {
     const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);
     check(/docs\/layout-maker\.md/.test(help) && /docs\/layout-format\.md/.test(help), 'help: open with its links: ' + help);
     await js(`document.querySelector('#help-panel button[value=close]').click()`);
+
+    // a .theme opened (L8, §12.4): 0.6.0's 薄荷 17 键 pack, zipped in the page; its theme the preview's, its k18.xml offered
+    // made a layout as the app makes it, a start from it checked clean; named .zip as a download may save it, a pack by its
+    // bytes still (review S3)
+    const mint = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'mint-k17');
+    const pack = { theme: readFileSync(join(mint, 'theme.xml'), 'utf8'), k18: readFileSync(join(mint, 'layouts', 'k18.xml'), 'utf8') };
+    await js(`(() => {
+      const p = ${JSON.stringify(pack)};
+      const enc = new TextEncoder();
+      const zip = window.YoumoLib.writeZip([['theme.xml', enc.encode(p.theme)], ['layouts/k18.xml', enc.encode(p.k18)]]);
+      const input = document.getElementById('open-input');
+      input.click = () => { const dt = new DataTransfer(); dt.items.add(new File([zip], 'mint.theme.zip')); input.files = dt.files; input.onchange(); };
+    })()`);
+    await js(`document.querySelector('#file-menu [data-act=open]').click()`);
+    await until(`document.getElementById('theme-panel').open`, 'a .theme opened: no panel');
+    const offer = await js(`[document.getElementById('env-theme').value, document.getElementById('env-theme').selectedOptions[0].textContent, [...document.querySelectorAll('#theme-boards button')].map((b) => b.textContent)]`);
+    check(offer[0] === 'opened' && /薄荷 17 键（打开的 \.theme）/.test(offer[1]) && offer[2].length === 1 && /薄荷 17 键 · 17 键/.test(offer[2][0]), 'a .theme: its theme the preview\'s, its 18 keys offered: ' + JSON.stringify(offer));
+    await js(`document.querySelector('#theme-boards button').click()`);
+    await until(`!document.getElementById('theme-panel').open`, 'starting from the pack\'s board did not close the panel');
+    await wait(500);
+    const fromPack = await source();
+    const packCount = await count();
+    check(/based-on="k18"/.test(fromPack) && /letters="hjk"/.test(fromPack) && (/^0 个错误/.test(packCount) || packCount === '没有'), 'from the pack\'s 17 keys: based on k18, no errors: ' + packCount);
+    await choose('env-theme', 'material');
 
     // the picture: a new 18 keys upright
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);

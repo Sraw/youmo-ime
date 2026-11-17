@@ -1544,4 +1544,5 @@
     <string name="layout_finding_gap_look">空位（gap）的 look=、class= 不起作用</string>
     <string name="layout_finding_pad_lacks">数字键盘「%1$s」缺 %2$s：这种输入框里打不出来</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 自带的一样）</string>
+    <string name="layout_finding_split_scaled">分体时这一行在「%2$s」有 %1$s 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小</string>
 </resources>

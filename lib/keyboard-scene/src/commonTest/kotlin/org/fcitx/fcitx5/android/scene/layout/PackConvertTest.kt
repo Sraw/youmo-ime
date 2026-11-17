@@ -30,7 +30,7 @@ class PackConvertTest {
         "qwerty", "symbols", "zhuyin-nine", "zhuyin",
     )
     private val sources = LayoutCheck.Sources(boards.associateWith { testData("$it.xml") }, mapOf("grouped-bottom" to testData("grouped-bottom.xml")))
-    private val k17 by lazy { testData("../../../../../web/theme-maker/examples/k17-motion/layouts/k18.xml") }
+    private val k17 by lazy { testData("mint-k17/layouts/k18.xml") }
     private val meta = Meta("小明", "1.0", "CC-BY-4.0", null, null)
 
     private fun convert(text: String, id: String = "k18", theme: String = "薄荷", fragments: Map<String, String> = emptyMap(), m: Meta? = meta) =
@@ -167,6 +167,9 @@ class PackConvertTest {
         val same = done(convert(k17.replace("letters=\"hjk\"", "letters=\"h\"")))
         assertTrue("shortcut=\"g18/h\"" in same.text)
         assertEquals(emptyMap(), same.renames)
+        // a group of a ; alone, no letter a–z to name it by: `keys`, the layout page's name too (layout-edit's groupName, L8 review R1)
+        val semi = done(convert(k17.replace("letters=\"hjk\"", "letters=\"hjkl\"").replace("letters=\"l;\"", "letters=\";\"")))
+        assertEquals(mapOf("g18/h" to "${semi.id}/hjkl", "g18/l" to "${semi.id}/keys"), semi.renames)
     }
 
     // a pack's layout's own <meta min-app> newer than the app: not made (L7 review NIT3; the made one writes none)

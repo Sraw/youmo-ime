@@ -841,8 +841,8 @@ case("ST-80", needs="manual:主题制作网页；在电脑浏览器上手工跑�
 case("ST-81", needs="manual:主题制作网页；在电脑浏览器上手工跑（关页重开、两个标签页的草稿）")(lambda d: None)
 case("ST-69", needs="manual:要真麦克风说话，用过语音后再导入语音包")(lambda d: None)
 case("ST-70", needs="manual:按键字符里选中一项左移、删除，看轮廓和删掉的是哪个")(lambda d: None)
-case("ST-73", needs="manual:要从制作页导出动效示例主题，按键的缩放、下沉、渐隐要人眼看")(lambda d: None)
-case("ST-74", needs="manual:要从制作页导出 17 键示例主题，按它的分组打拼音、看固定的词")(lambda d: None)
+case("ST-73", needs="manual:要从制作页导出动效示例主题「薄荷（动效）」，按键的缩放、下沉、渐隐要人眼看")(lambda d: None)
+case("ST-74", needs="manual:要导入 0.6.0 的薄荷 17 键旧主题包（mint-k17 测试数据），按它的分组打拼音、看固定的词")(lambda d: None)
 
 
 case("ST-63", needs="release:多选文字包、语音包和一个非包文件导入，读逐文件的结果框、看下载里的原文件还在；结果框出现时转屏只一个框，点确定后再转屏、切到别的应用再回来不再弹出（手工）；结果的说法在 JVM 上：PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles")(lambda d: None)
@@ -1945,11 +1945,12 @@ def st143(d):
     return "导入后是自带的分词；重启后拼音换成转出来的 26 键，打字时是分词（xi'an）；之后导入的那块仍是 ⇧"
 
 
-MINT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "examples", "k17-motion")
+# 0.6.0's theme maker example 薄荷 17 键 (a pack with its own layouts/k18.xml), keyboard-scene's test data since L8
+MINT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "lib", "keyboard-scene", "src", "commonTest", "data", "mint-k17")
 
 
 def push_mint_pack(d, name="uat-mint"):
-    """<name>.theme in 下载: the theme maker's 薄荷 17 键 example (its theme.xml and layouts/k18.xml) renamed"""
+    """<name>.theme in 下载: 0.6.0's 薄荷 17 键 example pack (its theme.xml and layouts/k18.xml) renamed"""
     with open(os.path.join(MINT, "theme.xml"), encoding="utf-8") as f:
         xml = f.read()
     assert 'name="薄荷 17 键"' in xml
@@ -2385,7 +2386,10 @@ def st162(d):
     import_uat_qwerty(d)
     card = layout_card(d, "UAT 26 键")
     check(card, "导入后列表里没有 UAT 26 键")
-    check(not d.screen().find(contains="用在："), "没用在输入法上，卡片下却写了「用在：」")
+    # its own card's line only: the app's 数字 and 符号 cards say 用在：数字键盘 / 符号面板 (L5) and may be on screen
+    s = d.screen()
+    under = [n.text for n in s.app() if n.text.startswith("用在：") and abs(n.c[0] - card.c[0]) < 200 and 0 < n.c[1] - card.c[1] < 150]
+    check(not under, f"没用在输入法上，卡片下却写了「用在：」：{under}")
     d.step("点卡片 → 用在… 勾拼音、英文")
     d.tap(card.c, 1.0)
     d.tap_text("用在…", where="all", scroll=False, after=1.5)
@@ -2708,6 +2712,19 @@ def st179(d):
     check("enter" in keys and "1" in keys and keys["enter"][3] - keys["enter"][1] < 1.5 * (keys["1"][3] - keys["1"][1]),
           f"电话框的数字键盘不是自带的：{sorted(keys)}")
     return "确认框写 123、只有数字、小数；卡片写用在：数字键盘；123 一行四个、回车跨两行、1 2 ⌫ 5 打出 15；小数框是它，电话框是自带的"
+
+
+@case("ST-180", base="B0-设置", mutates=True)
+def st180(d):
+    push_layout(d, "uat-split-1.0")
+    import_layout(d, "uat-split-1.0")
+    check(d.wait_text("导入布局 UAT 分体？", timeout=8, where="all", contains=True), f"没出导入确认：{d.screen().texts('all')[:10]}")
+    for told in ("注意：", "有 8 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小"):
+        check(d.wait_text(told, timeout=5, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:16]}")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    skip_use(d)
+    check(layout_card(d, "UAT 分体"), "导入后列表里没有 UAT 分体")
+    return "确认框能导入，警告第一行分体时 8 个键整行缩小；导入后列表里有 UAT 分体"
 
 
 # ---------------------------------------------------------------- 布局的键名 (061-custom-layout §9, §19.4, L6)

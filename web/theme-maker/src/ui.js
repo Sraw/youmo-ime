@@ -725,22 +725,10 @@
       }
       if (said.length) toast(said.join('；'));
     } catch (e) {
-      toast('打不开这个文件：' + openError(e));
+      toast('打不开这个文件：' + M.openError(e));
     }
   }
 
-  // a file refused (youmo-lib's ThemeError codes) in words that say what to do
-  function openError(e) {
-    switch (e && e.code) {
-      case 'limit': return '文件太大或文件太多，超过了 App 的限制';
-      case 'newer': return '它是更新版本的幽默输入法做的（' + e.detail + '），先刷新这个网页再试';
-      case 'older': return '它是很旧的版本（' + e.detail + '），先导入 App 再从 App 导出';
-      case 'not-theme': return '这不是主题文件（.theme 或 theme.xml）';
-      case 'missing': return '主题里写到的文件 ' + e.detail + ' 包里没有';
-      case 'bad': return '主题文件有错：' + e.detail;
-      default: return (e && e.message) || String(e);
-    }
-  }
 
   // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
   // where any pixel is see-through

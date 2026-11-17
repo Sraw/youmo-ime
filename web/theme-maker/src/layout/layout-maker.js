@@ -70,6 +70,7 @@
     'gap-look': () => '空位（gap）的 look=、class= 不起作用',
     'pad-lacks': ([pad, keys]) => '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来',
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',
+    'split-scaled': ([n, where]) => '分体时这一行在「' + where + '」有 ' + n + ' 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小',
   };
 
   /** A finding of checkLayout (`{line, key, args}`) in words; one of a key the table lacks, as the engine has it. */
@@ -216,7 +217,7 @@
    * its start (a file far past the limit is not read whole to be refused).
    */
   function openText(bytes, max, size = bytes.length) {
-    if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包（.theme）：这里打开的是 .layout 布局文件');
+    if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包：用「打开 .layout 或 .theme…」打开它');
     if (size > max) throw new Error('文件 ' + size + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
     let text;
     try {
@@ -396,6 +397,41 @@
     return out;
   }
 
+  // PackLayouts.convert's why in words (review S2); one not known here as it said it
+  function refusal(why) {
+    const w = why || '';
+    let m;
+    if (w === 'too big') return '文件太大';
+    if (w === 'does not read') return '读不出来';
+    if (w === 'not a keyboard listed') return '不是 App 布局列表里的键盘';
+    if ((m = /^for a newer app \((.*)\)$/.exec(w))) return '要更新版本的 App（' + m[1] + '）';
+    if ((m = /^its fragment (.*) does not read$/.exec(w))) return '它用的片段 ' + m[1] + ' 读不出来';
+    if ((m = /^its id is (.*)$/.exec(w))) return '里面写的 id 是 ' + m[1] + '，和文件名不一样';
+    if ((m = /^its family is (.*), the app's (.*)$/.exec(w))) return '种类是 ' + m[1] + '，App 的这块是 ' + m[2];
+    if ((m = /^the app's (.*) does not read$/.exec(w))) return 'App 自带的 ' + m[1] + ' 读不出来';
+    if ((m = /^made one that does not take: (.*)$/.exec(w))) return '转出来的布局检查不过：' + m[1];
+    return w || '转不出来';
+  }
+
+  /**
+   * A theme pack's boards a layout can start from (§12.4 打开 .theme): of [d] (the theme maker's document, M.open's), each
+   * of [bases] (the app's listed boards, in their order) its `layouts/` has a file of, made one of the user's as the
+   * app makes it on import (E.convertPackLayout, PackLayouts.convert, with the pack's fragments): `{board, ok, id, name,
+   * text}`, or `{board, ok: false, why}`. [theme] the pack's theme read (its name and `<meta>` the layout's); [version]
+   * the app's. The conversion's `renames` (the user's settings of a key renamed carried over, L6) are the app's alone:
+   * the page has none to carry.
+   */
+  function themeBoards(E, d, theme, bases, version) {
+    const fragments = {};
+    for (const [file, xml] of Object.entries(d.layouts)) if (!bases.includes(file.replace(/\.xml$/, ''))) fragments[file.replace(/\.xml$/, '')] = xml;
+    const m = theme.info(false).meta;
+    const meta = m ? { author: m.author || null, license: m.license || null } : null;
+    return bases.filter((b) => typeof d.layouts[b + '.xml'] === 'string').map((board) => {
+      const c = E.convertPackLayout(theme.name, meta, board, d.layouts[board + '.xml'], fragments, version);
+      return c.ok ? { board, ok: true, id: c.id, name: c.name, text: c.text } : { board, ok: false, why: refusal(c.why) };
+    });
+  }
+
   /** The line of [xml] where key [id] is (its `id="…"`), 0 where none: what a finding of a key without a line goes to. */
   function lineOfKey(xml, id) {
     const at = F.uncommented(xml).search(new RegExp('<key\\b[^>]*\\sid\\s*=\\s*["\']' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '["\']'));
@@ -405,6 +441,6 @@
   root.YoumoLayoutMaker = {
     BASE_LABEL, FAMILY_LABEL, PAD_LABEL, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
     words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, fromExample, openText, fileName, saveCheck,
-    restoreEnv, shape, envJson, check, lineOfKey,
+    restoreEnv, shape, envJson, check, lineOfKey, themeBoards, refusal,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

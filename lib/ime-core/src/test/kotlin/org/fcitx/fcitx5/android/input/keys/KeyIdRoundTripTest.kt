@@ -22,7 +22,7 @@ class KeyIdRoundTripTest {
     ).map { SceneData.read("$it.xml") }
 
     // the theme maker's example of a theme's own groups
-    private val themes = File("../../web/theme-maker/examples/k17-motion/layouts").listFiles { f -> f.extension == "xml" }.orEmpty().map { it.readText() }
+    private val themes = File("../keyboard-scene/src/commonTest/data/mint-k17/layouts").listFiles { f -> f.extension == "xml" }.orEmpty().map { it.readText() }
 
     private val fragments by lazy { mapOf("grouped-bottom" to (LayoutReader.fragment(SceneData.read("grouped-bottom.xml")) as Parsed.Ok).value) }
 

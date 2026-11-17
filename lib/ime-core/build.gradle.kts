@@ -73,11 +73,10 @@ tasks.withType<Test>().configureEach {
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
     // the other files tests read from disk by a path of their own, not the classpath: each an input, so an edit to it
     // alone runs them again rather than leaving them up to date. The built-in themes (ThemePackCheckTest), the import
-    // fixtures (LayoutImportTest, ScelGoldenTest), the theme maker's example layouts (KeyResolverGoldenTest,
-    // KeyIdRoundTripTest), the learning fixtures (LearnFixtures), the words page's variables (TextVariablesTest)
+    // fixtures (LayoutImportTest, ScelGoldenTest), the learning fixtures (LearnFixtures), the words page's variables
+    // (TextVariablesTest); the 0.6.0 example pack's layouts (KeyResolverGoldenTest, KeyIdRoundTripTest) are sceneData's
     inputs.dir(rootProject.file("lib/keyboard-scene/src/commonMain/themes")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneThemes")
     inputs.files(rootProject.file("uat/fixtures/layouts"), rootProject.file("uat/fixtures/scel")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("uatFixtures")
-    inputs.dir(rootProject.file("web/theme-maker/examples/k17-motion/layouts")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("themeMakerLayouts")
     inputs.dir(rootProject.file("app/src/main/assets/learn")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("learnAssets")
     inputs.file(rootProject.file("docs/words.md")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("wordsDoc")
     testLogging {

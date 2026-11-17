@@ -1574,4 +1574,5 @@
     <string name="layout_finding_gap_look">look= and class= of a gap do nothing</string>
     <string name="layout_finding_pad_lacks">The number keyboard %1$s lacks %2$s: it cannot be typed in such fields</string>
     <string name="layout_finding_bottom_left">The bottom left is usually %1$s (as in the app’s)</string>
+    <string name="layout_finding_split_scaled">Split, this row has %1$s keys in %2$s, not 9 or 10: it cannot be halved and is scaled instead</string>
 </resources>

@@ -199,6 +199,14 @@ test('only images the theme names are decoded, each within its role\'s sides, al
   const files = { 'src.png': pngHeader(6000, 4000), 'cut.png': pngHeader(2000, 1000), 'k.png': pngHeader(100, 100), 'big-key.png': pngHeader(2000, 2000), 'loose.png': pngHeader(10, 10), 'c.jpg': new Uint8Array([1]) };
   assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, files)), ['src.png', 'cut.png', 'k.png'], 'a key image past keyImageSide, an unnamed file: not');
   assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, { ...files, 'cut.png': pngHeader(6000, 6000) })), ['src.png', 'k.png'], 'a cut past pictureSide: not');
+  // a file refused in words (the theme maker's and the layout page's, review S2)
+  assert.match(M.openError(new L.ThemeError('limit', 'entries')), /限制/);
+  assert.match(M.openError(new L.ThemeError('newer', '0.7.0')), /0\.7\.0.*刷新/);
+  assert.equal(M.openError(new Error('x')), 'x');
+  // the layout page's (review S1): the keys' alone, a picture spending the budget not decoded to starve them
+  const huge = { ...files, 'src.png': pngHeader(8000, 8000) };
+  assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, huge)), ['src.png']);
+  assert.deepEqual(M.decodableImages(L, FORMAT, M.doc(xml, huge), ['key']), ['k.png']);
   // many big images: decoded only while the budget lasts
   const many = Array.from({ length: 10 }, (_, i) => 'p' + i + '.png');
   const all = '<theme name="t">' + many.map((n) => '<style select="qwerty/' + n[1] + '" fill="image(' + n + ', 0 0 0 0, 3x)"/>').join('') + '</theme>';
@@ -384,17 +392,31 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
 // 060-render-p3 M4: the examples the page starts from, as assemble.mjs puts them in
 const examples = JSON.parse(examplesJson());
 
+// 0.6.0's example 薄荷 17 键, a pack with its own k18.xml (an 18 keys of 17), kept as keyboard-scene's test data since L8
+const MINT_K17 = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'mint-k17');
+const oldMint = () => M.exampleDoc({
+  xml: readFileSync(join(MINT_K17, 'theme.xml'), 'utf8'),
+  layouts: { 'k18.xml': readFileSync(join(MINT_K17, 'layouts', 'k18.xml'), 'utf8') },
+});
+
 test('each example opens, passes the check before a save with no error, and saves to a pack that opens the same', async () => {
-  assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'k17-motion']);
+  assert.deepEqual(examples.map((e) => e.id), ['gradient', 'picture', 'mint']);
   for (const ex of examples) {
     const d = M.exampleDoc(ex);
     const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
     assert.deepEqual(errors, [], ex.id);
-    // the 17 keys' k18.xml: one of the user's layouts once imported since 0.6.1, said so (its own example in W3)
-    assert.deepEqual(warnings.map((w) => w.message), ex.id === 'k17-motion' ? ['layouts/k18.xml：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）'] : [], ex.id);
+    // none carries layouts/ (§11: the 17 keys are the layout maker's example)
+    assert.deepEqual(warnings.map((w) => w.message), [], ex.id);
+    assert.deepEqual(Object.keys(ex.layouts || {}), [], ex.id);
     const again = (await M.open(E, L, FORMAT, M.save(L, d).bytes)).doc;
     assert.ok(M.same(d, again), ex.id);
   }
+  // 0.6.0's example, its k18.xml one of the user's layouts once imported since 0.6.1: said so, kept as it is
+  const mint = oldMint();
+  const told = M.exportCheck(E, L, FORMAT, mint, E.layouts(), M.envJson(M.ENV));
+  assert.deepEqual(told.errors, []);
+  assert.deepEqual(told.warnings.map((w) => w.message), ['layouts/k18.xml：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）']);
+  assert.ok(M.same(mint, (await M.open(E, L, FORMAT, M.save(L, mint).bytes)).doc));
   const pic = M.exampleDoc(examples[1]);
   assert.deepEqual(Object.keys(pic.files).sort(), ['picture-landscape.jpg', 'picture-portrait.jpg', 'picture.jpg']);
   assert.ok(/<style select="keyboard" fill="linear\(/.test(examples[0].xml));
@@ -443,7 +465,7 @@ test("a pack's own layout of a board is the one the preview draws; one that does
 });
 
 test("a pack's board the user picks among their own layouts is not drawn for the app's, a warning says where it goes (061-custom-layout §11)", () => {
-  const d = M.exampleDoc(examples[2]);
+  const d = oldMint();
   const keys = (doc) => M.check(E, doc, 'k18', M.envJson(M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
   assert.deepEqual(keys(d), keys(M.doc(d.xml)), "the app's 18 keys");
   const { warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
@@ -464,7 +486,7 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
   // drawn as the app's: its corners the app's
   assert.equal(r.scene.text(), M.check(E, d, 'zhuyin', env, null).scene.text());
   // the example 17 keys write its corners as the app draws them: no notice
-  const k17 = M.check(E, M.exampleDoc(examples[2]), 'k18', env, null);
+  const k17 = M.check(E, oldMint(), 'k18', env, null);
   assert.deepEqual(k17.problems.filter((p) => /不起作用/.test(p.message)), []);
   assert.deepEqual(M.ignoredNotice([]), []);
 });
@@ -483,7 +505,7 @@ test('the check before a save: an error of any board or version stops it, the ap
 });
 
 test("a pack's layouts the app refuses on import stop a save, by the app's own limits; one it would not use is not previewed", () => {
-  const d = M.exampleDoc(examples[2]);
+  const d = oldMint();
   const k18 = d.layouts['k18.xml'];
   const many = Object.fromEntries(Array.from({ length: FORMAT.limits.layouts + 1 }, (_, i) => ['k' + i + '.xml', k18]));
   assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(M.ENV)).errors.some((p) => /最多收/.test(p.message)));

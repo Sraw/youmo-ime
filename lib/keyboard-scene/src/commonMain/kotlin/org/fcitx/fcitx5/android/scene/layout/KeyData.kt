@@ -142,7 +142,7 @@ object KeyData {
             }
             t as Taken.App
             // a group key's corner written as the app draws it at its name's place (0.6.0's k18 wrote each,
-            // `alt="{punct:(}" swipe-up="("`, as k17-motion does): the same as taken, no notice of it
+            // `alt="{punct:(}" swipe-up="("`, as the 0.6.0 example mint-k17 does): the same as taken, no notice of it
             val corner = t.place?.takeIf { it >= 0 && t.held.alt == null }?.let { KeyDefaults.corner(form, it) }
             val written = Held(a.alt, held(a.actions), k.popup, k.menu)
             note(file, k.line, a.shortcut ?: k.id, corner?.let { written.besides(it) } ?: written, t.held)

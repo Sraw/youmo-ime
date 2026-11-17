@@ -534,13 +534,13 @@
 - **JVM**：`SceneThemesPackTest.aCopyEqualToAnOlderPackDrawsItsOwnTheme`（相等的新副本画自己的颜色）；设备上手动走一遍。
 
 ### ST-73 [P1] 主题的按键动效，键盘动效 开关和 禁用动画 停掉它
-- **前提**：B0-设置；**跟随系统深色模式** 关掉；"下载"里有制作页示例「薄荷（17 键、动效）」导出的 `.theme`（`web/theme-maker/examples/k17-motion`，在制作页打开后导出）。
+- **前提**：B0-设置；**跟随系统深色模式** 关掉；"下载"里有制作页示例「薄荷（动效）」导出的 `.theme`（`web/theme-maker/examples/mint`，在制作页打开后导出）。
 - **操作**：**主题 → 新增主题** 导入它，点它；回测试页按住一个字母键再松开，看按键；再快速连打五个字母，看按键和气泡。回 **外观 → 大小与样式** 关掉 **键盘动效**，再按一次；打开 **键盘动效**、打开 **禁用动画**，再按一次；最后把两项改回去。
 - **预期**：动效开着时，按住的键缩小一点、往下沉一点，松开时按下的颜色渐渐褪去（约 160 毫秒）；快速连打时每个按下的键仍直接缩小、下沉（不渐变），气泡直接出现、消失，不淡入淡出。关掉 **键盘动效** 或打开 **禁用动画** 后，按下、松开都是直接变化，不缩放、不下沉、不渐隐；改回去后又有动效。
 - **JVM**：设置与动效的规则见 `KeyboardCanvasViewTest`、`MotionTest`（lib/keyboard-scene 的 `scene.MotionTest` 和 lib/ime-core 的 `input.motion.MotionTest`）；动效看的是画面，真机或模拟器上手工跑，不在自动跑里。
 
 ### ST-74 [P1] 主题包自带字母分组的键盘上打拼音
-- **前提**：同 ST-73，导入（**一起导入** 勾着）并选用「薄荷（17 键、动效）」；**输入法 → 拼音** 的 **键盘** 选「薄荷 · 17 键（自定义）」（0.6.1 起主题带的 17 键放在 外观 → 布局 里，不再顶替 18 键）。
+- **前提**：B0-设置；"下载"里有 0.6.0 的示例主题包「薄荷 17 键」（带自己的 `layouts/k18.xml`；0.6.1 起网页示例拆成「薄荷（动效）」主题和布局制作页的「17 键」，旧包留作测试数据 `lib/keyboard-scene/src/commonTest/data/mint-k17`，把 `theme.xml` 和 `layouts/k18.xml` 打成 zip 改名 `.theme`），导入（**一起导入** 勾着）并选用；**输入法 → 拼音** 的 **键盘** 选「薄荷 17 键 · 17 键（自定义）」（0.6.1 起主题带的 17 键放在 外观 → 布局 里，不再顶替 18 键）。
 - **操作**：回测试页按分组打 n i h a o（H 和 JK 并成了一个键），看候选；点「你好」。再打一次，长按候选「你好」选 **固定首位**；打开 **词库与短语 → 用户词库 → 固定的词** 看这一条。
 - **预期**：键盘是 17 键（H、JK 一个键）；长按 HJK 弹出的是 h、j、k（它转成了自己的键，不跟自带 18 键的 H 走），**外观 → 布局** 导入这块时的确认框和卡片信息里没有「g18/h 是18 键的键」的提醒；「你好」在前三个候选里，点了上屏「你好」；固定的词里这一条标「拼音 主题键盘」，按键按主题的键组显示，不是自带 18 键的分组。
 - **JVM**：主题带的布局转成自己的布局见 `ThemeLayoutsToListTest`、keyboard-scene `PackConvertTest`（HJK 改名、长按 hjk：`aKeyOfTheAppsNameWithLettersOfItsOwnIsAKeyOfItsOwn`）；按布局的分组打拼音、学到的按键显示没有 JVM 测试，真机或模拟器上手工跑，不在自动跑里。
@@ -968,7 +968,7 @@
 - **JVM**：`CustomPanelTest.oneRefusedAsItIsReadDrawsTheAppsTheChoiceKept`、`PanelLayoutsTest.thePanelsUsingALayoutGoBackOnTheAppsAsItIsDeleted`、`PanelLayoutsTest.aChoiceNotReadIsListedUnderItsPanelOneGoneOnTheAppsCard`、`CustomLayoutFilesTest.aBackupsFileIsRestoredOnlyAsTheLayoutItsNameSays`。
 
 ### ST-175 [P1] 升级到 0.6.1：正在用的主题带的 18 键放进 外观 → 布局，拼音换成它，看到的不变，提示一次
-- **前提**：B0-设置，模拟器、debug 包，**跟随系统深色模式** 关；「下载」里有制作页示例「薄荷（17 键、动效）」导出的 `.theme`（同 ST-73，脚本用 `web/theme-maker/examples/k17-motion` 打包成 `uat-mint.theme`）；**输入法 → 拼音** 的 **键盘** 选「18 键」。
+- **前提**：B0-设置，模拟器、debug 包，**跟随系统深色模式** 关；「下载」里有 0.6.0 的示例主题包「薄荷 17 键」（同 ST-74，脚本用 `lib/keyboard-scene/src/commonTest/data/mint-k17` 打包成 `uat-mint.theme`）；**输入法 → 拼音** 的 **键盘** 选「18 键」。
 - **操作**：导入它（**一起导入** 去掉勾）并选用；`adb shell run-as <包名> rm no_backup/theme-layouts-listed`、`am force-stop <包名>`（等于从 0.6.0 升级后第一次启动）；看 **外观 → 布局**、**输入法 → 拼音 → 键盘**；到测试页点「普通文本」框看键盘上方；用拼音按 17 键的分组打 n i h a o。再 `am force-stop` 一次，回测试页。
 - **预期**：第一次弹出键盘时提示「主题「uat-mint」带的17 键已放进 外观 → 布局，拼音正在用」，停约 4 秒，只这一次（再重启不再提示）。转换在后台，启动不卡；转完前弹出的键盘先是自带的 18 键，转完自己换成 17 键（布局页等转换和换选择都做完才列出，脚本在这之后才看选择和键盘）。主题带数字键盘时，数字键盘的选择同时换上，但要到下一次开始打字才用它（L5），第一次弹出的数字键盘可能还是自带的。转换中途应用被关，下次启动接着做（最多 3 次）。布局页有「uat-mint · 17 键」，卡片下写「用在：拼音」；拼音的 **键盘** 是「uat-mint · 17 键（自定义）」，键盘是 17 键（H、JK 一个键），和 0.6.0 用这个主题时一样，「你好」在前三个候选里。双拼选着 18 键时不换（17 键的分组双拼打不了，0.6.0 里双拼画的也是自带的 18 键；只在 JVM 上断言）。
 - **JVM**：`ThemeLayoutsToListTest.atTheFirstStartThePacksBoardsAreListedAndThoseChosenSwitchedOnce`（放进列表、拼音英文码表换上、双拼不换、没在用的主题只放进列表、提示的字、只一次）、`ThemeLayoutsToListTest.aStartThatEndedInTheMiddleIsTriedAgainThreeTimesAtMost`（启动中途被杀，下次接着做并换上；第 3 次还没做完就放弃）、`aStartCountsItsTry`、`theStartListsOffTheMainThreadAndSwitchesOnItAfter`（后台转换、之后主线程换上；之间什么都没换、键名设置没拷、导入只等转换、这期间恢复记下的留给下次）、`aStartKilledBetweenItsListingAndItsSwitchSwitchesAtTheNext`（转完、换之前被杀，标记都没写，下次按记录的 id 换上）、`theSwitchIsPlannedOnTheSettingsAsItIsMade`（换时按当时的设置算）、`aPanelSetToALayoutGoneCountsAsNone`（数字键盘选的布局已删，按没选算）、`KotlinHostTest.theThemeLayoutsChosenAreToldOnce`（提示看到为止、只一次）、`EngineNoticesTest.newsUntilSeenSaysTheTimeItAsks` 和 ime-core `NoticeStateTest`（这条提示 4 秒，其余的时长不变）；ime-core `ThemeLayoutSwitchTest`（每个输入法换不换：显示的那块、双拼的分组、微软双拼没有 14 键、码表要额外键、数字和符号）；设备上走一遍重启、提示、布局页和打字。
@@ -996,6 +996,12 @@
 - **操作**：导入它，看确认框，问「现在就用作数字键盘吗？」时点 **用**；到测试页普通框点 **123**，看键盘，点 1、2、⌫、5；再到小数框（`#decimal`）、电话框看数字键盘。
 - **预期**：确认框写「数字键盘：123、只有数字、小数」。卡片下写「用在：数字键盘」。123 打开的是它：一行四个键（1 2 3 ⌫），回车竖着占两行，左下是 **符**、**返回**，没有 `=`、`,`；点 1、2、⌫、5 打出 15。小数框也是它，6 右边是 `.`；电话框还是 App 自带的数字键盘。
 - **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（每种输入框各画一次）、`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`；网页：`test/layout-maker.test.mjs`（大按键数字键盘的几何和 pads）。
+
+### ST-180 [P2] 导入分体时分不成两半的布局：确认框警告这一行会整行缩小
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-split-1.0.layout`（26 键，`on-split="split"`，第一行 Q、W 写 `split="after"`，`split="halves"` 的这一行只剩 8 个键可分）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框；点 **导入**，问「现在就用在」时点 **先不用**。
+- **预期**：确认框标题「导入布局 UAT 分体？」，能导入（不是错误），「注意：」下面一条「分体时这一行在「360dp」有 8 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小」（台湾正体同义）。导入后列表里有「UAT 分体」。网页键盘布局页打开这个文件，「问题」里同样有这条警告。
+- **JVM**：keyboard-scene `LayoutCheckTest.aSplitRowThatCannotBeHalvedIsTold`（JVM 和 JS：几个键、哪一行、只在分体的键盘、`split="after"` 不算、主题包的布局也警告）、ime-core `LayoutImportTest.theUatsSplitRowThatCannotBeHalvedIsTakenWithAWarning`（这个文件的判定）、app `LayoutTextsTest`（每个检查结果都有说法）；网页 `test/layout-maker.test.mjs`（每个检查结果都有说法）。
 
 ### ST-185 [P1] 按键字符和快捷键：正在用的布局多一张卡片，同名键写「共用」
 <!-- 061-custom-layout §9 (L6) -->

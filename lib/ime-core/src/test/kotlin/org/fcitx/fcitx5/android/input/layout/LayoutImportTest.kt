@@ -133,4 +133,14 @@ class LayoutImportTest {
         assertEquals(listOf(LayoutCheck.Finding(14, "held", listOf("g18/we", "k18"))), ok.report.warnings.filter { it.key == "held" })
         assertEquals(listOf("哈", "哈哈", "嘿"), ok.commits)
     }
+
+    // L8: a split row with 8 keys to halve, taken with that one warning, its count and the scene told
+    @Test
+    @Uat("ST-180")
+    fun theUatsSplitRowThatCannotBeHalvedIsTakenWithAWarning() {
+        val split = judge(File("../../uat/fixtures/layouts/uat-split-1.0.layout").readText()) as Verdict.Ok
+        assertEquals(listOf("split-scaled"), split.report.warnings.map { it.key })
+        assertEquals("8", split.report.warnings.single().args[0])
+        assertEquals(emptyList<String>(), split.commits)
+    }
 }

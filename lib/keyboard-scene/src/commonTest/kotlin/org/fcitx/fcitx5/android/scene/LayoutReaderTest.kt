@@ -343,6 +343,20 @@ class LayoutReaderTest {
         }
     }
 
+    // L8: {group:} takes one or two letters; a group of three or more (17 键's HJK) is written out, letters= its letters,
+    // as the layout maker writes it (layout-edit.js groupLabel)
+    @Test
+    fun aGroupBindingIsOfOneOrTwoLettersAndLongerGroupsAreWrittenOut() {
+        assertEquals(Text.Binding("group", "qw"), LayoutReader.text("{group:qw}"))
+        assertEquals(Text.Binding("group", "l;"), LayoutReader.text("{group:l;}"))
+        assertNull(LayoutReader.text("{group:hjk}"))
+        assertTrue(problems(board("<row><key id=\"hjk\" label=\"{group:hjk}\" letters=\"hjk\"/></row>")).isNotEmpty())
+        val l = LayoutReader.layout(board("<row><key id=\"hjk\" label=\"HJK\" letters=\"hjk\"/></row>")).ok()
+        val hjk = l.parts.filterIsInstance<Row>().single().cells.filterIsInstance<Key>().single()
+        assertEquals(Text.Literal("HJK"), hjk.attrs.label)
+        assertEquals("hjk", hjk.letters?.group)
+    }
+
     @Test
     fun aComposedKeyWrittenWithNoNameIsNamedAsTheAppsAre() {
         // a theme pack's nine keys and 注音九键 of before 060-keys-unify: no shortcut=, named by their place (060-s6-review M3)
