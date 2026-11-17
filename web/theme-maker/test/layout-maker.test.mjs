@@ -316,7 +316,8 @@ test("a draft's environment is taken only as the bar offers it: another device, 
 // as the engine's (format.test.mjs): just above what it is, so it grows only on purpose (the engine is most of it)
 test('the layout maker built is no bigger than its budget', () => {
   const page = assemble(LAYOUT_SRC, ENGINE);
-  assert.ok(Buffer.byteLength(page) <= 1_910_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
+  // 0.6.1 L6/L7/W3: raised once with room for the custom-layout stages (user 11-16)
+  assert.ok(Buffer.byteLength(page) <= 2_000_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
   assert.ok(statSync(ENGINE).size < Buffer.byteLength(page));
 });
 

@@ -37,6 +37,8 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
+import org.fcitx.fcitx5.android.input.layout.LayoutImport
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import org.fcitx.fcitx5.android.utils.isPlainFileName
 import timber.log.Timber
@@ -422,7 +424,10 @@ object ThemePackFiles {
         }
         val warnings = read.warnings.map { it.toString() } +
             listOfNotNull(checks.lowContrast(ThemePackCheck.lowContrast(theme)), still?.let { checks.animatedStill() })
-        val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text)
+        // its boards the user picks among their own as the layouts of theirs 「一起导入」 would make (061-custom-layout §11)
+        val listed = ThemeLayoutsToList.staged(File(from, LAYOUTS), theme.name, theme.meta, LayoutImport.appVersion(checks.appVersion))
+        val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text, listed.listed)
+            .listing(listed.replaced, listed.notFitting)
         return Staged(theme, source, from, files.all, layouts, report, warnings, files.preview?.let { File(from, it) })
     }
 

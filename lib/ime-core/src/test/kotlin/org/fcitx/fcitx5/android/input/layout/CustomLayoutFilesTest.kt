@@ -134,6 +134,81 @@ class CustomLayoutFilesTest {
         assertTrue(CustomLayoutFiles.mergeConverted(null, wide).encodeToByteArray().size <= CustomLayoutFiles.MAX_CONVERTED_BYTES)
     }
 
+    // a pack imported again records its new stamp in place of the old one (review NIT2: the old ones piled up, and past
+    // the most lines the new one was dropped, the pack converted at each start); a layout written again its new digest
+    @Test
+    fun aRecordKeepsEachPacksAndLayoutsLastLineTheNewestWhereFull() {
+        assertEquals("a@2\nb@1\n", CustomLayoutFiles.mergeConverted("a@1\nb@1\n", "a@2"))
+        assertEquals("=t1-k18 k18 d2 a\n", CustomLayoutFiles.mergeConverted("=t1-k18 k18 d1 a", "=t1-k18 k18 d2 a"))
+        // a pack's name may hold an @
+        assertEquals("a@b@2\na@1\n", CustomLayoutFiles.mergeConverted("a@b@1\na@1", "a@b@2"))
+        val full = (1..CustomLayoutFiles.MAX_CONVERTED_LINES).joinToString("\n") { "p$it@1" }
+        val lines = CustomLayoutFiles.convertedLines("${CustomLayoutFiles.CURRENT}\n$full\nnew@1")
+        assertEquals(CustomLayoutFiles.MAX_CONVERTED_LINES, lines.size)
+        assertEquals(CustomLayoutFiles.CURRENT, lines.first())
+        assertEquals("new@1", lines.last())
+    }
+
+    @Test
+    fun aRecordReadsItsPacksLayoutsAndWhetherCurrent() {
+        val r = CustomLayoutFiles.record("#l7\nmint@5\n=t1a2b3c4d-k18 k18 0123456789abcdef mint 2\n=Bad k18 x y\n=t9-nine nine\nold@1")
+        assertTrue(r.current)
+        assertEquals(listOf("mint@5", "old@1"), r.packs)
+        assertEquals(setOf("mint", "old"), r.packNames)
+        val made = CustomLayoutFiles.Made("t1a2b3c4d-k18", "k18", "0123456789abcdef", "mint 2")
+        assertEquals(listOf(made), r.made)
+        assertEquals(made, r.madeOf("mint 2", "k18"))
+        assertEquals(null, r.madeOf("mint 2", "nine"))
+        assertEquals("=t1a2b3c4d-k18 k18 0123456789abcdef mint 2", made.line)
+        assertFalse(CustomLayoutFiles.record("p@1").current)
+        assertFalse(CustomLayoutFiles.record(null).current)
+    }
+
+    // L7 re-check NIT-1: a pack whose file name begins with `=` is a pack's line, kept a line of its own, not dropped
+    @Test
+    fun aPackNamedWithAnEqualsSignFirstIsRecordedAsAPack() {
+        val r = CustomLayoutFiles.record("#l7\n=mint.theme@5\n=odd one.theme@6\n=t1-k18 k18 d1 =mint.theme\n=mint.theme@7")
+        assertEquals(listOf("=mint.theme@7", "=odd one.theme@6"), r.packs)
+        assertEquals(setOf("=mint.theme", "=odd one.theme"), r.packNames)
+        assertEquals(listOf(CustomLayoutFiles.Made("t1-k18", "k18", "d1", "=mint.theme")), r.made)
+    }
+
+    @Test
+    fun aFreeIdIsTheOneWantedElseTheNextNumbered() {
+        assertEquals("t1-k18", CustomLayoutFiles.freeId("t1-k18") { false })
+        assertEquals("t1-k18-3", CustomLayoutFiles.freeId("t1-k18") { it in setOf("t1-k18", "t1-k18-2") })
+        val long = "a".repeat(LayoutCheck.MAX_ID)
+        assertEquals("a".repeat(LayoutCheck.MAX_ID - 2) + "-2", CustomLayoutFiles.freeId(long) { it == long })
+        assertEquals(16, CustomLayoutFiles.digest("x".encodeToByteArray()).length)
+        assertEquals(CustomLayoutFiles.digest("x".encodeToByteArray()), CustomLayoutFiles.digest("x".encodeToByteArray()))
+    }
+
+    // L7 review S2: what a pack's conversion writes over, and what it keeps
+    @Test
+    fun aPacksBoardReplacesOnlyTheLayoutItMadeAsItIs() {
+        val record = CustomLayoutFiles.record("=t1-k18 k18 d1 mint\nmint@1")
+        fun target(files: Map<String, String>, same: Boolean = false, file: String = "mint") =
+            CustomLayoutFiles.target(record, file, "k18", "t1-k18", same) { files[it] }
+        // its last one as written: replaced (an update)
+        assertEquals(CustomLayoutFiles.Target("t1-k18", CustomLayoutFiles.Put.REPLACE), target(mapOf("t1-k18" to "d1")))
+        // changed by the user since (exported, edited, imported over it): kept, the pack's under the next id
+        assertEquals(CustomLayoutFiles.Target("t1-k18-2", CustomLayoutFiles.Put.NEW), target(mapOf("t1-k18" to "d2")))
+        // the same import listed again (a start killed in the middle): the one it made, kept as the user has it
+        assertEquals(CustomLayoutFiles.Target("t1-k18", CustomLayoutFiles.Put.KEEP), target(mapOf("t1-k18" to "d2"), same = true))
+        // deleted: made again
+        assertEquals(CustomLayoutFiles.Target("t1-k18", CustomLayoutFiles.Put.NEW), target(emptyMap()))
+        // another pack of the same hash, or the user's own of that id: kept
+        assertEquals(CustomLayoutFiles.Target("t1-k18-2", CustomLayoutFiles.Put.NEW), target(mapOf("t1-k18" to "d1"), file = "other"))
+        assertEquals(CustomLayoutFiles.Target("t1-k18-3", CustomLayoutFiles.Put.NEW), target(mapOf("t1-k18" to "", "t1-k18-2" to "x"), file = "other"))
+        // L7 re-check SHOULD-1: a file already what the board makes under its id (saved, then killed before the record
+        // was written; tried again) is written over as it is, not a second copy at -2
+        fun unrecorded(files: Map<String, String>, writes: Map<String, String>) =
+            CustomLayoutFiles.target(CustomLayoutFiles.record("#l7"), "mint", "k18", "t1-k18", same = false, writes = { writes[it] }) { files[it] }
+        assertEquals(CustomLayoutFiles.Target("t1-k18", CustomLayoutFiles.Put.REPLACE), unrecorded(mapOf("t1-k18" to "d1"), mapOf("t1-k18" to "d1")))
+        assertEquals(CustomLayoutFiles.Target("t1-k18-2", CustomLayoutFiles.Put.REPLACE), unrecorded(mapOf("t1-k18" to "d9", "t1-k18-2" to "d2"), mapOf("t1-k18" to "d1", "t1-k18-2" to "d2")))
+        assertEquals(CustomLayoutFiles.Target("t1-k18-2", CustomLayoutFiles.Put.NEW), unrecorded(mapOf("t1-k18" to "d9"), mapOf("t1-k18" to "d1")))
+    }
+
     companion object {
         // the app's boards, as the build copies them in
         const val LAYOUTS = "../keyboard-scene/src/commonMain/layouts"

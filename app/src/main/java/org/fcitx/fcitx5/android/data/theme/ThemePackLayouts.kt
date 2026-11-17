@@ -25,7 +25,8 @@ import java.io.File
 /**
  * A theme 4.0 pack's `layouts/<id>.xml` (060-render-p3 T8b, 060-render-v2 §15): what [SceneLayouts] reads first
  * while the pack is the theme in use, the app's own under it, keyboard by keyboard. A pack replaces only a keyboard
- * the app has ([BuiltInLayouts.RAW]: `qwerty`, `k14`, `k18`, `nine`…), never adds one; a fragment of its own
+ * the app has that the user does not pick among their own layouts ([PackLayouts.replaces]: `zhuyin`, `emoji`…; since
+ * 0.6.1 its `qwerty`, `k18`… are put in 外观 → 布局 instead, ThemeLayoutsToList), never adds one; a fragment of its own
  * (`grouped-bottom.xml`) is read only by the pack's own keyboards that include it, the app's keep the app's. A
  * keyboard is taken only where it is as typable as the app's of its id ([judge]), else the app's is drawn (logged
  * once). Kept under the pack's file and its `theme.xml`'s time: a pack imported again is read again.
@@ -45,9 +46,27 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
     /**
      * What an import tells of a pack's layouts: the keyboards it replaces, the files it never uses with why, the `commit:`
      * actions of those used (as they are taken: a long press's or a swipe's written in it is not), and how many of what
-     * they write a key does held or swiped is not taken ([ignored], KeyData: 061-custom-layout §19.4).
+     * they write a key does held or swiped is not taken ([ignored], KeyData: 061-custom-layout §19.4); [listed], the names
+     * of the layouts of the user's its boards of those the user picks would be (ThemeLayoutsToList, §11).
      */
-    class Report(val used: List<String>, val unused: List<Pair<String, String>>, val commits: Int, val ignored: Int = 0)
+    /**
+     * [used] boards drawn from the pack, [unused] with why, [commits] the `commit:` texts in those; [listed] the names of
+     * the layouts 「一起导入」 would make, [listedCommits] the `commit:` texts their keys type that their bases' do not
+     * (§13), [replaced] the names of the layouts they write over (§4.2 第 4 步), [notFitting] how many the list has no room for.
+     */
+    class Report(
+        val used: List<String>,
+        val unused: List<Pair<String, String>>,
+        val commits: Int,
+        val ignored: Int = 0,
+        val listed: List<String> = emptyList(),
+        val listedCommits: Int = 0,
+        val replaced: List<String> = emptyList(),
+        val notFitting: Int = 0,
+    ) {
+        /** This with what listing it does to the list ([ThemeLayoutsToList.staged]). */
+        fun listing(replaced: List<String>, notFitting: Int) = Report(used, unused, commits, ignored, listed, listedCommits, replaced, notFitting)
+    }
 
     companion object {
         const val PREFIX = "theme:"
@@ -113,9 +132,17 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         /**
          * The pack's layout files [files] (`k18.xml`) in [dir], as they would be drawn: each keyboard the app has that
          * reads and is [judge]d typable used, its fragments the pack's where it has them; the rest with why not (a
-         * fragment none of those includes is no keyboard). [app]: the app's layout of an id.
+         * fragment none of those includes is no keyboard). [app]: the app's layout of an id. [listed]: its boards the user
+         * picks among their own layouts as they would be made ones (ThemeLayoutsToList.convert): listed by name, or
+         * unused with why; a fragment of the pack one of those includes is one used.
          */
-        fun report(dir: File, files: List<String>, app: (String) -> SceneLayout?, appText: (String) -> String?): Report {
+        fun report(
+            dir: File,
+            files: List<String>,
+            app: (String) -> SceneLayout?,
+            appText: (String) -> String?,
+            listed: List<Pair<String, PackLayouts.Converted>> = emptyList(),
+        ): Report {
             val used = ArrayList<String>()
             val unused = ArrayList<Pair<String, String>>()
             // the fragments of the keyboards used, each counted once (k14 and k18 share the bottom row)
@@ -123,8 +150,19 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             // each thing not taken once, a fragment's though two keyboards include it
             val ignored = HashSet<KeyData.Ignored>()
             var commits = 0
+            var listedCommits = 0
             val ids = files.map { it.removeSuffix(".xml") }
+            val made = listed.toMap()
+            val inList = HashSet<String>()
             for (id in ids) {
+                val c = made[id]
+                // the pack's bottom row one listed took in: no fragment unused
+                if (c is PackLayouts.Converted.Done) {
+                    inList += includes(File(dir, "$id.xml"))
+                    listedCommits += c.commits.size
+                }
+                if (c is PackLayouts.Converted.Not) unused += id to c.why
+                if (c != null) continue
                 when (val r = taken(dir, id, app, appText)) {
                     is Taken.Not -> r.why?.let { unused += id to it }
                     is Taken.Yes -> {
@@ -136,9 +174,17 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
                 }
             }
             commits += included.values.sumOf { f -> commits(listOf(f.defaults), f.rows) }
-            ids.filter { it !in used && it !in included && unused.none { u -> u.first == it } }
+            ids.filter { it !in used && it !in included && it !in inList && it !in made && unused.none { u -> u.first == it } }
                 .forEach { unused += it to "a fragment no keyboard of the pack includes" }
-            return Report(used, unused, commits, ignored.size)
+            // in the order they are made in, not the files'
+            val names = listed.filter { it.first in ids }.mapNotNull { (it.second as? PackLayouts.Converted.Done)?.name }
+            return Report(used, unused, commits, ignored.size, names, listedCommits)
+        }
+
+        // the fragments the layout [file] includes; none where it does not read
+        private fun includes(file: File): List<String> {
+            val text = file.takeIf { it.isFile && it.length() <= ThemeAssetLimits.MAX_LAYOUT_BYTES }?.readText()?.removePrefix(BOM) ?: return emptyList()
+            return (LayoutReader.layout(text) as? Parsed.Ok)?.value?.parts?.filterIsInstance<Include>()?.map { it.src }.orEmpty()
         }
     }
 }

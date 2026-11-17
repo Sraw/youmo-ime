@@ -6,11 +6,13 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.scene.theme.Meta
@@ -50,6 +52,15 @@ object ThemePackDialogs {
         val out = lines(ctx, staged.theme.meta, staged.theme.version).toMutableList()
         if (pack.replaces) out += ctx.getString(R.string.theme_pack_replaces)
         val layouts = staged.layoutReport
+        if (layouts.listed.isNotEmpty()) {
+            out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_listed, layouts.listed.size, layouts.listed.size, layouts.listed.joinToString(listSeparator(ctx)))
+            // what their keys type written in them (§13), what they write over (§4.2 第 4 步), what has no room
+            if (layouts.listedCommits > 0) out += ctx.getString(R.string.theme_pack_layouts_listed_commits, layouts.listedCommits)
+            layouts.replaced.forEach { out += ctx.getString(R.string.theme_pack_layouts_replaces, it) }
+            if (layouts.notFitting > 0) {
+                out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_full, layouts.notFitting, layouts.notFitting, CustomLayoutFiles.MAX_LAYOUTS)
+            }
+        }
         if (layouts.used.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts, layouts.used.joinToString(", "), layouts.commits)
         if (layouts.ignored > 0) out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_ignored, layouts.ignored, layouts.ignored)
         if (layouts.unused.isNotEmpty()) out += ctx.getString(R.string.theme_pack_layouts_unused, layouts.unused.joinToString(", ") { it.first })
@@ -87,13 +98,14 @@ object ThemePackDialogs {
     private const val CUSTOM_FORMAT = "3.0"
 
     /** [title] and [text], with [preview] above it (a pack's; checked an image as it was imported). */
-    fun builder(ctx: Context, title: String, text: String, preview: File?): AlertDialog.Builder {
+    fun builder(ctx: Context, title: String, text: String, preview: File?, below: View? = null): AlertDialog.Builder {
         val padding = ctx.dp(PADDING_DP)
         val body = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(padding, padding, padding, 0)
             image(ctx, preview)?.let { addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, ctx.dp(PREVIEW_DP))) }
             addView(TextView(ctx).apply { this.text = text })
+            below?.let(::addView)
         }
         return AlertDialog.Builder(ctx).setTitle(title).setView(body)
     }

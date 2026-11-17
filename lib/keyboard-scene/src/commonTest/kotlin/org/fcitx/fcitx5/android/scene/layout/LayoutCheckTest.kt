@@ -170,6 +170,13 @@ class LayoutCheckTest {
         assertEquals(listOf("name-prefix"), errors(named("g18/mine")))
         // a function key's prefix written: read as a bare name (fn/ is how one is kept), so said as one
         assertEquals(listOf("name-no-slash"), errors(named("fn/mine")))
+        // one a <defaults> gives every key under it that names none: the layout's, a row's (L7 review S4)
+        assertEquals(listOf("name-no-slash"), errors(qwerty.replaceFirst("<defaults", "<defaults shortcut=\"mine\"")))
+        assertEquals(listOf("name-prefix"), errors(qwerty.replaceFirst(Regex("<row([^>]*)>"), "<row$1><defaults shortcut=\"g18/mine\"/>")))
+        assertEquals(emptyList(), errors(qwerty.replaceFirst("<defaults", "<defaults shortcut=\"my-qwerty/all\"")))
+        val loose = check(qwerty.replaceFirst("<defaults", "<defaults shortcut=\"mine\""), strict = false)
+        assertTrue(loose.ok)
+        assertTrue(loose.warnings.any { it.key == "name-no-slash" }, loose.warnings.toString())
     }
 
     @Test
@@ -185,6 +192,10 @@ class LayoutCheckTest {
         assertEquals(emptyList(), check(decimal).errors)
         val noDot = Regex("<key id=\"\\.\"[^>]*/>").replace(decimal, "<gap width=\"10\"/>")
         assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("pad=decimal: ."))), check(noDot).errors)
+        // the pad lacking it read off the finding, by the restore and a pack's conversion alike
+        assertEquals(listOf("decimal"), check(noDot).errors.mapNotNull(LayoutCheck::padLacking))
+        assertEquals(listOf("full"), check(replaceKey(number, "back", "<gap width=\"14\"/>")).errors.mapNotNull(LayoutCheck::padLacking))
+        assertEquals(null, LayoutCheck.padLacking(LayoutCheck.Finding(0, "lacks", listOf("panel-back"))))
         // its digits held by what they type, not by the app's ids (a board of one's own names its keys as it likes)
         val renamed = (0..9).fold(number) { t, d -> t.replaceFirst("<key id=\"$d\"", "<key id=\"d$d\"") }
         assertEquals(emptyList(), check(renamed).errors)

@@ -225,6 +225,26 @@ object CustomLayouts {
         }
     }
 
+    /** The record of the theme packs whose layouts were put in the list ([CustomLayoutFiles.CONVERTED], §11) in [dir], read. */
+    @Synchronized
+    fun record(dir: File = dir()): CustomLayoutFiles.Record =
+        CustomLayoutFiles.record(
+            File(dir, CustomLayoutFiles.CONVERTED).takeIf { it.isFile && it.length() <= CustomLayoutFiles.MAX_CONVERTED_BYTES }
+                ?.readBytes()?.let(CustomLayoutFiles::decode),
+        )
+
+    /**
+     * [lines] (a pack's `file@stamp`, a layout's [CustomLayoutFiles.Made.line]) added to the record in [dir], its
+     * [CustomLayoutFiles.CURRENT] with them (none: that alone), put in place whole.
+     */
+    @Synchronized
+    @Throws(IOException::class)
+    fun recordConverted(lines: List<String>, dir: File = dir()) {
+        val mine = File(dir, CustomLayoutFiles.CONVERTED)
+        val record = mine.takeIf { it.isFile && it.length() <= CustomLayoutFiles.MAX_CONVERTED_BYTES }?.readBytes()?.let(CustomLayoutFiles::decode)
+        putInPlace(mine, CustomLayoutFiles.mergeConverted(record, (listOf(CustomLayoutFiles.CURRENT) + lines).joinToString("\n")))
+    }
+
     /** Whether a backup takes [file] of the layouts' folder: a layout's or the record, not one half written. */
     fun backedUp(file: File): Boolean = CustomLayoutFiles.idOf(file.name) != null || file.name == CustomLayoutFiles.CONVERTED
 

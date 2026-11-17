@@ -29,8 +29,8 @@ object BlankKeys {
     val REQUIRED_ROLES = setOf("shift", "backspace", "space", "enter")
 
     /** A board the theme may be shown on: the app's own, or a pack's (`layouts/`), with the fragments it includes. */
-    /** A board, [id] the app's file's it is drawn as (`emoticon`, whose `<keyboard id>` is `emoji`). */
-    class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap(), val id: String = layout.id)
+    /** A board, [id] the app's file's it is drawn as (`emoticon`, whose `<keyboard id>` is `emoji`), [base] a layout of the user's `based-on` ([Env.base]). */
+    class Board(val layout: Layout, val fragments: Map<String, Fragment> = emptyMap(), val id: String = layout.id, val base: String? = null)
 
     /** A key left blank: on [board], its id [key], in [scenes], in [states]. */
     data class Blank(val board: String, val key: String, val scenes: Set<String>, val states: Set<KeyState>) {
@@ -85,8 +85,9 @@ object BlankKeys {
             val rest = scenes.filterTo(HashSet()) { !it.startsWith(KEYBOARD) }
             for (b in boards) {
                 // a board this scene set names not, or its scenes asked already
-                if ((named != null && named != b.layout.id) || !asked.add(b.layout.id to rest)) continue
-                val builder = SceneBuilder(theme, env(rest, b.layout.id), FixedMeasurer, cascades = cascades)
+                val other = named != null && named != b.layout.id && named != b.base
+                if (other || !asked.add(b.layout.id to rest)) continue
+                val builder = SceneBuilder(theme, env(rest, b.layout.id, b.base), FixedMeasurer, cascades = cascades)
                 for ((key, states) in builder.blanks(b.layout, b.fragments, REQUIRED_ROLES, stateSets, expanded)) {
                     out += Blank(b.layout.id, key.key.id, scenes, states)
                     if (out.size >= limit) return out
@@ -128,7 +129,7 @@ object BlankKeys {
 
     private const val KEYBOARD = "keyboard="
 
-    private fun env(scenes: Set<String>, board: String) = Env(
+    private fun env(scenes: Set<String>, board: String, base: String?) = Env(
         width = WIDTH,
         height = HEIGHT,
         density = DENSITY,
@@ -141,6 +142,7 @@ object BlankKeys {
         flat = "flat" in scenes,
         typed = scenes.filterTo(HashSet()) { it !in FORMS },
         board = board,
+        base = base,
     )
 
     // a phone's keyboard: the sizes do not change what is styled, only that the keys are laid out

@@ -151,6 +151,22 @@
         <item quantity="other">%1$d long-press, corner or swipe settings written in its layouts do nothing: from 0.6.1 a theme sets only how keys look; what a key gives held or swiped follows its name, under Keys → Key characters and shortcuts.</item>
     </plurals>
     <string name="theme_pack_layouts_unused">Layouts not used (unreadable, missing keys the keyboard needs, or not one of the app\'s keyboards): %1$s</string>
+    <plurals name="theme_pack_layouts_listed">
+        <item quantity="one">This theme brings %1$d layout: %2$s. Imported with it, it is in Look → Layouts.</item>
+        <item quantity="other">This theme brings %1$d layouts: %2$s. Imported with it, they are in Look → Layouts.</item>
+    </plurals>
+    <string name="theme_pack_layouts_listed_commits">In them, %1$d actions type text written in the layout.</string>
+    <string name="theme_pack_layouts_replaces">Replaces your existing “%1$s” (the layout an earlier import of this theme made, unchanged since).</string>
+    <plurals name="theme_pack_layouts_full">
+        <item quantity="one">Look → Layouts is full (%2$d): %1$d of them will not be put in it.</item>
+        <item quantity="other">Look → Layouts is full (%2$d): %1$d of them will not be put in it.</item>
+    </plurals>
+    <string name="theme_pack_layouts_not_listed">Not all of its layouts were put in Look → Layouts (the list is full, or one could not be made).</string>
+    <string name="theme_pack_layouts_with">Import its layouts too</string>
+    <string name="theme_layouts_in_use">Theme “%1$s”: %2$s now in Look → Layouts, used for %3$s</string>
+    <string name="theme_layouts_aside_dark">Dark theme “%1$s”: %2$s in the list too, not used</string>
+    <string name="theme_layouts_aside_light">Light theme “%1$s”: %2$s in the list too, not used</string>
+    <string name="theme_layouts_told" translatable="false">%1$s</string>
     <string name="keyboard_themed">%1$s (theme: %2$s)</string>
     <string name="theme_pack_warnings">Note:</string>
     <string name="theme_info">Info</string>

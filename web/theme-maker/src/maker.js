@@ -156,13 +156,16 @@
     const enc = new TextEncoder();
     // the pack's layouts as the app takes them (ThemePackFiles.checkLayouts, ThemeAssetLimits.layouts; ThemePackLayouts.report)
     const names = Object.keys(d.layouts);
+    // the app's boards (BuiltInKeyData.BOARDS): one of those it does not read from a pack (PackLayouts.replaces) is one
+    // the user picks among their own layouts, made one of those once imported (061-custom-layout §11; one rule, not two)
+    const boards = new Set(E.layouts());
     for (const n of names) if (!n.endsWith('.xml') || !L.isPlainFileName(n)) bad('layouts/' + n + ' 不是 App 认得的布局文件名（<键盘>.xml）');
     if (names.length > lim.layouts) bad('自带的键盘布局 ' + names.length + ' 个，App 最多收 ' + lim.layouts + ' 个');
     for (const n of names) if (enc.encode(d.layouts[n]).length > lim.layoutBytes) bad('layouts/' + n + ' 超过 ' + lim.layoutBytes + ' 字节');
     for (const n of names) {
       const id = n.replace(/\.xml$/, '');
-      // the app's one rule of the files it reads (PackLayouts.replaces)
-      if (!E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
+      if (boards.has(id) && !E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）' });
+      else if (!E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
     }
     // the app's ThemeAssetLimits.MAX_THEME_XML_BYTES
     const xmlBytes = enc.encode(d.xml).length;
@@ -583,7 +586,7 @@
   }
 
   /**
-   * The keyboard [board] is drawn with: the pack's own `layouts/<board>.xml` where it has one that reads (its includes
+   * The keyboard [board] is drawn with: the pack's own `layouts/<board>.xml` where it has one the app reads (PackLayouts.replaces: 注音's, the emoji's…) that reads (its includes
    * from the pack's other files there, else the app's), else the app's (its id). One that does not read is [warn]ed
    * of, the app's drawn, as the app does (ThemePackLayouts: logged, its own drawn). One taken is drawn as the app takes
    * it: its keys' long press, corner and swipes the app's keys' of their names (主题只管外观), what it writes of them
@@ -591,7 +594,8 @@
    */
   function layoutOf(E, d, board, warn) {
     const own = d.layouts[board + '.xml'];
-    if (own == null) return board;
+    // a board the app draws its own of since 0.6.1 (26 键, 14/18 键…: the pack's is one of the user's layouts once imported)
+    if (own == null || !E.replaces(board)) return board;
     const fragments = Object.create(null);
     // the pack's fragments the app reads: only under an id of its own (ThemePackLayouts.read)
     for (const [n, t] of Object.entries(d.layouts)) if (n !== board + '.xml' && n.endsWith('.xml') && E.replaces(n.slice(0, -4))) fragments[n.slice(0, -4)] = t;

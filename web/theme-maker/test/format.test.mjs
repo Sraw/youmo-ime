@@ -657,7 +657,8 @@ test("the page made without --engine holds no engine; the page built holds the b
   // 1.5 KB more, 1.446 MB; its builtIn ids and readOwnLayout's own warnings, with 0.6.1's pre-0.6.1 packs' Shift
   // beside them: 1.447 MB, a little room left for the layout maker's next phases; L3's command rule and its review fixes:
   // 1.464 MB; its allow-list over every state of a key: 1.471 MB)
-  assert.ok(Buffer.byteLength(engine) <= 1_480_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  // 0.6.1 L6/L7/W3: raised once with room for the custom-layout stages (user 11-16)
+  assert.ok(Buffer.byteLength(engine) <= 1_560_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   // the global a page reads it by (build.gradle.kts: the library's link names it)
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   // all else as without it: the engine's script and the CSP's hash of it the only difference

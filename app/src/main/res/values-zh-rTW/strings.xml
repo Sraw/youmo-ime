@@ -150,6 +150,19 @@
         <item quantity="other">主題自帶的佈局裡有 %1$d 處長按、角標、滑動的寫法不起作用：0.6.1 起主題只管樣子，這些由 按鍵 → 按鍵字元和快捷鍵 管。</item>
     </plurals>
     <string name="theme_pack_layouts_unused">不會使用的佈局（讀不出、缺鍵盤必需的鍵，或不是已有的鍵盤）：%1$s</string>
+    <plurals name="theme_pack_layouts_listed">
+        <item quantity="other">這個主題帶 %1$d 個佈局：%2$s，匯入後在 外觀 → 佈局 裡。</item>
+    </plurals>
+    <string name="theme_pack_layouts_listed_commits">其中 %1$d 個動作直接輸入佈局裡寫的文字。</string>
+    <string name="theme_pack_layouts_replaces">取代已有的『%1$s』（這個主題上次匯入時做的，之後沒改過）。</string>
+    <plurals name="theme_pack_layouts_full">
+        <item quantity="other">外觀 → 佈局 已滿（%2$d 個）：其中 %1$d 個放不進去。</item>
+    </plurals>
+    <string name="theme_pack_layouts_not_listed">它的佈局沒有全部放進 外觀 → 佈局（列表已滿，或有的沒能轉成）。</string>
+    <string name="theme_pack_layouts_with">一起匯入</string>
+    <string name="theme_layouts_in_use">主題「%1$s」帶的%2$s已放進 外觀 → 佈局，%3$s正在用</string>
+    <string name="theme_layouts_aside_dark">深色主題「%1$s」帶的%2$s也在列表裡，沒有換上</string>
+    <string name="theme_layouts_aside_light">淺色主題「%1$s」帶的%2$s也在列表裡，沒有換上</string>
     <string name="keyboard_themed">%1$s（主題：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">資訊</string>

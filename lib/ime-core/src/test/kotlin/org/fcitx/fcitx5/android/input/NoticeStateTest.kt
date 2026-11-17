@@ -26,6 +26,11 @@ class NoticeStateTest {
         "a failure, 2 s" to { assertEquals(2000L, NoticeState<String>().show(null, steady = true).ms) },
         // a button to reach for wins
         "a failure with a button, 3 s" to { assertEquals(3000L, NoticeState<String>().show("删", steady = true).ms) },
+        // news of several lines (L7's boards chosen): the time its sayer asks, the kinds' own unchanged
+        "a time asked, that" to { assertEquals(4000L, NoticeState<String>().show(null, steady = false, ms = 4000L).ms) },
+        "a time asked, typed away all the same" to {
+            assertTrue(NoticeState<String>().apply { show(null, steady = false, ms = 4000L) }.typed())
+        },
     )
 
     @Test

@@ -1012,43 +1012,69 @@ def push_layouts_pack(d):
     push_download(d, p, "uat-layouts")
 
 
+def answer_pack(d, with_layouts=True):
+    """the open 导入主题 dialog answered 导入, its 一起导入 ticked or not (061-custom-layout §11)"""
+    try:   # the dialog reads the pack first (加载中)
+        box = d.wait(lambda x: x.find(text="一起导入", where="all"), 15, what="确认框里的「一起导入」")
+    except Blocked:
+        box = None
+    check(box, f"确认框里没有「一起导入」：{d.screen().texts('all')[:10]}")
+    if not with_layouts:
+        d.tap(box.c, 0.5)
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+
+
+def types_q(d):
+    """the q key on the test page: what reaches the field"""
+    d.open_page("text")
+    d.tap(d.keys(refresh=True)["q"], 1.0)
+    text = d.field_text() or ""
+    d.clear()
+    return text
+
+
+def use_theme(d):
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+
+
 @case("ST-72", base="B0-设置", mutates=True)
 def st72(d):
-    from uat import gear
     appearance_tab(d, "大小与样式")
     d.switch("跟随系统深色模式", False)
     push_layouts_pack(d)
     d.step("导入")
     import_theme(d, "uat-layouts", confirm=False)
-    # the app's 26 keys' four (/ @ . .com) and q's; k14 does not read
-    for told in ("此主题包含自定义布局：k18, qwerty（其中 5 个动作直接输入布局里写的文字）", "缺键盘必需的键，或不是已有的键盘）：k14"):
+    # its 26 and 18 keys made layouts of the user's; k14 does not read; no keyboard stood for
+    for told in ("这个主题带 2 个布局：uat-layouts · 主题 26 键、uat-layouts · 主题 18 键，导入后在 外观 → 布局 里。",
+                 "缺键盘必需的键，或不是已有的键盘）：k14"):
         check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
-    d.tap_text("导入", where="all", scroll=False, after=3.0)
-    appearance_tab(d, "主题")
-    item = custom_item(d)
-    check(item, "导入后主题列表里没有它")
-    d.tap(item.c, 1.5)
-    d.step("打字")
-    d.open_page("text")
-    d.type("q")
-    d.expect_field("你好", msg="点 q 没有输入布局里写的「你好」")
-    d.step("切键盘")
+    check(not d.screen().find(contains="此主题包含自定义布局", where="all"), "确认框仍说这个主题顶替键盘")
+    answer_pack(d)
+    use_theme(d)
+    d.step("不再顶替")
+    check("你好" not in types_q(d), "用这个主题时 q 仍打出主题 26 键的「你好」")
+    d.step("布局页")
+    check(layout_card(d, "uat-layouts · 主题 18 键"), "布局页没有「uat-layouts · 主题 18 键」")
+    card = layout_card(d, "uat-layouts · 主题 26 键")
+    check(card, "布局页没有「uat-layouts · 主题 26 键」")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    check(d.wait_text("「uat-layouts · 主题 26 键」用在", timeout=5, where="all"), f"没出「用在」勾选：{d.screen().texts('all')[:10]}")
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    got = types_q(d)
+    check("你好" in got, f"拼音用 uat-layouts · 主题 26 键 时 q 没打出「你好」：{got!r}")
     gear(d, "拼音")
     d.tap_text("键盘", after=1.0)
+    d.wait_text("注音全键盘", timeout=10, where="all")
     opts = d.screen().texts("all")
     d.back(after=0.5)
-    for want in ("全键盘（主题：主题 26 键）", "18 键（主题：主题 18 键）", "14 键"):
-        check(want in opts, f"键盘选项里没有「{want}」：{opts[:12]}")
-    out = []
-    for option in ("18 键（主题：主题 18 键）", "14 键"):
-        gear(d, "拼音")
-        choose(d, "键盘", option)
-        d.open_page("text")
-        n = len(d.keys(refresh=True))
-        check(n > 10, f"{option} 没弹出（{n} 个键）")
-        out.append(f"{option} {n} 键")
-    return "提示 5 个 commit:、k14 不用；q 打出你好；" + "、".join(out)
-
+    check(not any("（主题：" in t for t in opts), f"键盘选项里还有「（主题：…）」：{opts[:12]}")
+    check("uat-layouts · 主题 26 键（自定义）" in opts, f"键盘选项里没有「uat-layouts · 主题 26 键（自定义）」：{opts[:12]}")
+    return "确认框列出 2 个布局、k14 不用、勾着一起导入；主题不顶替；布局页两张卡片；用在拼音后 q 打出你好"
 
 SOUNDS_ICONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "theme-sounds-icons")
 
@@ -1883,36 +1909,111 @@ def st143(d):
     d.switch("跟随系统深色模式", False)
     push_shift060_pack(d, "uat-shift060")
     d.step("导入旧包")
-    import_theme(d, "uat-shift060")
-    appearance_tab(d, "主题")
-    item = custom_item(d)
-    check(item, "导入后主题列表里没有它")
-    d.tap(item.c, 1.5)
+    import_theme(d, "uat-shift060", confirm=False)
+    answer_pack(d, with_layouts=False)
+    use_theme(d)
     ids = typing_xi(d)
-    check("shift" in ids and "apostrophe" not in ids, f"导入的包没写分词键，打 xi 时那格应仍是 ⇧：{sorted(ids)[:40]}")
+    # since 0.6.1 (061-custom-layout §11) the pack's 26 keys stand for the app's no more: the app's, 分词 its own
+    check("apostrophe" in ids and "shift" not in ids, f"导入后画的应是自带的 26 键，打 xi 时那格是分词：{sorted(ids)[:40]}")
     d.step("当作升级后第一次启动")
-    out = d.sh(f"run-as {PKG} rm no_backup/theme-separator-added; am force-stop {PKG}")
+    out = d.sh(f"run-as {PKG} rm no_backup/theme-separator-added no_backup/theme-layouts-listed; am force-stop {PKG}")
     check("No such file" not in out, f"标记文件不在（第一次启动没写？）：{out.strip()[:120]}")
+    # the start lists and switches off the main thread (seconds for a 26 keys'): 外观 → 布局 waits for it to end, the
+    # input method's page does not, so it is opened after (as ST-175)
+    check(layout_card(d, "uat-shift060 · 旧 26 键"), "布局页没有「uat-shift060 · 旧 26 键」")
+    gear(d, "拼音")
+    check(d.wait_text("uat-shift060 · 旧 26 键（自定义）", timeout=5, contains=True), f"重启后拼音没换成转出来的 26 键：{d.screen().texts()[:16]}")
+    keyboard_back(d)
     ids = typing_xi(d)
-    check("apostrophe" in ids and "shift" not in ids, f"重启后打 xi 时那格不是分词：{sorted(ids)[:40]}")
+    # a layout of the user's is found by its labels (分词), the app's by its scene ids too (apostrophe)
+    sep = "apostrophe" if "apostrophe" in ids else "分词"
+    check(sep in ids and "shift" not in ids, f"重启后打 xi 时那格不是分词：{sorted(ids)[:40]}")
     d.open_page("text")
     d.type("xi")
-    d.tap(d.keys(refresh=True)["apostrophe"], 0.6)
+    d.tap(d.keys(refresh=True)[sep], 0.6)
     d.type("an")
     code = d.preedit()
     d.clear()
     check("xi'an" in code.replace(" ", ""), f"分词后编码不是 xi'an：{code!r}")
     d.step("之后导入的不改")
     push_shift060_pack(d, "uat-shift060b")
-    import_theme(d, "uat-shift060b")
-    appearance_tab(d, "主题")
-    item = custom_item(d)
-    check(item, "导入后主题列表里没有它")
-    d.tap(item.c, 1.5)
+    import_theme(d, "uat-shift060b", confirm=False)
+    answer_pack(d)
+    pinyin_keyboard(d, "uat-shift060b · 旧 26 键（自定义）")
     ids = typing_xi(d)
-    check("shift" in ids and "apostrophe" not in ids, f"之后导入的包打 xi 时那格应是 ⇧：{sorted(ids)[:40]}")
-    return "旧包重启后打字时是分词（xi'an）；之后导入的仍是 ⇧"
+    check("shift" in ids and not {"apostrophe", "分词"} & ids, f"之后导入的包的 26 键打 xi 时那格应是 ⇧：{sorted(ids)[:40]}")
+    return "导入后是自带的分词；重启后拼音换成转出来的 26 键，打字时是分词（xi'an）；之后导入的那块仍是 ⇧"
 
+
+MINT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "examples", "k17-motion")
+
+
+def push_mint_pack(d, name="uat-mint"):
+    """<name>.theme in 下载: the theme maker's 薄荷 17 键 example (its theme.xml and layouts/k18.xml) renamed"""
+    with open(os.path.join(MINT, "theme.xml"), encoding="utf-8") as f:
+        xml = f.read()
+    assert 'name="薄荷 17 键"' in xml
+    p = os.path.join(tempfile.gettempdir(), f"{name}-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", xml.replace('name="薄荷 17 键"', f'name="{name}"', 1))
+        z.write(os.path.join(MINT, "layouts", "k18.xml"), "layouts/k18.xml")
+    push_download(d, p, name)
+
+
+def keyboard_back(d, tries=3):
+    """the test page's keyboard after a force-stop: the system starts the input method again late (another one meanwhile)"""
+    for i in range(tries):
+        try:
+            d.open_page("text")
+            return d.keys(refresh=True)
+        except Blocked:
+            if i == tries - 1:
+                raise
+            time.sleep(5.0)
+
+
+def unseen_notice(d):
+    """the theme layouts' notice waiting to be said on the keyboard (KotlinHost.tellUnseen), "" none"""
+    out = d.sh(f"run-as {PKG} cat shared_prefs/{PKG}_preferences.xml")
+    m = re.search(r'<string name="theme_layouts_unseen">([^<]*)</string>', out)
+    return m.group(1) if m else ""
+
+
+@case("ST-175", base="B0-设置", mutates=True)
+def st175(d):
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    pinyin_keyboard(d, "18 键")
+    push_mint_pack(d)
+    import_theme(d, "uat-mint", confirm=False)
+    answer_pack(d, with_layouts=False)
+    use_theme(d)
+    d.step("当作升级后第一次启动")
+    out = d.sh(f"run-as {PKG} rm no_backup/theme-layouts-listed; am force-stop {PKG}")
+    check("No such file" not in out, f"标记文件不在（第一次启动没写？）：{out.strip()[:120]}")
+    told = "主题「uat-mint」带的17 键已放进 外观 → 布局，拼音正在用"
+    # the settings first: the app's start lists and switches off the main thread, 外观 → 布局 waits for it; a keyboard
+    # asked for at once waits on the system to start the input method again (over 10 s after a force-stop on an emulator)
+    d.step("布局页、拼音的键盘")
+    check(layout_card(d, "uat-mint · 17 键"), "布局页没有「uat-mint · 17 键」")
+    check(d.wait_text("用在：拼音", timeout=5, where="all"), f"卡片下没写「用在：拼音」：{d.screen().texts()[:20]}")
+    gear(d, "拼音")
+    check(d.wait_text("uat-mint · 17 键（自定义）", timeout=5, contains=True), f"拼音的「键盘」不是 uat-mint · 17 键：{d.screen().texts()[:16]}")
+    d.step("键盘上的提示")
+    # the notice stays 4 s (ThemeLayoutsToList.NOTICE_MS), yet a screen dump as the keyboard comes up may miss it: what
+    # waits to be said is read off the settings (internal.themeLayoutsUnseen), then seen as the keyboard shows it
+    check(told in unseen_notice(d), f"等着说的提示不是「{told}」：{unseen_notice(d)!r}")
+    keyboard_back(d)
+    d.wait(lambda x: not unseen_notice(d), 15, what="提示说过")
+    d.step("再启动不再提示")
+    d.sh(f"am force-stop {PKG}")
+    keyboard_back(d)
+    time.sleep(2.0)
+    check(not d.screen().find(contains=told, where="ime") and not unseen_notice(d), "再启动又提示了一次")
+    return "重启后提示一次；布局页 uat-mint · 17 键 用在：拼音；拼音的键盘是它；再启动不提示"
+
+
+case("ST-176", needs="jvm:ThemeLayoutsToListTest.bothSlotsPacksOfOneBoardTheShownOnesChosenTheOthersToldOf")(lambda d: None)
 
 case("ST-156", needs="jvm:SettingsMenuUatTest.searchingAChoiceOpensItsSetting")(lambda d: None)
 
@@ -2135,7 +2236,8 @@ def st148(d):
     d.wait_text("替换已有的", timeout=8, where="all", contains=True)
     d.tap_text("导入", where="all", scroll=False, after=3.0)
     skip_use(d)
-    appearance_tab(d, "布局")
+    # scrolled to it first: the built-in cards (L3) can put it below the fold
+    check(layout_card(d, "UAT 26 键"), "替换后列表里没有 UAT 26 键")
     check(len([n for n in d.screen().app() if n.text == "UAT 26 键"]) == 1, "替换后不止一张 UAT 26 键")
     card = layout_card(d, "UAT 26 键")
     d.hold(card.c, 1000)

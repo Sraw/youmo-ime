@@ -226,13 +226,13 @@ abstract class BaseInputView(
 
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
 
-    private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false): Boolean {
+    private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false, ms: Long? = null): Boolean {
         // one line per notice, never its text (it may hold a word typed): UAT counts these to
         // catch a notice said twice, which crossfades in the same chip and can't be seen as two
         Timber.i("say")
         chipTyping.chipShown()
         val chip = undoChip ?: UndoChip(undoAnchor, theme, ::undoPlace).also { undoChip = it }
-        return chip.show(message, undo, aboveKeys, steady)
+        return chip.show(message, undo, aboveKeys, steady, ms)
     }
 
     // a long press's act said over the bar, with what takes it back: only the last act, and only
@@ -259,10 +259,11 @@ abstract class BaseInputView(
     /**
      * [message] said for a moment above the keyboard ([FcitxInputMethodService.say]), with 撤销
      * doing [undo] if there is one; not over the bar, whose buttons it hid (the user, 2026-10-22).
-     * [steady]: not put away by typing ([UndoChip.show]). False if it could not be shown, [undo] lapsed.
+     * [steady]: not put away by typing ([UndoChip.show]); [ms] its own time, null its kind's. False if it could
+     * not be shown, [undo] lapsed.
      */
-    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) =
-        notice(message, undo, aboveKeys = true, steady)
+    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false, ms: Long? = null) =
+        notice(message, undo, aboveKeys = true, steady, ms)
 
     private val chipTyping = ChipTyping()
 

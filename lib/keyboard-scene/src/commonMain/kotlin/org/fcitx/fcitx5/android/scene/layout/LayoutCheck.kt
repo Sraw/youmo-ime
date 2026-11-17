@@ -206,7 +206,7 @@ object LayoutCheck {
         out += narrow(layout)
         if (commits.isNotEmpty()) out += Finding(0, "commits", listOf(commits.size.toString()))
         theme?.let { t ->
-            BlankKeys.find(t, listOf(BlankKeys.Board(layout, fragments)), limit = BLANK_LIMIT).forEach { out += Finding(0, "theme-blank", listOf(it.toString())) }
+            BlankKeys.find(t, listOf(BlankKeys.Board(layout, fragments, base = layout.basedOn)), limit = BLANK_LIMIT).forEach { out += Finding(0, "theme-blank", listOf(it.toString())) }
         }
         return out
     }
@@ -262,6 +262,7 @@ object LayoutCheck {
     }
 
     private const val BOM = "\uFEFF"
+    private const val PAD_LACKING = "pad="
     private val ROLES = setOf("backspace", "enter", "lang")
     private val DIGIT = Regex("[0-9]")
     private const val BLANK_LIMIT = 5
@@ -337,19 +338,44 @@ object LayoutCheck {
     // the attributes that hold an action (the rest of KeyAttrs.actions are a key's ways: swipe-axis, repeat, preview)
     private val ACTION_ATTRS = setOf("send", "swipe-up", "swipe-down", "long-press", "double-tap")
 
-    // §3.2 第 7 条: a name not the app's has a / and none of the app's prefixes
+    // §3.2 第 7 条: a name not the app's has a / and none of the app's prefixes; a key's, its variants', and one a
+    // <defaults> gives every key under it (the layout's, a row's: L7 review S4, a pack's 0.6.0 row named so slipped by)
     private fun names(layout: Layout, sources: Sources): List<Finding> {
-        val app = sources.names
-        return ownCells(layout).filterIsInstance<Key>().flatMap { k -> (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNull { it.shortcut }.distinct().map { k to it } }
-            .filter { it.second !in app }
-            .mapNotNull { (k, name) ->
-                val id = KeyId(name)
-                when {
-                    id.isFunction -> Finding(k.line, "name-no-slash", listOf(id.key))
-                    id.form in NAME_PREFIXES -> Finding(k.line, "name-prefix", listOf(name))
-                    else -> null
-                }
+        val rows = layout.parts.filterIsInstance<Row>()
+        val keys = rows.flatMap { it.cells }.filterIsInstance<Key>()
+            .flatMap { k -> (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNull { it.shortcut }.distinct().map { k.line to it } }
+        val defaults = listOfNotNull(layout.defaults.shortcut?.let { 0 to it }) + rows.mapNotNull { r -> r.defaults.shortcut?.let { r.line to it } }
+        return (defaults + keys).mapNotNull { (line, name) ->
+            when (nameProblem(name, sources)) {
+                "name-no-slash" -> Finding(line, "name-no-slash", listOf(KeyId(name).key))
+                "name-prefix" -> Finding(line, "name-prefix", listOf(name))
+                else -> null
             }
+        }
+    }
+
+    /**
+     * The pad a number board lacks what its fields type of, where [finding] says so (`lacks` `pad=<pad>: …`); null for
+     * any other finding. A restore refuses such a board, a theme pack's made one is made for the pads it does not lack
+     * (061-custom-layout §7; L5 review N1, L7 review S3): one rule for both.
+     */
+    fun padLacking(finding: Finding): String? =
+        finding.takeIf { it.key == "lacks" }?.args?.firstOrNull()?.takeIf { it.startsWith(PAD_LACKING) }
+            ?.removePrefix(PAD_LACKING)?.substringBefore(':')
+
+    /**
+     * What §3.2 第 7 条 says of a key's [name] (as read: a bare one `fn/`'s), null where it may be: one not the app's
+     * (`name-no-slash`) without a `/`, (`name-prefix`) under one of the app's prefixes. What a theme pack's layout made
+     * one of the user's renames (PackLayouts.convert).
+     */
+    internal fun nameProblem(name: String, sources: Sources): String? {
+        if (name in sources.names) return null
+        val id = KeyId(name)
+        return when {
+            id.isFunction -> "name-no-slash"
+            id.form in NAME_PREFIXES -> "name-prefix"
+            else -> null
+        }
     }
 
     // [text] read as the app reads a file: no more than its bytes, then its byte-order mark gone (PackLayouts.read); null
@@ -757,7 +783,7 @@ object LayoutCheck {
             else -> emptyList()
         }.filter { it !in types }
         return listOfNotNull(
-            need.takeIf { it.isNotEmpty() }?.let { true to Finding(0, "lacks", listOf("pad=$pad: " + it.joinToString(" "))) },
+            need.takeIf { it.isNotEmpty() }?.let { true to Finding(0, "lacks", listOf("$PAD_LACKING$pad: " + it.joinToString(" "))) },
             told.takeIf { it.isNotEmpty() }?.let { false to Finding(0, "pad-lacks", listOf(pad, it.joinToString(" "))) },
         )
     }

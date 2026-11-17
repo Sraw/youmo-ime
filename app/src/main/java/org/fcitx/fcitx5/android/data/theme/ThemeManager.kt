@@ -12,6 +12,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.ThemeManager.activeTheme
@@ -536,9 +537,20 @@ object ThemeManager {
         packsListed()
         _activeTheme = evaluateActiveTheme()
         settleKeyStyle()
+        listPackLayouts()
         // fire all `OnThemeChangedListener`s on theme preferences change
         prefs.registerOnChangeListener(onThemePrefsChange)
         prefetch()
+    }
+
+    // the packs' boards of before 0.6.1 put in 外观 → 布局 once, and those a backup restored (061-custom-layout §11), off
+    // the main thread: the theme shown and the other slot's of 跟随系统深色模式 as they switch, the packs in use, the
+    // choices they stood for switched
+    private fun listPackLayouts() {
+        ThemeLayoutsToList.atStart(packs) {
+            val other = if (prefs.followSystemDayNightTheme.getValue()) (if (isDarkMode) prefs.lightModeTheme else prefs.darkModeTheme).getValue() else null
+            ThemeLayoutsToList.InUse(_activeTheme, other, isDarkMode)
+        }
     }
 
     // the key style settings before theme file 3.0 into the themes in use (ThemeLookMigration step 2), once

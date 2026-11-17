@@ -57,6 +57,12 @@ data class Env(
     val typed: Set<String>? = null,
     /** The app's 按键样式 over a 4.0 theme's own keys, key by key after its cascade; null: the theme's alone (a 3.0 look has them in it, the theme maker none). */
     val keyStyle: KeyStyleOver? = null,
+    /**
+     * A layout of the user's: the app's board it is `based-on` (061-custom-layout §10), which the theme's names of keys
+     * (`k18/r1c1`, every key of `k18`) and `@keyboard=k18` select too, as they do [board]. Null: none (the app's boards, a
+     * theme pack's).
+     */
+    val base: String? = null,
 ) {
     /** The keyboard's width in dp as Android's configuration has it (a whole number, rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
@@ -88,6 +94,7 @@ data class Env(
                 input.field?.takeIf { it in Selector.FIELDS }?.let { add("field=$it") }
             }
             board?.let { add("keyboard=$it") }
+            base?.let { add("keyboard=$it") }
         }
 
     /** What a `when=` asks of, answered here. */

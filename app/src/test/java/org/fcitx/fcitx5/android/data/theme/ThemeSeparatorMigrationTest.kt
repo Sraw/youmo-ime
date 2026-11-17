@@ -14,9 +14,9 @@ import org.fcitx.fcitx5.android.core.dirsUnder
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.LEGACY_APPLICATION_ID_ROOT
 import org.fcitx.fcitx5.android.data.UserDataManager
-import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -92,9 +92,11 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         // the pack's time kept: its place in the list, and its layouts' cache key
         assertEquals(at, themeXml.lastModified())
         assertTrue(marker.isFile)
-        // as the app takes it: drawn, and listed after the blank-key check of its new stamp
-        val report = ThemePackLayouts.report(file.parentFile!!, listOf("qwerty.xml"), { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text)
-        assertEquals(listOf("qwerty"), report.used)
+        // as the app takes it: a layout of the user's since 0.6.1 (ThemeLayoutsToList), 分词 in it; listed after the
+        // blank-key check of its new stamp
+        val made = ThemeLayoutsToList.convert(file.parentFile!!, "mine", null).single()
+        assertEquals("qwerty", made.first)
+        assertTrue("when=\"!table !composing\"" in (made.second as PackLayouts.Converted.Done).text)
         File(packs, "mine/.checked").delete()
         assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
         // an import after: as it is written, though the start runs it again

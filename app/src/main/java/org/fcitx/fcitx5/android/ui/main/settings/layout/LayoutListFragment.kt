@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
@@ -192,6 +193,8 @@ class LayoutListFragment : Fragment() {
     }
 
     private fun items(ctx: Context): List<Item> {
+        // opened as the app starts after an upgrade or a restore: the packs' boards listed and chosen first, not missed
+        ThemeLayoutsToList.awaitStart()
         val prefs = AppPrefs.getInstance().keyboard
         // each panel's choice: the app's ("") used where none of the user's is
         val panels = prefs.panelLayouts()

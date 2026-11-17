@@ -230,7 +230,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     // [say]: whether it was said on the keyboard, else a toast if [toast] (EngineNotices' choose their own)
-    private fun sayOnKeyboard(message: String, undo: UndoChip.Undo?, steady: Boolean, toast: Boolean = true): Boolean {
+    private fun sayOnKeyboard(message: String, undo: UndoChip.Undo?, steady: Boolean, toast: Boolean = true, ms: Long? = null): Boolean {
         // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
         val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
         val length = if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
@@ -241,7 +241,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 false
             }
             // shown, but its window not yet (or no longer) on the screen: the chip lapsed [undo] (F3530)
-            !view.say(message, undo, steady) -> {
+            !view.say(message, undo, steady, ms) -> {
                 if (toast) toast(message, length)
                 false
             }
@@ -250,7 +250,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     // what the engine says, said here while this keyboard runs
-    private val engineSayer = EngineNotices.Sayer { message, steady -> sayOnKeyboard(message, null, steady, toast = false) }
+    private val engineSayer = object : EngineNotices.Sayer {
+        override fun say(message: String, steady: Boolean) = sayOnKeyboard(message, null, steady, toast = false)
+        override fun say(message: String, steady: Boolean, ms: Long?) = sayOnKeyboard(message, null, steady, toast = false, ms = ms)
+    }
 
     /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password

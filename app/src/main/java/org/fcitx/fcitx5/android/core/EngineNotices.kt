@@ -25,6 +25,9 @@ object EngineNotices {
          * keyboard waits for it: the toast in its place is [post]'s to say or not.
          */
         fun say(message: String, steady: Boolean): Boolean
+
+        /** [say] for [ms] (NoticeState.show), null its kind's time: a sayer that times none says it as any. */
+        fun say(message: String, steady: Boolean, ms: Long?): Boolean = say(message, steady)
     }
 
     @Volatile
@@ -37,7 +40,7 @@ object EngineNotices {
 
     // a notice's own text as it was said (not joined with the others it was said with), whether it is a
     // failure, and what is to be done once it is seen
-    private class Unseen(val text: String, val steady: Boolean, val seen: () -> Unit)
+    private class Unseen(val text: String, val steady: Boolean, val seen: () -> Unit, val ms: Long? = null)
 
     /** A failure, said as a key fails: not put away by the key typed after it, and long (rule 4). */
     fun failed(@StringRes id: Int) = post(steady = true) { appContext.getString(id) }
@@ -54,15 +57,16 @@ object EngineNotices {
      * keyboard as a [tip] is, and with none shown (as the host starts) when it next shows
      * ([keyboardShown]); no toast, which would say it before the keyboard it is about. [seen] runs on
      * the main thread once it is said there: what records it told, so one never seen is told again.
-     * Told again before it is seen (the host reloaded first), nothing more: it is on its way.
+     * Told again before it is seen (the host reloaded first), nothing more: it is on its way. [ms]: how long it
+     * stays, null a line said's (NoticeState.SAID_MS): news of several lines takes longer to read.
      */
-    fun toldUntilSeen(@StringRes id: Int, vararg args: Any, seen: () -> Unit = {}) {
+    fun toldUntilSeen(@StringRes id: Int, vararg args: Any, ms: Long? = null, seen: () -> Unit = {}) {
         if (!telling.add(id)) return
         val done = {
             telling.remove(id)
             seen()
         }
-        post(steady = false, toast = { null }, said = done, unsaid = untilSeen(id, steady = false, done)) { appContext.getString(id, *args) }
+        post(steady = false, ms = ms, toast = { null }, said = done, unsaid = untilSeen(id, steady = false, done, ms)) { appContext.getString(id, *args) }
     }
 
     // what toldUntilSeen has on its way and not yet seen
@@ -101,13 +105,15 @@ object EngineNotices {
         val pending = unseen.toMap()
         // a failure among them makes the notice one
         val steady = pending.values.any { it.steady }
+        // as long as the longest of them asks; none asking, its kind's
+        val ms = pending.values.mapNotNull { it.ms }.maxOrNull()
         unseen.clear()
         // one notice on the keyboard, so one line each in it: said one after another, each would put the last away.
         // Not said there either (the window not yet on the screen): each waits again as itself, not as the
         // joined line, which joined again would say each twice
         // the toast, with no keyboard, the failures alone: news is not toasted (toldUntilSeen)
         val failures = pending.values.filter { it.steady }.joinToString("\n") { it.text }
-        post(steady, toast = { failures.ifEmpty { null } }, said = { pending.values.forEach { it.seen() } }, unsaid = { pending.forEach { (id, u) -> unseen.putIfAbsent(id, u) } }) {
+        post(steady, ms, toast = { failures.ifEmpty { null } }, said = { pending.values.forEach { it.seen() } }, unsaid = { pending.forEach { (id, u) -> unseen.putIfAbsent(id, u) } }) {
             pending.values.joinToString("\n") { it.text }
         }
     }
@@ -119,20 +125,21 @@ object EngineNotices {
     fun tip(message: String) = post(steady = false) { message }
 
     // [id] said but not seen: to be said when the keyboard next shows
-    private fun untilSeen(@StringRes id: Int, steady: Boolean, seen: () -> Unit = {}): (String) -> Unit = { said ->
-        unseen[id] = Unseen(said, unseen[id]?.steady == true || steady, seen)
+    private fun untilSeen(@StringRes id: Int, steady: Boolean, seen: () -> Unit = {}, ms: Long? = null): (String) -> Unit = { said ->
+        unseen[id] = Unseen(said, unseen[id]?.steady == true || steady, seen, ms)
     }
 
     // looked up when it is said, on the main thread; on the keyboard [said] told, else [toast] of the text toasted (null none) and [unsaid] told
     private fun post(
         steady: Boolean,
+        ms: Long? = null,
         toast: (String) -> String? = { it },
         said: () -> Unit = {},
         unsaid: (String) -> Unit = {},
         message: () -> String,
     ) = ContextCompat.getMainExecutor(appContext).execute {
         val text = message()
-        if (sayer?.say(text, steady) == true) return@execute said()
+        if (sayer?.say(text, steady, ms) == true) return@execute said()
         toast(text)?.let { appContext.toast(it, if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT) }
         unsaid(text)
     }

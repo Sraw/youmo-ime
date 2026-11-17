@@ -448,3 +448,5 @@ case("PR-63", needs="manual:要 0.6.0 的正式包：升级后已装主题包的
 
 
 case("PR-64", needs="jvm:BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones、BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays")(lambda d: None)
+
+case("PR-68", needs="jvm:ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched、ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone")(lambda d: None)

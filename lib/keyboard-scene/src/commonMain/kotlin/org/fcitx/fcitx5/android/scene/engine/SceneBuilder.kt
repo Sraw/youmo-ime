@@ -237,13 +237,13 @@ class SceneBuilder(
         if (look == null || face == Face.None) return emptyList()
         // a slot's face: the theme's alone, the key style is for the keys (the owner's settings name keys)
         val c = cascadeFor(face)
-        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, emptySet(), slot = true)), theme)
+        val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, emptySet(), slot = true, base = env.base)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
     }
 
     // the handwriting pad: its face, the grid over it the theme shows, the ink its strokes are drawn in (060-render-p3 T7b)
     private fun pad(board: String, s: Slot, cell: Box, face: List<Op>): SlotNode {
-        val target = Selector.Target("key", board, s.id, null, setOfNotNull(s.look) + s.classes, emptySet(), slot = true)
+        val target = Selector.Target("key", board, s.id, null, setOfNotNull(s.look) + s.classes, emptySet(), slot = true, base = env.base)
         // the grid and the ink are the scene's, flat or not; only the face keeps 3.0's
         val v = cascade.of(target)
         val c = cascadeFor(s.face)
@@ -278,6 +278,7 @@ class SceneBuilder(
     // unbounded: the key styles and forms are a few fixed choices, so its keys are too (a free slider would need a bound)
     private data class StyledFor(
         val board: String,
+        val base: String?,
         val id: String,
         val role: String?,
         val classes: Set<String>,
@@ -292,7 +293,7 @@ class SceneBuilder(
         val c = cascadeFor(key.attrs.face)
         val states = statesOf(key)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
-        return c.kept(StyledFor(board, key.key.id, key.attrs.role, classes, states, over?.let { OverIn(it, env.landscape, env.compact) })) { styled(c, board, key, classes, states) }
+        return c.kept(StyledFor(board, env.base, key.key.id, key.attrs.role, classes, states, over?.let { OverIn(it, env.landscape, env.compact) })) { styled(c, board, key, classes, states) }
     }
 
     private fun styled(c: Cascade, board: String, key: ExpandedKey, classes: Set<String>, states: Set<KeyState>): Styled {
@@ -300,7 +301,7 @@ class SceneBuilder(
         val parts = HashMap<Set<KeyState>, (Part) -> TextLook>()
         for (s in listOf(states, states + KeyState.Pressed)) {
             // the key's target once a state, its parts the same but the part's name
-            val whole = Selector.Target("key", board, key.key.id, key.attrs.role, classes, s.mapTo(HashSet()) { it.xml })
+            val whole = Selector.Target("key", board, key.key.id, key.attrs.role, classes, s.mapTo(HashSet()) { it.xml }, base = env.base)
             looks[s] = KeyLook(over(c.of(whole)), theme)
             // a part's look only when a text or an icon of it is placed or drawn
             val byPart = HashMap<Part, TextLook>()
@@ -332,7 +333,7 @@ class SceneBuilder(
             val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
             val own = statesOf(key)
             for (states in stateSets.map { own + it }.distinct().flatMap { listOf(it, it + KeyState.Pressed) }) {
-                val whole = Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, states.mapTo(HashSet()) { it.xml })
+                val whole = Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, states.mapTo(HashSet()) { it.xml }, base = env.base)
                 // what the key shows (its words, its icon) all hidden by the theme; one that shows neither is the layout's
                 fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden
                 val shown = (key.label != null && !hides(Part.Label)) || (key.icon != null && !hides(Part.Icon))
@@ -371,7 +372,7 @@ class SceneBuilder(
         val c = cascadeFor(key.attrs.face)
         val classes = setOf(key.kind) + key.attrs.classes.orEmpty()
         val all = statesOf(key).mapTo(HashSet()) { it.xml } + states
-        return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, all, part))
+        return c.sources(Selector.Target("key", layout.id, key.key.id, key.attrs.role, classes, all, part, base = env.base))
     }
 
     // the key's face's layers in each state

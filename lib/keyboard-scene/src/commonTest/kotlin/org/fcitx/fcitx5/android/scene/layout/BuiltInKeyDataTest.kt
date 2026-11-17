@@ -49,7 +49,9 @@ class BuiltInKeyDataTest {
     fun theTableHasEveryBoardAndTheFragmentsNone() {
         assertEquals(boards.keys, BuiltInKeyData.BOARDS.keys)
         assertEquals(PackLayouts.FRAGMENTS, fragments.keys)
-        for (id in boards.keys + fragments.keys) assertTrue(PackLayouts.replaces(id), id)
+        // a board the user picks among their own layouts not stood for (061-custom-layout §11, L7): a pack's file of it is one of those
+        for (id in boards.keys) assertEquals(id !in KeyData.LISTED, PackLayouts.replaces(id), id)
+        for (id in fragments.keys) assertTrue(PackLayouts.replaces(id), id)
         assertTrue(!PackLayouts.replaces("mine"))
     }
 

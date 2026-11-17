@@ -6,15 +6,16 @@ package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardVariants
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keys.KeyOutput
 import org.fcitx.fcitx5.android.input.keys.KeyState
@@ -24,6 +25,7 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
@@ -48,6 +50,8 @@ import java.util.zip.ZipOutputStream
 /**
  * A theme pack's layouts (060-render-p3 T8b): while the pack is in use each keyboard it has is drawn from it, one
  * that does not read or is not the app's keyboard of its id the app's alone, the rest the pack's; another theme, the app's.
+ * Since 0.6.1 only the boards the user does not pick among their own layouts (注音's…: PackLayouts.replaces); its
+ * `qwerty`, `k18`… are layouts of the user's to be (ThemeLayoutsToList, 061-custom-layout §11), the app's drawn.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -94,6 +98,9 @@ class ThemePackLayoutsTest {
         .replace("send=\"q\"", "send=\"q\" swipe-up=\"commit:qq\"")
         .replace("send=\"w\"", "send=\"w\" swipe-up=\"commit:ww\"")
 
+    // the app's 注音大千 named [name]: a board a pack still stands for
+    private fun zhuyin(name: String = "主题注音") = builtIn.text("zhuyin")!!.replace("name=\"注音大千\"", "name=\"$name\"")
+
     private fun zip(name: String, layouts: Map<String, String>) = ByteArrayOutputStream().also { bytes ->
         ZipOutputStream(bytes).use { zip ->
             zip.putNextEntry(ZipEntry("theme.xml"))
@@ -116,9 +123,6 @@ class ThemePackLayoutsTest {
     }
 
     private fun name(id: String) = SceneLayouts.of(appContext, id)!!.layout.name
-
-    private fun keyQ(id: String) = SceneLayouts.of(appContext, id)!!.layout.parts.filterIsInstance<Row>()
-        .flatMap { it.cells }.filterIsInstance<Key>().first { it.id == "q" }
 
     // the blank-key check runs at import, its pass stamped: a listing does not run it again, unless the pack (its
     // theme.xml, its layouts) changed
@@ -162,100 +166,111 @@ class ThemePackLayoutsTest {
     }
 
     @Test
-    fun aPacksQwertyReplacesThe26Keys() {
-        inUse("mine", mapOf("qwerty.xml" to qwerty()))
-        assertEquals("主题 26 键", name("qwerty"))
-        // its q's swipe written is not taken (主题只管外观, 061-custom-layout §19): q's first and corner the app's
-        assertNull(keyQ("qwerty").attrs.actions["swipe-up"])
-        val q = SceneBoard.resolver(SceneLayouts.of(appContext, "qwerty")!!, "pinyin").resolve(KeyId("full/q"), KeyState())
-        val app = SceneBoard.resolver(SceneLayouts.builtIn(appContext, "qwerty")!!, "pinyin").resolve(KeyId("full/q"), KeyState())
-        assertEquals(app.corner, q.corner)
-        assertEquals(KeyOutput.of(app.first!!), KeyOutput.of(q.first!!))
-        // the others the app's
-        assertSame(SceneLayouts.builtIn(appContext, "k14"), SceneLayouts.of(appContext, "k14"))
+    fun aPacksZhuyinReplacesTheAppsItsQwertyNoLonger() {
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin(), "qwerty.xml" to qwerty()))
+        assertEquals("主题注音", name("zhuyin"))
         assertEquals(
-            appContext.getString(R.string.keyboard_themed, "26", "主题 26 键"),
-            KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.FULL, "26"),
+            appContext.getString(R.string.keyboard_themed, "注音", "主题注音"),
+            KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.ZHUYIN_FULL, "注音"),
         )
-        assertEquals("18", KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.KEYS18, "18"))
+        // its 26 keys a layout of the user's to be (061-custom-layout §11): the app's drawn, named the app's
+        assertSame(SceneLayouts.builtIn(appContext, "qwerty"), SceneLayouts.of(appContext, "qwerty"))
+        assertEquals("26", KeyboardLabels.label(appContext, InputMethodCatalog.PINYIN, ImKeyboard.FULL, "26"))
+        assertSame(SceneLayouts.builtIn(appContext, "k14"), SceneLayouts.of(appContext, "k14"))
     }
 
     @Test
-    fun aPacksK14WritingAnotherBoardItIsBasedOnIsThe14KeysStill() {
-        // a pack's board is of its own id (judge holds it to k14's): based-on="k18" makes it no 18 keys
-        inUse("mine", mapOf("k14.xml" to builtIn.text("k14")!!.replaceFirst("<keyboard ", "<keyboard based-on=\"k18\" ")))
-        val pack = SceneLayouts.of(appContext, "k14")!!
-        assertEquals("k18", pack.layout.basedOn)
-        assertEquals(Form.Grouped14, KeyboardVariants.of(pack.layout, InputMethodCatalog.PINYIN, EngineState.shuangpinScheme).form)
-        val app = SceneLayouts.builtIn(appContext, "k14")!!
-        val groups = app.layout.parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
-            .mapNotNull { it.attrs.shortcut }.filter { it.startsWith("g14/") }
-        assertTrue(groups.isNotEmpty())
-        val drawn = SceneBoard.resolver(pack, "pinyin")
-        val asApp = SceneBoard.resolver(app, "pinyin")
-        val edited = KeyCaps.resolver(appContext, "k14")!!
-        for (name in groups) {
-            val corner = asApp.resolve(KeyId(name), KeyState()).corner
-            assertEquals(name, corner, drawn.resolve(KeyId(name), KeyState()).corner)
-            assertEquals(name, corner, edited.resolve(KeyId(name), KeyState()).corner)
-        }
+    fun aPacksK14WritingAnotherBoardItIsBasedOnIsMadeOneBasedOnThe14Keys() {
+        // a pack's board is of its own id (judge holds it to k14's): based-on="k18" makes it no 18 keys, the layout
+        // of the user's made of it based on the 14 keys
+        val k14 = builtIn.text("k14")!!.replaceFirst("<keyboard ", "<keyboard based-on=\"k18\" ")
+        val made = ThemeLayoutsToList.convert(packLayouts(mapOf("k14.xml" to k14)), "mine", null).single().second as PackLayouts.Converted.Done
+        val layout = (LayoutReader.layout(made.text) as Parsed.Ok).value
+        assertEquals("k14", layout.basedOn)
+        assertEquals(Form.Grouped14, KeyboardVariants.of(layout, InputMethodCatalog.PINYIN, EngineState.shuangpinScheme, base = "k14").form)
+    }
+
+    // a pack's layouts written in a folder of their own, as an import would leave them
+    private fun packLayouts(layouts: Map<String, String>): File = File(appContext.cacheDir, "pack-layouts").apply {
+        deleteRecursively()
+        mkdirs()
+        layouts.forEach { (name, text) -> File(this, name).writeText(text) }
     }
 
     @Test
     fun aBadLayoutFallsBackAloneTheRestThePacks() {
-        // k14 does not read; k18 is the 26 keys under k18's id (not the app's 18 keys' family)
-        inUse("mine", mapOf("qwerty.xml" to qwerty(), "k14.xml" to "<keyboard/>", "k18.xml" to qwerty().replace("id=\"qwerty\"", "id=\"k18\"")))
-        assertSame(SceneLayouts.builtIn(appContext, "k14"), SceneLayouts.of(appContext, "k14"))
-        assertSame(SceneLayouts.builtIn(appContext, "k18"), SceneLayouts.of(appContext, "k18"))
-        assertEquals("主题 26 键", name("qwerty"))
-        assertNull(KeyboardLabels.themedName(appContext, InputMethodCatalog.PINYIN, ImKeyboard.KEYS14))
+        // 注音九键 does not read; 注音大千 the pack's
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin(), "zhuyin-nine.xml" to "<keyboard/>"))
+        assertSame(SceneLayouts.builtIn(appContext, "zhuyin-nine"), SceneLayouts.of(appContext, "zhuyin-nine"))
+        assertEquals("主题注音", name("zhuyin"))
+        assertNull(KeyboardLabels.themedName(appContext, InputMethodCatalog.PINYIN, ImKeyboard.ZHUYIN_NINE))
     }
 
     @Test
     fun aLayoutIncludingAFragmentThePackHasNotTakesTheApps() {
-        val k18 = builtIn.text("k18")!!.replace("name=\"18 键\"", "name=\"主题 18 键\"")
-        inUse("mine", mapOf("k18.xml" to k18))
-        assertEquals("主题 18 键", name("k18"))
-        assertEquals(setOf("grouped-bottom"), SceneLayouts.of(appContext, "k18")!!.fragments.keys)
-        // the app's groups: 双拼 types them too
-        assertEquals("主题 18 键", KeyboardLabels.themedName(appContext, InputMethodCatalog.SHUANGPIN, ImKeyboard.KEYS18))
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin()))
+        assertEquals("主题注音", name("zhuyin"))
+        assertEquals(setOf("grouped-bottom"), SceneLayouts.of(appContext, "zhuyin")!!.fragments.keys)
+        assertEquals("主题注音", KeyboardLabels.themedName(appContext, InputMethodCatalog.PINYIN, ImKeyboard.ZHUYIN_FULL))
     }
 
     @Test
     fun anotherThemeDrawsTheAppsLayoutsAndThePacksAgainOnceBack() {
-        inUse("mine", mapOf("qwerty.xml" to qwerty()))
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin()))
         val pack = ThemeManager.activeTheme
         ThemeManager.setNormalModeTheme(ThemeManager.prefs.normalModeTheme.defaultValue)
-        assertEquals("26 键", name("qwerty"))
+        assertEquals("注音大千", name("zhuyin"))
         ThemeManager.setNormalModeTheme(pack)
-        assertEquals("主题 26 键", name("qwerty"))
+        assertEquals("主题注音", name("zhuyin"))
         // imported again (another file), read again
-        inUse("mine", mapOf("qwerty.xml" to qwerty("又一个")))
-        assertEquals("又一个", name("qwerty"))
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin("又一个")))
+        assertEquals("又一个", name("zhuyin"))
     }
 
     @Test
     fun theImportTellsTheKeyboardsUsedAndTheirCommitsEvenOnesWrittenAsReferences() {
-        // .com's tap written c as a character reference: the reader decodes it, so it counts; the swipes of q and w and
-        // e's (a reference too) are not taken, so not counted, and told as not taken instead
-        val q = qwerty().replace("send=\"e\"", "send=\"e\" swipe-up=\"&#99;ommit:ee\"").replace("send=\"commit:.com\"", "send=\"&#99;ommit:.com\"")
-        val pack = opened("mine", mapOf("qwerty.xml" to q, "mine.xml" to "<keyboard/>", "k14.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
-        // the app's 26 keys have four (/ @ . .com), the pack's own swipes none
+        // the bottom row's .com tap written c as a character reference: the reader decodes it, so it counts; the swipes
+        // of 注音's 1 and 2 (one a reference too) are not taken, so not counted, and told as not taken instead
+        val zy = zhuyin().replace("shortcut=\"zyfull/1\"", "shortcut=\"zyfull/1\" swipe-up=\"&#99;ommit:ee\"")
+            .replace("shortcut=\"zyfull/2\"", "shortcut=\"zyfull/2\" swipe-up=\"commit:ff\" swipe-down=\"commit:gg\"")
+        val bottom = builtIn.text("grouped-bottom")!!.replace("send=\"commit:.com\"", "send=\"&#99;ommit:.com\"")
+        val pack = opened("mine", mapOf("zhuyin.xml" to zy, "mine.xml" to "<keyboard/>", "zhuyin-nine.xml" to "<keyboard/>", "grouped-bottom.xml" to bottom))
+        // the bottom row's four (/ @ . .com), the pack's own swipes none
         val report = pack.staged.layoutReport
         assertEquals(4, report.commits)
         assertEquals(3, report.ignored)
-        assertEquals(listOf("qwerty"), report.used)
-        // not the app's; does not read; a fragment no keyboard used includes
-        assertEquals(setOf("mine", "k14", "grouped-bottom"), report.unused.map { it.first }.toSet())
+        assertEquals(listOf("zhuyin"), report.used)
+        // not the app's; does not read
+        assertEquals(setOf("mine", "zhuyin-nine"), report.unused.map { it.first }.toSet())
         val text = ThemePackDialogs.confirmText(appContext, pack)
-        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts, "qwerty", 4)))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts, "zhuyin", 4)))
         assertTrue(text, text.contains(appContext.resources.getQuantityString(R.plurals.theme_pack_layouts_ignored, 3, 3)))
         // one: said as one (the English plural)
-        val one = opened("one", mapOf("qwerty.xml" to builtIn.text("qwerty")!!.replace("send=\"e\"", "send=\"e\" swipe-up=\"commit:ee\"")))
+        val one = opened("one", mapOf("zhuyin.xml" to builtIn.text("zhuyin")!!.replace("shortcut=\"zyfull/1\"", "shortcut=\"zyfull/1\" swipe-up=\"commit:ee\"")))
         assertEquals(1, one.staged.layoutReport.ignored)
         val said = ThemePackDialogs.confirmText(appContext, one)
         assertTrue(said, said.contains("1 long-press, corner or swipe setting written in its layouts does nothing"))
         assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_unused, report.unused.joinToString(", ") { it.first })))
+    }
+
+    // its boards the user picks among their own: told as the layouts of theirs 「一起导入」 makes, never as unused; one
+    // that is not one with why; the pack's bottom row they take in no fragment unused
+    @Test
+    @Uat("ST-72")
+    fun theImportTellsTheLayoutsItWouldList() {
+        val k18 = builtIn.text("k18")!!.replace("name=\"18 键\"", "name=\"17 键\"")
+        val pack = opened("薄荷", mapOf("qwerty.xml" to qwerty(), "k18.xml" to k18, "nine.xml" to "<keyboard/>", "grouped-bottom.xml" to builtIn.text("grouped-bottom")!!))
+        val report = pack.staged.layoutReport
+        assertEquals(listOf("薄荷 · 主题 26 键", "薄荷 · 17 键"), report.listed)
+        assertEquals(emptyList<String>(), report.used)
+        assertEquals(listOf("nine"), report.unused.map { it.first })
+        val text = ThemePackDialogs.confirmText(appContext, pack)
+        assertTrue(text, text.contains(appContext.resources.getQuantityString(R.plurals.theme_pack_layouts_listed, 2, 2, report.listed.joinToString(appContext.getString(R.string.list_separator)))))
+        // what their keys type written in them (§13; L7 review S1): the 26 keys' q and w swiped up
+        assertEquals(2, report.listedCommits)
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_layouts_listed_commits, 2)))
+        // none: nothing said of them
+        assertTrue(opened("none", mapOf("zhuyin.xml" to zhuyin())).staged.layoutReport.listed.isEmpty())
     }
 
     // 主题只管外观 (061-custom-layout §19): a pack's 注音 (no board 0.6.1 moves) writing keys' corners and swipes, as
@@ -294,17 +309,20 @@ class ThemePackLayoutsTest {
     @Test
     fun aPacksFragmentIncludedIsCountedOnceAndABrokenOneRefusesItsKeyboard() {
         val bottom = builtIn.text("grouped-bottom")!!
-        val k14 = builtIn.text("k14")!!
-        val k18 = builtIn.text("k18")!!
-        val both = opened("mine", mapOf("k14.xml" to k14, "k18.xml" to k18, "grouped-bottom.xml" to bottom)).staged.layoutReport
-        assertEquals(listOf("k14", "k18"), both.used.sorted())
+        val zy = builtIn.text("zhuyin")!!
+        val nine = builtIn.text("zhuyin-nine")!!
+        val both = opened("mine", mapOf("zhuyin.xml" to zy, "zhuyin-nine.xml" to nine, "grouped-bottom.xml" to bottom)).staged.layoutReport
+        assertEquals(listOf("zhuyin", "zhuyin-nine"), both.used.sorted())
         assertTrue(both.unused.isEmpty())
-        // the bottom row's four (k14 and k18 have none of their own), once though both include it
+        // the bottom row's four (注音's have none of their own), once though both include it
         assertEquals(4, both.commits)
-        val broken = opened("other", mapOf("k18.xml" to k18, "grouped-bottom.xml" to "<fragment/>")).staged.layoutReport
+        val broken = opened("other", mapOf("zhuyin.xml" to zy, "grouped-bottom.xml" to "<fragment/>")).staged.layoutReport
         assertTrue(broken.used.isEmpty())
-        inUse("third", mapOf("k18.xml" to k18.replace("name=\"18 键\"", "name=\"x\""), "grouped-bottom.xml" to "<fragment/>"))
-        assertSame(SceneLayouts.builtIn(appContext, "k18"), SceneLayouts.of(appContext, "k18"))
+        inUse("third", mapOf("zhuyin.xml" to zhuyin("x"), "grouped-bottom.xml" to "<fragment/>"))
+        assertSame(SceneLayouts.builtIn(appContext, "zhuyin"), SceneLayouts.of(appContext, "zhuyin"))
+        // a board the user picks including it: made one with no layout (its fragment does not read), told so
+        val made = opened("fourth", mapOf("k18.xml" to builtIn.text("k18")!!, "grouped-bottom.xml" to "<fragment/>")).staged.layoutReport
+        assertEquals(setOf("grouped-bottom" to "does not read", "k18" to "its fragment grouped-bottom does not read"), made.unused.toSet())
     }
 
     @Test
@@ -320,29 +338,32 @@ class ThemePackLayoutsTest {
         val noSide = builtIn.text("nine")!!.replace("kind=\"nine-side\"", "kind=\"symbol-grid\"")
         assertTrue(ThemePackLayouts.judge("nine", (LayoutReader.layout(noSide) as Parsed.Ok).value, nine.fragments, nine)!!.startsWith("it has no slot"))
         // in use: the app's drawn
-        inUse("mine", mapOf("qwerty.xml" to qwerty().replace("role=\"backspace\" ", "")))
-        assertSame(app, SceneLayouts.of(appContext, "qwerty"))
+        inUse("mine", mapOf("zhuyin.xml" to zhuyin().replace("role=\"backspace\" ", "")))
+        assertSame(SceneLayouts.builtIn(appContext, "zhuyin"), SceneLayouts.of(appContext, "zhuyin"))
     }
 
     @Test
     fun theImportsCheckLeavesTheCacheAlone() {
         // the check runs off the main thread; the cache is the main thread's
         SceneLayouts.invalidate()
-        opened("mine", mapOf("qwerty.xml" to qwerty(), "k18.xml" to builtIn.text("k18")!!))
+        opened("mine", mapOf("zhuyin.xml" to zhuyin(), "k18.xml" to builtIn.text("k18")!!))
         assertEquals(0, SceneLayouts.cached)
     }
 
     @Test
     fun aLayoutIsReadPastItsByteOrderMarkAndNotPastTheLimit() {
         val dir = File(appContext.cacheDir, "layouts-read").apply { deleteRecursively(); mkdirs() }
-        File(dir, "qwerty.xml").writeText("\uFEFF<keyboard/>")
-        assertEquals("<keyboard/>", ThemePackLayouts.read(dir, "qwerty"))
-        File(dir, "qwerty.xml").writeText("x".repeat(ThemeAssetLimits.MAX_LAYOUT_BYTES.toInt() + 1))
-        assertNull(ThemePackLayouts.read(dir, "qwerty"))
+        File(dir, "zhuyin.xml").writeText("\uFEFF<keyboard/>")
+        assertEquals("<keyboard/>", ThemePackLayouts.read(dir, "zhuyin"))
+        File(dir, "zhuyin.xml").writeText("x".repeat(ThemeAssetLimits.MAX_LAYOUT_BYTES.toInt() + 1))
+        assertNull(ThemePackLayouts.read(dir, "zhuyin"))
         File(dir, "mine.xml").writeText("<keyboard/>")
         assertNull(ThemePackLayouts.read(dir, "mine"))
+        // one the user picks among their own: not read so since 0.6.1
+        File(dir, "qwerty.xml").writeText("<keyboard/>")
+        assertNull(ThemePackLayouts.read(dir, "qwerty"))
         dir.deleteRecursively()
-        inUse("mine", mapOf("qwerty.xml" to "\uFEFF" + qwerty()))
-        assertEquals("主题 26 键", name("qwerty"))
+        inUse("mine", mapOf("zhuyin.xml" to "\uFEFF" + zhuyin()))
+        assertEquals("主题注音", name("zhuyin"))
     }
 }

@@ -127,10 +127,11 @@ class SceneBoard(
     private fun ownLayout(layout: SceneLayout): SceneLayout? =
         SceneLayouts.builtIn(context, layout.base)?.takeIf { it !== layout }
 
-    // what the keys of [layout] show now as the engine's environment, the board's id its theme's @keyboard= (060-render-p3 T5)
+    // what the keys of [layout] show now as the engine's environment, the board's id its theme's @keyboard= (060-render-p3 T5),
+    // a layout of the user's the board it is based on too (the theme's styles of that board its, 061-custom-layout §10)
     // [keyStyle]: the key style settings over a pack's own keys (a look's has them in it)
     private fun envOf(look: ThemeLook, layout: SceneLayout, width: Int, height: Int, keyStyle: KeyStyleOver?): Env =
-        SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, keyStyle = keyStyle) }
+        SceneTrace.section("env") { env(look, layout, width, height).copy(board = layout.id, base = layout.base.takeIf { it != layout.id }, keyStyle = keyStyle) }
 
     // the scene of [sceneTheme] in [env] ([layout]'s): the last kept for the same values, or made; null, the engine refused it
     private fun scene(layout: SceneLayout, sceneTheme: SceneTheme, measurer: TextMeasurer, env: Env): Scene? {

@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
@@ -869,6 +870,8 @@ class KotlinHost(
         if (internal.nineKeysUnseen.getValue()) {
             EngineNotices.toldUntilSeen(R.string.nine_keys_merged) { internal.nineKeysUnseen.setValue(false) }
         }
+        // the theme packs' boards put in the list and chosen, not yet seen: told as the start that chose them told them
+        ThemeLayoutsToList.tellUnseen()
         val retired = internal.schemeRetiredUnseen.getValue()
         if (retired.isNotEmpty()) {
             val name = ShuangpinNames.of(context, retired) ?: retired

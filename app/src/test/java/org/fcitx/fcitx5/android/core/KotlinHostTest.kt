@@ -96,6 +96,7 @@ class KotlinHostTest {
         home.deleteRecursively()
         // the singleton's prefs outlive the test: a notice one left unseen is not the next one's
         AppPrefs.getInstance().internal.nineKeysUnseen.setValue(false)
+        AppPrefs.getInstance().internal.themeLayoutsUnseen.setValue("")
         AppPrefs.getInstance().keyboard.pinyinKeyboard.run { setValue(defaultValue) }
         AppPrefs.getInstance().internal.nineKeysMerged.run { setValue(defaultValue) }
         // published by the host, read by the keyboard window: not the next test's
@@ -623,6 +624,23 @@ class KotlinHostTest {
         restart()
         idle()
         assertEquals(emptyList<String>(), said.list())
+    }
+
+    // the theme packs' boards listed and chosen at the start (ThemeLayoutsToList, 061-custom-layout §11): what was made
+    // said as it is, once seen
+    @Test
+    @Uat("ST-175")
+    fun theThemeLayoutsChosenAreToldOnce() = runBlocking {
+        val unseen = AppPrefs.getInstance().internal.themeLayoutsUnseen
+        unseen.setValue("主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用")
+        fcitx.stop()
+        EngineNotices.forgetToldOnce()
+        said.clear()
+        listen()
+        start()
+        idle()
+        assertEquals(listOf("主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用"), said.list())
+        assertEquals("", unseen.getValue())
     }
 
     // a 0.4 install's files with both pinyins on, no merge done yet; the host stopped, listened to

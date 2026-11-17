@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
 import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.RareCharsManager
@@ -263,12 +264,29 @@ object UserDataManager {
 
     // the packs of this app's backup ([own]; an upstream one has none) of before 0.6.1 ([from] its themes, laid over)
     // given 分词 at the start after, as the phone's were (FB12); not recorded, they are left as they are (logged), the
-    // restore whole
-    private fun restoredPacks(name: String, from: File, own: Boolean, versionCode: Long) {
-        if (name != ConfigHome.THEME.old || !own || versionCode >= FIRST_WITH_SEPARATOR) return
+    // restore whole. The names of the packs [from] has, every backup's (their layouts listed: restoredPackLayouts)
+    private fun restoredPacks(name: String, from: File, own: Boolean, versionCode: Long): List<String> {
+        if (name != ConfigHome.THEME.old) return emptyList()
+        // the names of the theme 4.0 packs the backup brings (also listed in 外观 → 布局 at the next start)
         val packs = ThemePackFiles.folder(from).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") })
-        runCatching { ThemeSeparators.restoredBeforeSeparator(packs.orEmpty().map { it.name }) }
-            .onFailure { Timber.w(it, "Theme packs restored not recorded to be given 分词") }
+            ?.map { it.name }.orEmpty()
+        if (own && versionCode < FIRST_WITH_SEPARATOR) {
+            runCatching { ThemeSeparators.restoredBeforeSeparator(packs) }
+                .onFailure { Timber.w(it, "Theme packs restored not recorded to be given 分词") }
+        }
+        return packs
+    }
+
+    // the packs this app's backup brought ([names], [own]; an upstream one has none) put in 外观 → 布局 at the next start
+    // (061-custom-layout §11): those its record ([layouts]' CONVERTED) has not, by name (a pack restored is stamped with the
+    // copy's time, not the backup's; one imported with 「一起导入」 unticked is recorded, not listed); their choices switched
+    // where the record is not 0.6.1's (no CURRENT line: 0.6.0's, a 0.6.1 beta's, none at all), as what it chose is then a
+    // board its packs stood for. Not by its version nor by whether it has layouts (L7 review NIT1: 0.6.1's with none
+    // would be switched, a beta's with some not)
+    private fun restoredPackLayouts(layouts: File, names: List<String>, own: Boolean) {
+        if (!own || names.isEmpty()) return
+        val record = CustomLayouts.record(layouts)
+        ThemeLayoutsToList.restored(names.filter { it !in record.packNames }, switch = !record.current)
     }
 
     // [from], the backup's directory of [name] (one of [Dirs.moved]), laid over the phone's [dir]
@@ -412,6 +430,9 @@ object UserDataManager {
 
     internal fun import(src: InputStream, dirs: Dirs) = runCatching {
         if (!dirs.settled) errorRuntime(R.string.user_data_not_settled)
+        // the start's listing of the packs ended first (ThemeLayoutsToList.atStart), and its switch, not yet made, dropped:
+        // made on the main thread after the settings copied in, it would write the phone's over the backup's
+        ThemeLayoutsToList.awaitStart(restoring = true)
         withTempDir { tempDir ->
             // closed before anything is copied: nothing may fail the import once the engine's is in
             val extracted = extractWithinRoom(src, tempDir)
@@ -465,11 +486,13 @@ object UserDataManager {
             // files, ConfigHome: settled before, by appDirs, so an older build's is moved in first, never
             // passed over by a restore made before the move), the rest of external where it was
             val external = File(tempDir, "external")
+            // the theme packs the backup brings, by name
+            var packs = emptyList<String>()
             for ((name, dir) in dirs.moved) {
                 val from = File(tempDir, "external-$name")
                 if (File(external, name).renameTo(from)) {
                     layOver(name, from, dir)
-                    restoredPacks(name, from, origin == UserDataOrigin.Own, metadata.versionCode)
+                    packs += restoredPacks(name, from, origin == UserDataOrigin.Own, metadata.versionCode)
                 }
             }
             if (external.isDirectory) copyDir(external, dirs.external)
@@ -488,6 +511,8 @@ object UserDataManager {
             // restore's failure, which would leave the settings and themes above the backup's and the engine's not
             runCatching { CustomLayouts.restore(File(tempDir, CustomLayouts.DIR), dirs.layouts, ThemePackFiles.minAppVersion(BuildConfig.VERSION_NAME)) }
                 .onFailure { Timber.w(it, "layouts not restored") }
+            runCatching { restoredPackLayouts(File(tempDir, CustomLayouts.DIR), packs, origin == UserDataOrigin.Own) }
+                .onFailure { Timber.w(it, "theme packs restored not recorded to have their layouts listed") }
             // last: an import failing after it would start fcitx again on the logs it replaced
             val learning = File(tempDir, RestoreStash.BACKUP).takeIf { it.isFile }
             if (File(tempDir, "engine").exists() || learning != null) {

@@ -178,7 +178,9 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.ok(as18.ok, JSON.stringify(as18.problems));
   assert.deepEqual(E.defaultMarks(as18.layout, {}), E.defaultMarks('k14', {}));
   assert.equal(E.buildScene(as18.layout, light, env, fixed).scene.text(), E.buildScene('k14', light, env, fixed).scene.text());
-  assert.ok(E.replaces('grouped-bottom') && E.replaces('emoticon') && !E.replaces('mine'));
+  assert.ok(E.replaces('grouped-bottom') && E.replaces('emoticon') && E.replaces('zhuyin') && !E.replaces('mine'));
+  // the boards the user picks among their own layouts: a pack's file of one is not stood for (061-custom-layout §11)
+  for (const id of ['qwerty', 'k14', 'k18', 'nine', 'number', 'symbols']) assert.ok(!E.replaces(id), id);
   assert.equal(E.buildScene('nope', light, env, fixed).ok, false);
   assert.equal(E.buildScene('qwerty', light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
   assert.equal(E.buildScene('qwerty', light, '{"width": 1, "height": 1, "density": 1, "shift": "twice"}', fixed).ok, false);
@@ -612,4 +614,24 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
   assert.equal(bad.errors[0].key, 'read');
   assert.equal(E.checkLayout(42, '0.6.1', null).ok, false, 'a value of the wrong type is a problem');
   assert.equal(E.writeLayout(E.layout('k18')), read(data, 'writer', 'k18.layout'));
+});
+
+// a theme pack's layout made one of the user's (PackLayouts.convert, 061-custom-layout §2.3): the page's is the app's, the
+// text the JVM's own test holds (commonTest/data/convert)
+test("a pack's layout made one of the user's is the JVM's, byte for byte", () => {
+  const k18 = read(here, '..', 'examples', 'k17-motion', 'layouts', 'k18.xml');
+  const c = E.convertPackLayout('薄荷 17 键', { author: '小明', license: 'CC-BY-4.0' }, 'k18', k18, null, '0.6.1');
+  assert.ok(c.ok, c.why);
+  assert.equal(c.text, read(data, 'convert', 'k17-motion.layout'));
+  assert.equal(c.name, '薄荷 17 键 · 17 键');
+  assert.deepEqual(Object.keys(c.renames), []);
+  const named = E.convertPackLayout('薄荷', null, 'k18', k18.replace('shortcut="g18/q"', 'shortcut="mine"'), null, '0.6.1');
+  assert.deepEqual(Object.assign({}, named.renames), { 'fn/mine': named.id + '/r1c1' });
+  // a board a pack still stands for: not made one, why said
+  const zhuyin = E.convertPackLayout('薄荷', null, 'zhuyin', E.layoutSource('zhuyin'), null, '0.6.1');
+  assert.equal(zhuyin.ok, false);
+  assert.ok(zhuyin.why);
+  // a layout of the user's drawn with the styles of the board it is based on (§10)
+  const own = E.readOwnLayout(c.text);
+  assert.ok(own.ok, JSON.stringify(own.problems));
 });

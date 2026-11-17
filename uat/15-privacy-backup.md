@@ -347,3 +347,9 @@
 - **操作**：**备份与恢复 → 备份全部**；导入 `uat-qwerty-1.1.layout` 替换它；**从备份恢复** 选刚才的备份，等应用重启后看 **外观 → 布局**，长按 UAT 26 键看信息。再恢复一份 0.6.0 做的备份（没有布局），看布局页。
 - **预期**：恢复后 UAT 26 键是备份里的 1.0（备份里有的同 id 换掉手机上的）；恢复 0.6.0 的备份后 UAT 26 键还在（备份里没有布局，不动手机上的）。
 - **JVM**：`BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones`（备份里有 `layouts/`、没写完的不进、同 id 换掉、手机上别的留着、`.converted` 合并）、`BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays`（没有布局的备份不动手机上的；文件名和 id 对不上、读不了的不恢复）；设备上不跑。
+
+### PR-68 [P1] 恢复 0.6.0 的备份：备份里主题带的 18 键放进 外观 → 布局，选着它的输入法换上
+- **前提**：B0-设置；一份 0.6.0 做的备份，里面有用着的主题包「薄荷」（带 `layouts/k18.xml`，17 键），拼音的 **键盘** 是「18 键」；一份 0.6.1 做的备份，备份时「薄荷」带的布局已经在 外观 → 布局 里。
+- **操作**：**从备份恢复** 选 0.6.0 的那份，等应用重启；看 **外观 → 布局**、**输入法 → 拼音 → 键盘**，到测试页弹出键盘。再恢复 0.6.1 的那份。
+- **预期**：恢复 0.6.0 的备份后，布局页有「薄荷 · 17 键」，拼音的 **键盘** 是它，键盘和 0.6.0 里一样是 17 键，提示一次「主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用」。恢复 0.6.1 的备份不再转、不改选择（备份里的布局和选择本来就是转过的）；0.6.1 的备份带进来、备份里还没转过的主题，它的布局放进列表，不换选择；导入时没勾 **一起导入** 的主题恢复后也不放进列表。换不换看备份里的转换记录有没有 0.6.1 的标记（`#l7`），不看版本号：0.6.1 测试版的备份也换。
+- **JVM**：`ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched`（0.6.0 的记下要换、0.6.1 的转过的不记、没转过的只放进列表、测试版的（有布局没有 `#l7`）要换、0.6.1 没有布局的只放进列表、两次恢复之间没启动时有一次要换就换、下次启动放进列表并换上、只动备份带来的主题）、`ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone`、`onePackImportedUntickedIsRecordedNotListed`（没勾一起导入的记下、不放进列表）、`aRestoreWaitsForTheStartsListingAndDropsItsSwitch`（升级后第一次启动还在后台转换时恢复：等转换做完，不再换，恢复记下的留给下次启动）；要 0.6.0 的备份，设备上不跑。

@@ -889,15 +889,60 @@ once a process with the fragments it includes, kept by the source's key and the 
 first, and where it has none or it does not read, one step back to the app's own (`fallback`);
 `invalidate(key)` has a source's read again. The source is asked each time (`ThemePackLayouts.current`): while a
 theme 4.0 pack is in use, `ThemePackLayouts` (key `theme:<file>@<theme.xml's time>`, so a pack imported again is read
-again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has
-(`PackLayouts.replaces`, commonMain, the theme maker's rule too: a pack replaces keyboards, never adds one), and refuses (`LayoutSource.refuses`, logged once,
+again; a theme change makes the input view anew) reads its `layouts/<id>.xml`, only for an id the app has outside the
+boards the user picks among their own layouts (`PackLayouts.replaces`, commonMain, the theme maker's rule too: a pack
+replaces 注音's, the emoji panel's…, never adds one; since 0.6.1 its `qwerty`, `k14`, `k18`, `nine`, `number`, `symbols`,
+`KeyData.LISTED`, are layouts of the user's instead, below), and refuses (`LayoutSource.refuses`, logged once,
 the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
 and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place:
 `LayoutCheck.kept`, which the custom layouts' whole check `LayoutCheck.check` asks too, the maker's page through the JS
 `checkLayout`; its `Report.commits`, what the import's confirmation lists, are only the `commit:` texts the base does not
 type: a key of a base key's id typing a text that key types is left out, another text or a key of its own listed; `LayoutWriter` writes a layout back as canonical text, `writeLayout` on the page); a
 fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
-keyboards. Block by block: a bad `k14.xml` falls back alone (`ThemePackLayoutsTest`). The packs installed before 0.6.1 had
+keyboards. Block by block: a bad `zhuyin-nine.xml` falls back alone (`ThemePackLayoutsTest`).
+
+A pack's boards of `KeyData.LISTED` become layouts of the user's (061-custom-layout §11, `ThemeLayoutsToList`, app
+`data/layout/`): `PackLayouts.convert` (commonMain, the JS engine's `convertPackLayout` too) takes one as 0.6.0 drew it
+(reads, its includes read, `judge`; the loose check of §3.2), id `t<FNV-1a of the theme name, 8 hex>-<board>`,
+`based-on` the board, named 「theme · own name」 within 24, the pack's `grouped-bottom` written in, key names the rule
+refuses (a key's, a variant's, a `<defaults>`' of the layout, a row, a pack fragment: `<id>/keys`, `<id>/<row id>`)
+renamed `<id>/<key id>` and the user's `key_lists`/`key_swipes` under the old copied under the new (`RenamedKeys`,
+ime-core); not made where its own `<meta min-app>` is newer than the app; a number board without `pads=` written for
+`LayoutReader.PADS` but those it lacks a key of (`lacks pad=`; none: not made), one with `pads=` not made where one
+lacks; `Done.commits` its new `commit:` texts (§13, counted in the import's confirmation). Where it goes:
+`CustomLayoutFiles.target` (ime-core, pure; L7 review S2) over the layout the pack's last conversion of the board made
+where that file's digest is the one recorded (an update, the confirmation says 「替换已有的『…』」), else the default
+id or the first free `-2`, `-3`… (the user's own or changed, another pack's of the same FNV kept; a file already what the board makes under that id is written over, so a run killed between its save and its record does not list it twice). `run(pack)` saves
+them (`CustomLayouts.save`; none new past `MAX_LAYOUTS`) and records in `.converted` (`CustomLayoutFiles.record`: a
+line `#l7` that 0.6.1 always writes, `file@stamp` a pack, `=<id> <board> <digest> <file>` a layout written; each key's
+last line kept, the newest where full): the same pack again does nothing. Three ways: an import whose confirmation's
+「一起导入」 is ticked (`ThemeListFragment`, listed alone; unticked, `notListed` records it, so a restore does not list
+it; fewer listed than the confirmation said, a toast); at `ThemeManager.init` once an install
+(`noBackupFilesDir/theme-layouts-listed`), every user pack; at the start after a restore of this app's backup, the packs it
+brought not in its own `.converted` (by file name: a restored pack's stamp is the copy's), recorded by `UserDataManager`
+in `noBackupFilesDir/theme-layouts-restored` (first line `switch` where the backup's `.converted` has no `#l7`: 0.6.0's,
+a 0.6.1 beta's, none; else `list`). The first two of the start switch: `ThemeLayoutSwitch.plan` (ime-core, pure) chooses for each slot on the
+board the pack in use stood for (the shown theme's pack, else the other slot's of 跟随系统深色模式; Q15: where both
+have it the shown one's, the other's told as set aside) its layout where `ImKeyboards.usable` (S8: 双拼 not on other
+groups; one not drawn, none), and the number/symbol prefs where the app's is chosen (a pref of a layout gone or of
+another family counts as that, as the app's card says it: `PanelLayouts.missing`, one whose file does not read kept; the number keyboard's takes effect at the next input
+start, L5); the notice is kept in
+`internal.themeLayoutsUnseen` till it is seen (`ThemeLayoutsToList.tellUnseen`, as the engine starts and as the start
+switches; said for its own `NOTICE_MS` 4 s, `EngineNotices.toldUntilSeen(ms =)` → `NoticeState.show(ms =)`, the kinds'
+times unchanged). The start's work is in two stages, begun after `addSeparatorsOnce` (ThemeManager's `packs`): `listAtStart` on a thread
+of its own (each pack it takes converted again, `run(again = true)`: one a start that ended in the middle listed is
+switched by its recorded id, kept where the user changed it since; saved, recorded, each layout read; seconds for a 26
+keys', not on the main thread) under the object's lock, the start's files captured as it began; then `chooseAtStart` on
+the main thread (renamed keys' settings copied, `plan` with the prefs, the 双拼 scheme and the themes in use read then,
+the prefs written; then its end: the install's marker, the restore's names it took off `theme-layouts-restored`, others
+recorded since kept, `theme-layouts-trying` deleted). Till then the keyboards draw the app's boards; the layout prefs
+being in `remakeKeyboardsPrefs`, they are drawn anew as it switches. `theme-layouts-trying` holds the count of starts
+that tried: one that ended in the middle (killed, as is common; its switch thrown) is tried again, `MAX_TRIES` 3 starts,
+then given up (logged). `awaitStart` waits for the first
+stage: a theme import (`ThemeListFragment`, before it opens a pack) and a restore (`UserDataManager.import`, which also
+drops a switch not yet made, `restoring = true`: the settings it copies in are the backup's). A restore's record written
+after the first stage is the next start's. `ThemeListFragment`'s 「一起导入」 runs `run` on IO and copies the renamed
+keys' settings on the main thread too. The packs installed before 0.6.1 had
 their `qwerty.xml` given the app's 分词 once (FB12, dev/design/061-theme-separator-migration.md):
 `ThemeSeparators.addSeparatorsOnce`, run by `ThemeManager` before its first `listPacks` (Application.onCreate, main
 thread; nothing of a pack read yet, so no cache is stale), at the first start the themes are writable, marked done in
@@ -1775,7 +1820,8 @@ the packs listed) is replaced, as it could not be deleted otherwise. A new pack 
 16 layouts, `.xml`, 64 KB each. Warnings (not refusals): what the reader skips (a later version's names), and
 key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
 (`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
-3.0 theme of the name, the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
+3.0 theme of the name, the layouts of the user's its boards would make (`Report.listed`, `ThemeLayoutsToList.convert`;
+with 「一起导入」, ticked), the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
 engine's reader and judged as above) with the count of their `commit:` actions (as taken, KeyData's: a pack's own
 swipes are not; from the parsed layouts and the pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
 character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment

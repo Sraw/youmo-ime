@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -31,6 +33,7 @@ import org.fcitx.fcitx5.android.utils.applyNavBarInsetsBottomPadding
 import org.fcitx.fcitx5.android.utils.importErrorDialog
 import org.fcitx.fcitx5.android.utils.queryFileName
 import org.fcitx.fcitx5.android.utils.toast
+import timber.log.Timber
 
 class ThemeListFragment : Fragment() {
 
@@ -72,6 +75,9 @@ class ThemeListFragment : Fragment() {
                         // the list read here, where it is changed, not on the thread that imports
                         val themes = ThemeManager.getAllThemes()
                         val opened = withContext(Dispatchers.IO) {
+                            // not over the start's listing of the packs (ThemeLayoutsToList.atStart): the pack it reads
+                            // replaced, the layouts it would list told before it listed them
+                            ThemeLayoutsToList.awaitStart()
                             val inputStream = cr.openInputStreamOrThrow(uri)
                             if (skin) {
                                 ThemeFilesManager.openSkin(inputStream, name!!, themes).getOrThrow()
@@ -206,13 +212,22 @@ class ThemeListFragment : Fragment() {
         // let go however the dialog closes but by 导入 (cancelled, dismissed); one left by a fragment destroyed
         // with it open is cleared by a later open (ThemeFilesManager.openTheme)
         var taken = false
-        ThemePackDialogs.builder(ctx, title, ThemePackDialogs.confirmText(ctx, pack), pack.staged.preview)
+        // its boards the user picks among their own put in 外观 → 布局 with it (061-custom-layout §11), ticked unless unticked
+        val withLayouts = pack.staged.layoutReport.listed.takeIf { it.isNotEmpty() }?.let {
+            CheckBox(ctx).apply {
+                setText(R.string.theme_pack_layouts_with)
+                isChecked = true
+            }
+        }
+        ThemePackDialogs.builder(ctx, title, ThemePackDialogs.confirmText(ctx, pack), pack.staged.preview, withLayouts)
             .setPositiveButton(R.string.theme_pack_import) { _, _ ->
                 taken = true
+                val listLayouts = withLayouts?.isChecked == true
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
                         withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
                         ThemeManager.packPlaced(pack.staged.name)
+                        if (withLayouts != null) listLayouts(pack.staged.name, listLayouts, pack.staged.layoutReport.listed.size)
                         // its versions one card, a pack it replaced gone: the list made again
                         themeListAdapter.resetThemes(ThemeManager.getAllThemes())
                         updateSelectedThemes()
@@ -224,6 +239,25 @@ class ThemeListFragment : Fragment() {
             .setNegativeButton(android.R.string.cancel, null)
             .setOnDismissListener { if (!taken) lifecycleScope.launch(Dispatchers.IO) { pack.discard() } }
             .show()
+    }
+
+    // the pack [name] just imported, its boards put in 外观 → 布局 ([listed], none chosen), told where fewer than the
+    // confirmation listed ([expected]: the list full, one failed); or, unticked, recorded not to be listed by a restore.
+    // The theme imported whatever becomes of them
+    private suspend fun listLayouts(name: String, listed: Boolean, expected: Int) {
+        val pack = ThemeManager.Packs.firstOrNull { it.file == name } ?: return
+        if (!listed) {
+            withContext(Dispatchers.IO) {
+                runCatching { ThemeLayoutsToList.notListed(pack) }.onFailure { Timber.w(it, "theme pack %s: not recorded unlisted", name) }
+            }
+            return
+        }
+        val made = withContext(Dispatchers.IO) {
+            runCatching { ThemeLayoutsToList.run(pack) }.onFailure { Timber.w(it, "theme pack %s: layouts not listed", name) }.getOrNull()
+        }
+        // here, on the main thread, where the settings pages change them too
+        made?.forEach { ThemeLayoutsToList.copySettings(it.done.renames) }
+        if (made == null || made.size < expected) context?.toast(R.string.theme_pack_layouts_not_listed, Toast.LENGTH_LONG)
     }
 
     private fun themeInfo(theme: Theme) {

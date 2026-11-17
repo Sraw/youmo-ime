@@ -23,7 +23,7 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * [Env]'s; a name it does not know is a problem (a page's typo is not drawn as the default silently).
  *
  * `{"width", "height", "density", "landscape", "compact", "floating": text scale or null, "split",
- * "oneHanded"/"dock": "left"|"right"|"full", "dark", "flat", "shift": "none"|"once"|"lock", "board",
+ * "oneHanded"/"dock": "left"|"right"|"full", "dark", "flat", "shift": "none"|"once"|"lock", "board", "base",
  * "typed": [scene, …] or null, "states": {id or role: ["on", …]}, "input": {…Input's},
  * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "upAt" and
  * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"top"|"bottom"|"none", "shortcuts":
@@ -73,6 +73,7 @@ object EnvJson {
             marks = m.obj("marks")?.let(::marks) ?: d.marks,
             states = m.obj("states")?.let(::states) ?: d.states,
             board = m.nullableString("board", d.board),
+            base = m.nullableString("base", d.base),
             typed = m.nullableStrings("typed", d.typed?.toList())?.toSet(),
         )
         m.done()

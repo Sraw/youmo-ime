@@ -151,6 +151,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val nineKeysUnseen = bool("nine_keys_merged_unseen", false)
 
         /**
+         * What the theme packs' boards made layouts of the user's at an upgrade or a restore tell (ThemeLayoutsToList,
+         * 061-custom-layout §11: which are chosen now), as said; empty, nothing to say. Kept till it is said on the keyboard.
+         */
+        val themeLayoutsUnseen = string("theme_layouts_unseen", "")
+
+        /**
          * Whether the user saw that the 双拼 scheme they had is one 0.5 dropped, now 小鹤 (KotlinHost):
          * once, though the config could not be written back. Not a 0.4 backup's, so one restored is told again.
          */

@@ -182,11 +182,11 @@ test('save refuses what the app would: the name, files missing, images past thei
   const padding = [1, 2, 3, 4, 5, 6].map((i) => '<style select="@im=x' + i + ' keyboard" fill="#ff000000"/>').join('');
   assert.equal(withE(img + padding + '<style select="@dark @landscape @compact @flat */enter" fill="#ffffffff"/>' + hid), 1, 'four scenes, the keyboard\'s styles naming more');
   assert.equal(withE(img + '<style select="@floating */enter" fill="#ffffffff"/><style select="@split */enter label, @split */enter icon" hidden="true"/>'), 0, 'scenes never at once');
-  // a pack's own board, its Return named go: asked by its role
-  const own = { 'qwerty.xml': E.layoutSource("qwerty").replace('id="enter"', 'id="go"') };
+  // a pack's own board, its Return named go: asked by its role (注音's, a board a pack still stands for, its bottom row the pack's)
+  const own = { 'zhuyin.xml': E.layoutSource('zhuyin'), 'grouped-bottom.xml': E.layoutSource('grouped-bottom').replace('id="enter"', 'id="go"') };
   const ownDoc = (styles) => M.doc(ok.xml.replace('</theme>', styles + '\n</theme>'), { 'e.png': pngHeader(10, 10) }, own);
   assert.equal(M.saveProblems(E, L, FORMAT, ownDoc(img + hid)).length, 0);
-  assert.match(M.saveProblems(E, L, FORMAT, ownDoc(img + '<style select="qwerty/go" fill="#ffffffff"/>' + hid))[0].message, /qwerty\/go/);
+  assert.match(M.saveProblems(E, L, FORMAT, ownDoc(img + '<style select="zhuyin/go" fill="#ffffffff"/>' + hid))[0].message, /zhuyin\/go/);
   // the name as the app reads it: single quotes are a name
   assert.deepEqual(M.saveProblems(E, L, FORMAT, M.doc(ok.xml.replace(/name="nord-mine"/, "name='nord-mine'"))), []);
   const files = Object.fromEntries(Array.from({ length: FORMAT.limits.entries }, (_, i) => ['f' + i + '.bin', new Uint8Array(1)]));
@@ -390,7 +390,8 @@ test('each example opens, passes the check before a save with no error, and save
     const d = M.exampleDoc(ex);
     const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
     assert.deepEqual(errors, [], ex.id);
-    assert.deepEqual(warnings, [], ex.id);
+    // the 17 keys' k18.xml: one of the user's layouts once imported since 0.6.1, said so (its own example in W3)
+    assert.deepEqual(warnings.map((w) => w.message), ex.id === 'k17-motion' ? ['layouts/k18.xml：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）'] : [], ex.id);
     const again = (await M.open(E, L, FORMAT, M.save(L, d).bytes)).doc;
     assert.ok(M.same(d, again), ex.id);
   }
@@ -430,13 +431,24 @@ test("no marks given: the preview draws the board's defaults as a new install sh
 });
 
 test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {
+  const d = M.fromBuiltin(E, 'material');
+  const keys = (doc) => M.check(E, doc, 'zhuyin', M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id);
+  // 注音's, a board a pack still stands for: one key fewer drawn
+  const fewer = E.layoutSource('zhuyin').replace(/<key id="q"[^>]*\/>/, '');
+  assert.equal(keys(M.doc(d.xml, d.files, { 'zhuyin.xml': fewer })).length, keys(d).length - 1);
+  const bad = M.doc(d.xml, d.files, { 'zhuyin.xml': '<keyboard' });
+  const r = M.check(E, bad, 'zhuyin', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && p.message.startsWith('layouts/zhuyin.xml')), JSON.stringify(r.problems));
+  assert.deepEqual(keys(bad), keys(d));
+});
+
+test("a pack's board the user picks among their own layouts is not drawn for the app's, a warning says where it goes (061-custom-layout §11)", () => {
   const d = M.exampleDoc(examples[2]);
   const keys = (doc) => M.check(E, doc, 'k18', M.envJson(M.ENV), null).scene.json().keys.filter((k) => k.kind === 'letter').map((k) => k.id);
-  assert.equal(keys(d).length, keys(M.doc(d.xml)).length - 1, 'h and jk one key');
-  const bad = M.doc(d.xml, d.files, { 'k18.xml': '<keyboard' });
-  const r = M.check(E, bad, 'k18', M.envJson(M.ENV), null);
-  assert.ok(r.problems.some((p) => p.level === 'warning' && p.message.startsWith('layouts/k18.xml')), JSON.stringify(r.problems));
-  assert.deepEqual(keys(bad), keys(M.doc(d.xml)));
+  assert.deepEqual(keys(d), keys(M.doc(d.xml)), "the app's 18 keys");
+  const { warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(M.ENV));
+  assert.ok(warnings.some((p) => /^layouts\/k18\.xml：范围内的布局在 0\.6\.1 起要在布局列表里选/.test(p.message)), JSON.stringify(warnings));
+  assert.ok(!warnings.some((p) => /App 没有这个键盘/.test(p.message)), JSON.stringify(warnings));
 });
 
 test("a pack's layout writing a key's long press, corner or swipes: a warning a file with its lines, the app's drawn", () => {
@@ -477,15 +489,15 @@ test("a pack's layouts the app refuses on import stop a save, by the app's own l
   assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(M.ENV)).errors.some((p) => /最多收/.test(p.message)));
   const big = M.doc(d.xml, d.files, { 'k18.xml': k18 + '<!--' + 'x'.repeat(FORMAT.limits.layoutBytes) + '-->' });
   assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
-  // the app's qwerty under another board's name: the app keeps its own k14, so does the preview, with a warning
+  // the app's 注音 nine keys under another board's name: the app keeps its own 注音, so does the preview, with a warning
   const keys = (doc, board) => M.check(E, doc, board, M.envJson(M.ENV), null).scene.json().keys.map((k) => k.id).join();
-  const wrong = M.doc(d.xml, d.files, { 'k14.xml': E.layoutSource('qwerty') });
-  const r = M.check(E, wrong, 'k14', M.envJson(M.ENV), null);
-  assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is qwerty）/.test(p.message)), JSON.stringify(r.problems));
-  assert.equal(keys(wrong, 'k14'), keys(M.doc(d.xml), 'k14'));
+  const wrong = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin-nine') });
+  const r = M.check(E, wrong, 'zhuyin', M.envJson(M.ENV), null);
+  assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is zhuyin-nine）/.test(p.message)), JSON.stringify(r.problems));
+  assert.equal(keys(wrong, 'zhuyin'), keys(M.doc(d.xml), 'zhuyin'));
   // and one with no backspace
-  const noBack = M.doc(d.xml, d.files, { 'qwerty.xml': E.layoutSource('qwerty').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
-  assert.ok(M.check(E, noBack, 'qwerty', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
+  const noBack = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
+  assert.ok(M.check(E, noBack, 'zhuyin', M.envJson(M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
 });
 
 // an animated WebP's head (RIFF, VP8X with the animation flag, its frames of [ms] each), as the app's ThemeAssetLimitsTest makes one

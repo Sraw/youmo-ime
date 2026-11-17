@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
 import org.fcitx.fcitx5.android.scene.theme.IconPath
+import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.theme.SoundFile
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
@@ -308,8 +309,10 @@ object YoumoEngine {
             is Parsed.Failed -> return@checked failed(read.problems)
             is Parsed.Ok -> read.value
         }
-        val built = builder(theme, e, measurer).build(l.layout, l.fragments)
-        result(built) { "scene" to YoumoScene(it, e.density) }
+        // a layout of the user's styled by its based-on's name too (061-custom-layout §10), where the env names none
+        val based = if (e.base == null && l.variantOf != l.layout.id) e.copy(base = l.variantOf) else e
+        val built = builder(theme, based, measurer).build(l.layout, l.fragments)
+        result(built) { "scene" to YoumoScene(it, based.density) }
     }
 
     /**
@@ -581,6 +584,30 @@ object YoumoEngine {
             "ok" to r.ok, "errors" to findings(r.errors), "warnings" to findings(r.warnings), "family" to r.family,
             "ims" to r.ims.toTypedArray(), "pads" to r.pads.toTypedArray(), "commits" to r.commits.toTypedArray(), "minApp" to r.minApp,
         )
+    }
+
+    /**
+     * A theme pack's layout file [xml] of the board [id] (`k18`) made a layout of the user's, as the app makes it on import
+     * (PackLayouts.convert, 061-custom-layout §2.3): [theme] the pack's name, [meta] its `{author, license}` (none: none),
+     * [fragments] the pack's own (`{"grouped-bottom": xml}`), [appVersion] the app's its check is for. `{ok, id, name,
+     * text, renames: {old: new}, problems: [{line, key, args}], why}`: `ok` false and `why` where it is not made one (a
+     * value not of its type: `ok` false, `problems` as the other calls').
+     */
+    fun convertPackLayout(theme: dynamic, meta: dynamic, id: dynamic, xml: dynamic, fragments: dynamic, appVersion: dynamic): dynamic = checked {
+        val own = HashMap<String, String>()
+        if (fragments != null) for (f in keys(fragments, "fragments")) own[f] = text(fragments[f], "fragment $f")
+        val m = if (meta == null) null else Meta(optionalText(meta.author, "author"), null, optionalText(meta.license, "license"), null, null)
+        when (val c = PackLayouts.convert(text(theme, "theme"), m, text(id, "id"), text(xml, "layout"), own, checkSources, text(appVersion, "appVersion"))) {
+            is PackLayouts.Converted.Not -> obj("ok" to false, "why" to c.why)
+            is PackLayouts.Converted.Done -> {
+                val renames: dynamic = js("({})")
+                c.renames.forEach { (old, new) -> renames[old] = new }
+                obj(
+                    "ok" to true, "id" to c.id, "name" to c.name, "text" to c.text, "renames" to renames,
+                    "problems" to c.problems.map { obj("line" to it.line, "key" to it.key, "args" to it.args.toTypedArray()) }.toTypedArray(),
+                )
+            }
+        }
     }
 
     /** [layout] written as layout 1 (LayoutWriter: what the app exports, canonical, comments gone). */

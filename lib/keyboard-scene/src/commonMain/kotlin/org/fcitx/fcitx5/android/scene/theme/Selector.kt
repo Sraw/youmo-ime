@@ -58,7 +58,7 @@ data class Selector(
     /** Whether it selects [target], its scenes known to hold. */
     fun selects(target: Target): Boolean =
         widget == target.widget && part == target.part &&
-            (board == null || board == target.board) && (key == null || key == target.key) &&
+            (board == null || board == target.board || board == target.base) && (key == null || key == target.key) &&
             !(target.slot && board != null && key == null) &&
             (starRole == null || starRole == target.role) && target.classes.containsAll(classes) &&
             roles.all { it == target.role } && target.states.containsAll(states)
@@ -74,6 +74,8 @@ data class Selector(
         val part: String? = null,
         /** A slot's face (the handwriting pad's): not one of its board's every key, only by its name or look. */
         val slot: Boolean = false,
+        /** The app's board a layout of the user's is `based-on` ([org.fcitx.fcitx5.android.scene.engine.Env.base]): selected by its name as [board] is. */
+        val base: String? = null,
     )
 
     companion object {

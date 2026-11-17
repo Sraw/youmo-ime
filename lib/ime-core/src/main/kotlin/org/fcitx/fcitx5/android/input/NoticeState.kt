@@ -43,14 +43,15 @@ class NoticeState<U : Any> {
      * unseen, and it stays [STEADY_MS] (rule 4), longer than a line said, read before it goes.
      * [hidden]: said while the edit menu is up where it would show: under the menu till it goes
      * ([uncover]), its time not started, any notice alike (none lost to the menu, none over it).
+     * [ms]: how long it stays where its sayer times it (a notice of several lines); null its kind's time.
      */
-    fun show(undo: U?, steady: Boolean, hidden: Boolean = false): Shown<U> {
+    fun show(undo: U?, steady: Boolean, hidden: Boolean = false, ms: Long? = null): Shown<U> {
         val lapsed = pending
         pending = undo
         this.steady = steady
         leaving = false
         this.hidden = hidden
-        return Shown(lapsed, if (undo != null) UNDO_MS else if (steady) STEADY_MS else SAID_MS)
+        return Shown(lapsed, ms ?: if (undo != null) UNDO_MS else if (steady) STEADY_MS else SAID_MS)
     }
 
     /** A key typed, a word put in: whether it puts the notice away, as a tap would. */

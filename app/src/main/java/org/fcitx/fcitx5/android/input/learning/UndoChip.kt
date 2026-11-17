@@ -104,8 +104,9 @@ class UndoChip(
      * [steady]: kept as keys are typed ([typed]), what the engine says as a key fails: the key it
      * failed on comes to the keyboard after it, and would put it away unseen. False if not shown
      * (the keyboard not on the screen): [undo] lapsed, the words for the caller to say otherwise.
+     * [ms]: its own time, null its kind's (NoticeState.show).
      */
-    fun show(message: String, undo: Undo? = null, aboveKeys: Boolean = false, steady: Boolean = false): Boolean {
+    fun show(message: String, undo: Undo? = null, aboveKeys: Boolean = false, steady: Boolean = false, ms: Long? = null): Boolean {
         anchor.removeCallbacks(timeout)
         // a keyboard hidden is still attached: a result coming after it went is not shown on it
         if (!anchor.isAttachedToWindow || !anchor.isShown) {
@@ -120,7 +121,7 @@ class UndoChip(
         val to = place(row.layoutParams.width, row.layoutParams.height, aboveKeys)
         // the edit menu up where this goes ([covered]): said under it, shown as it goes, not over it
         val hide = menu?.let { Rect.intersects(it, Rect(to.left, to.top, to.left + row.layoutParams.width, to.top + row.layoutParams.height)) } == true
-        val (replaced, shownMs) = state.show(undo, steady, hide)
+        val (replaced, shownMs) = state.show(undo, steady, hide, ms)
         // the one shown goes now, untaken: its act stands
         replaced?.lapsed?.invoke()
         val shown = window

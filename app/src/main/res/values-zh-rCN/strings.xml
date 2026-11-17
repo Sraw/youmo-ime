@@ -150,6 +150,19 @@
         <item quantity="other">主题自带的布局里有 %1$d 处长按、角标、滑动的写法不起作用：0.6.1 起主题只管样子，这些由 按键 → 按键字符和快捷键 管。</item>
     </plurals>
     <string name="theme_pack_layouts_unused">不会使用的布局（读不出、缺键盘必需的键，或不是已有的键盘）：%1$s</string>
+    <plurals name="theme_pack_layouts_listed">
+        <item quantity="other">这个主题带 %1$d 个布局：%2$s，导入后在 外观 → 布局 里。</item>
+    </plurals>
+    <string name="theme_pack_layouts_listed_commits">其中 %1$d 个动作直接输入布局里写的文字。</string>
+    <string name="theme_pack_layouts_replaces">替换已有的『%1$s』（这个主题上次导入时做的，之后没改过）。</string>
+    <plurals name="theme_pack_layouts_full">
+        <item quantity="other">外观 → 布局 已满（%2$d 个）：其中 %1$d 个放不进去。</item>
+    </plurals>
+    <string name="theme_pack_layouts_not_listed">它的布局没有全部放进 外观 → 布局（列表已满，或有的没能转成）。</string>
+    <string name="theme_pack_layouts_with">一起导入</string>
+    <string name="theme_layouts_in_use">主题「%1$s」带的%2$s已放进 外观 → 布局，%3$s正在用</string>
+    <string name="theme_layouts_aside_dark">深色主题「%1$s」带的%2$s也在列表里，没有换上</string>
+    <string name="theme_layouts_aside_light">浅色主题「%1$s」带的%2$s也在列表里，没有换上</string>
     <string name="keyboard_themed">%1$s（主题：%2$s）</string>
     <string name="theme_pack_warnings">注意：</string>
     <string name="theme_info">信息</string>

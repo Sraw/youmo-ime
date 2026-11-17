@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<keyboard xmlns="https://youmo-ime/layout/1" id="t698bc6f4-k18" name="薄荷 17 键 · 17 键" family="grouped" based-on="k18" columns="100">
+  <meta author="小明" license="CC-BY-4.0"/>
+  <defaults kind="letter" text-size="20" width="fill"/>
+  <row>
+    <key id="r1c1" label="{group:q}" alt="1" swipe-up="keypad:1" shortcut="g18/q" letters="q"/>
+    <key id="r1c2" label="{group:we}" alt="2" swipe-up="keypad:2" shortcut="g18/we" letters="we"/>
+    <key id="r1c3" label="{group:rt}" alt="3" swipe-up="keypad:3" shortcut="g18/rt" letters="rt"/>
+    <key id="r1c4" label="{group:y}" alt="4" swipe-up="keypad:4" shortcut="g18/y" letters="y"/>
+    <key id="r1c5" label="{group:u}" alt="5" swipe-up="keypad:5" shortcut="g18/u" letters="u"/>
+    <key id="r1c6" label="{group:io}" alt="6" swipe-up="keypad:6" shortcut="g18/io" letters="io"/>
+    <key id="r1c7" label="{group:p}" alt="7" swipe-up="keypad:7" shortcut="g18/p" letters="p"/>
+  </row>
+  <row>
+    <key id="r2c1" label="{group:a}" alt="8" swipe-up="keypad:8" shortcut="g18/a" width="fill" letters="a"/>
+    <key id="r2c2" label="{group:sd}" alt="9" swipe-up="keypad:9" shortcut="g18/sd" width="fill" letters="sd"/>
+    <key id="r2c3" label="{group:fg}" alt="0" swipe-up="keypad:0" shortcut="g18/fg" width="fill" letters="fg"/>
+    <key id="r2c4" label="HJK" alt="{punct:(}" swipe-up="(" shortcut="g18/h" width="fill" letters="hjk"/>
+    <key id="r2c6" label="{group:l}" alt="{punct:-}" swipe-up="-" shortcut="g18/l" width="fill" letters="l;">
+      <variant when="ime=shuangpin scheme-types=semicolon" label="{group:l;}"/>
+    </key>
+  </row>
+  <row>
+    <key id="apostrophe" label="分词" kind="function" role="apostrophe" text-size="16" a11y="a11y_key_separator" send="'" shortcut="separator" width="15"/>
+    <key id="r3c1" label="{group:z}" alt="{punct:~}" swipe-up="~" shortcut="g18/z" width="14" letters="z"/>
+    <key id="r3c2" label="{group:xc}" alt="{punct:!}" swipe-up="!" shortcut="g18/xc" width="14" letters="xc"/>
+    <key id="r3c3" label="{group:v}" alt="{punct:@}" swipe-up="@" shortcut="g18/v" width="14" letters="v"/>
+    <key id="r3c4" label="{group:bn}" alt="{punct:?}" swipe-up="?" shortcut="g18/bn" width="14" letters="bn"/>
+    <key id="r3c5" label="{group:m}" alt="{punct::}" swipe-up=":" shortcut="g18/m" width="14" letters="m"/>
+    <key id="backspace" icon="backspace" kind="function" role="backspace" a11y="a11y_key_backspace" sound="delete" send="sym:BackSpace" swipe-axis="both" repeat="true" shortcut="backspace" width="15"/>
+  </row>
+  <include src="grouped-bottom"/>
+</keyboard>
