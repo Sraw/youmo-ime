@@ -16,7 +16,7 @@
 <p align="center">
 <img src="docs/images/screenshot-pinyin.png" width="19%" alt="整句拼音 / pinyin sentences">
 <img src="docs/images/screenshot-t9.png" width="19%" alt="九键 / nine keys">
-<img src="docs/images/screenshot-hw.png" width="19%" alt="手写 / handwriting">
+<img src="docs/images/screenshot-hw.png" width="19%" alt="在键盘上手写 / handwriting on the keyboard">
 <img src="docs/images/screenshot-floating.png" width="19%" alt="悬浮键盘 / floating keyboard">
 <img src="docs/images/screenshot-dark.png" width="19%" alt="深色主题 / dark theme">
 </p>
