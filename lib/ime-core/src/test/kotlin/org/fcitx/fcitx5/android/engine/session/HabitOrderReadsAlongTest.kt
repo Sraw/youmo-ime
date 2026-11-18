@@ -168,7 +168,9 @@ class HabitOrderReadsAlongTest {
         for (kind in listOf("全拼", "九键", "双拼", "双拼分组", "注音")) assertTrue("${counts.slipped[kind]} $kind graphs with a slip", (counts.slipped[kind] ?: 0) > 150)
         assertTrue("${counts.read} of ${counts.candidates} read", counts.read > 5000 && counts.read < counts.candidates)
         assertTrue("${counts.pastKept} read past text kept as typed", counts.pastKept > 200)
-        // and ones that read only if the word after text kept as typed is not walked again
+        // and ones that read only if the word after text kept as typed is not walked again. Fewer since 双拼's keys read
+        // alone count as read otherwise no longer, only slips do (061-sp-abbrev §3.6): the bound of 500 counted 双拼's random
+        // keys, nearly every one a graph with keys alone; the slipped graphs of every kind are what is left (R27 F8559)
         assertTrue("${counts.onlyWalked} told apart by the walk past text kept as typed", counts.onlyWalked > 40)
     }
 

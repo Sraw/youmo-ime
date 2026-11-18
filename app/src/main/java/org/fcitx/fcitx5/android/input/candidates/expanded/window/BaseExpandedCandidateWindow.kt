@@ -214,9 +214,10 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)
         // the first times the page opens drawing strokes: that a finger draws here, the pages turned by ↑↓. The notice,
         // above the keyboard (off the list), for the hint's own 2 s (a said line's 1 s is too short to read it);
-        // counted only once said
+        // counted only once said; not over a notice with 撤销 (a long press's 删除, 屏蔽), which it would lapse, the act
+        // then standing untaken (R27 F8528): said at a later opening instead
         val shown = prefs.internal.strokePageHintShown
-        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue()) &&
+        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue()) && !inputView.holdsUndo &&
             inputView.say(context.getString(R.string.stroke_page_hint), ms = PageStrokeTouch.Hint.MILLIS)
         ) {
             shown.setValue(shown.getValue() + 1)

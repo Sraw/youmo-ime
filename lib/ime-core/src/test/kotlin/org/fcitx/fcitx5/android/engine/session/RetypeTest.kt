@@ -11,6 +11,9 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
 import org.fcitx.fcitx5.android.engine.learn.Words
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -127,16 +130,35 @@ class RetypeTest {
     }
 
     // 双拼 keys deleted, then a word typed again: whole syllables take only what they read whole, as
-    // HabitOrder keeps the syllables' first there (061-sp-abbrev §3.3); keys not all pairs are read by initials too
+    // HabitOrder keeps the syllables' first there (061-sp-abbrev §3.3); keys not all pairs are read by initials too.
+    // The grouped keyboards' graphs read keys alone too (§3.1), a pair of keys as tens of syllables: they take what the
+    // 26 keys take (R27 F8539). But the nine keys' ufmuh: h shares ghi with i, so uh reads shi whole there and, as
+    // on any keyboard, the whole syllable is tried before the keys alone: 什么是 of 什么时候 (3), the code not reading whole
     @Test
     fun shuangpinKeysThatReadWholeTakeNoWordTheirKeysAloneSpell() {
-        val ziranma = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA)
         fun units(vararg syllables: String) = Retype.Units(syllables.map { "字" }, syllables.map(Syllables::id).toIntArray(), emptyMap(), whole = true)
-        fun taken(keys: String, vararg syllables: String) = Retype.byReading(ziranma.segment(keys)).consume(units(*syllables), 0)
-        assertEquals(null, taken("xm", "xia", "mian")) // 下面 retyped after xm (先) deleted
-        assertEquals(1, taken("xm", "xian"))
-        assertEquals(2, taken("xwmm", "xia", "mian"))
-        assertEquals(4, taken("ufmuh", "shen", "me", "shi", "hou")) // 什么时候: h begun, m alone in the middle
-        assertEquals(2, taken("x'm", "xia", "mian"))
+        val rows = listOf(
+            listOf("xm", "xia", "mian") to null, // 下面 retyped after xm (先) deleted
+            listOf("xm", "xian") to 1,
+            listOf("xwmm", "xia", "mian") to 2,
+            listOf("ufmuh", "shen", "me", "shi", "hou") to 4, // 什么时候: h begun, m alone in the middle
+            listOf("x'm", "xia", "mian") to 2,
+        )
+        // the 26 keys (no letters) and the grouped keyboards, whose codes keep the separator as it is, as the session
+        // gives it the segmenter (the nine keys' 1 key made one)
+        val keyboards = listOf<Pair<NineKeyLetters?, Segmenter>>(null to ShuangpinSegmenter(ShuangpinScheme.ZIRANMA)) +
+            listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP).map { it to GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, it) }
+        val want = HashMap<String, Int?>()
+        val got = HashMap<String, Int?>()
+        for ((letters, segmenter) in keyboards) {
+            for ((row, taken) in rows) {
+                val keys = row[0]
+                val name = "${letters ?: "26"} $keys ${row.drop(1)}"
+                want[name] = if (letters == NineKeyLetters.NINE_SP && keys == "ufmuh") 3 else taken
+                val codes = keys.map { letters?.key(it) ?: it }.joinToString("")
+                got[name] = Retype.byReading(segmenter.segment(codes)).consume(units(*row.drop(1).toTypedArray()), 0)
+            }
+        }
+        assertEquals(want, got)
     }
 }

@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.input.candidates.expanded.StrokePageRecyclerView
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
+import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -325,23 +326,35 @@ class StrokePageUatTest {
         }
     }
 
+    // PY-147's hint: whether the notice up says it
+    private fun said() = h.notice()?.let { n ->
+        val line = h.service.getString(R.string.stroke_page_hint)
+        KeyboardHarness.all(n.contentView).filterIsInstance<TextView>().any { it.visibility == View.VISIBLE && it.text.toString() == line }
+    } == true
+
+    // the page's pinyin typed, its ⌄ to open it
+    private fun typedOn(): View {
+        typed("hao")
+        candidates(*Array(80) { "字$it" })
+        return h.described(h.service.getString(R.string.expand_candidates_list))
+    }
+
+    private fun closePage() {
+        typed("")
+        candidates()
+        assertNull(list())
+    }
+
+    private fun closeAndOpen() {
+        closePage()
+        h.tap(typedOn())
+    }
+
     // the notice the first three times the page opens drawing strokes: above the keyboard, off the list, gone in 2 s
     @Test
     @Uat("PY-147")
     fun theFirstThreePagesDrawingSayHowTheyTurn() {
         val shown = AppPrefs.getInstance().internal.strokePageHintShown
-        fun said() = h.notice()?.let { n ->
-            val line = h.service.getString(R.string.stroke_page_hint)
-            KeyboardHarness.all(n.contentView).filterIsInstance<TextView>().any { it.visibility == View.VISIBLE && it.text.toString() == line }
-        } == true
-        fun closeAndOpen() {
-            typed("")
-            candidates()
-            assertNull(list())
-            typed("hao")
-            candidates(*Array(80) { "字$it" })
-            h.tap(h.described(h.service.getString(R.string.expand_candidates_list)))
-        }
         // where the keys draw none: nothing said, none counted
         page(drawing = KeyDrawing.Glide)
         assertFalse(said())
@@ -366,6 +379,51 @@ class StrokePageUatTest {
         closeAndOpen()
         assertFalse(said())
         assertEquals(3, shown.getValue())
+    }
+
+    // the hint as any line said: a stroke drawn puts it away; one not said is not counted, said at a later opening
+    @Test
+    @Uat("PY-147")
+    fun theHintGoesAsAStrokeIsDrawnAndIsCountedOnlyOnceSaid() {
+        val shown = AppPrefs.getInstance().internal.strokePageHintShown
+        // a stroke drawn on the page: put away at once, not its 2 s (the engine's preedit edited)
+        page()
+        val shownAt = SystemClock.uptimeMillis()
+        assertTrue(said())
+        assertEquals(1, shown.getValue())
+        draw("字20", 0f, 40f)
+        typed("hao 丨")
+        h.after(shownAt + 1500 - SystemClock.uptimeMillis())
+        assertFalse("put away by the stroke", said())
+        closePage()
+        // the keyboard not on the screen: not said, not counted
+        val expand = typedOn()
+        h.inputView.visibility = View.INVISIBLE
+        h.tap(expand)
+        h.inputView.visibility = View.VISIBLE
+        h.relayout()
+        assertFalse(said())
+        assertEquals(1, shown.getValue())
+        closePage()
+        // a notice with 撤销 up (a long press's 删除): not said over it, which would lapse its act, nor counted; its
+        // 撤销 still takes back (R27 F8528)
+        val acts = mutableListOf<String>()
+        val expandAgain = typedOn()
+        h.inputView.say("删掉了", UndoChip.Undo({ acts += "undone" }, { acts += "lapsed" }))
+        h.tap(expandAgain)
+        assertNotNull("the page", list())
+        assertFalse(said())
+        assertEquals(1, shown.getValue())
+        val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>()
+            .first { it.text.toString() == h.service.getString(R.string.learning_undo) }
+        assertTrue(undo.performClick())
+        h.idle()
+        assertEquals(listOf("undone"), acts)
+        closePage()
+        // the next opening: said and counted
+        h.tap(typedOn())
+        assertTrue(said())
+        assertEquals(2, shown.getValue())
     }
 
     @Test

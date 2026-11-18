@@ -100,9 +100,9 @@
 
 ### VO-15 [P1] 关于页列出语音模型用到的数据
 - **前提**：B0-设置（导入了语音包），**⋮ → 关于**。
-- **操作**：点"第三方库许可证"，找 LibriSpeech、语音整理、MagicData-RAMC、RealTalk-CN、CS2W、Chinese ELECTRA。
-- **预期**：列着 LibriSpeech，许可是 CC BY 4.0（CC-BY-4.0），链接到 openslr.org/12；「语音整理（口头禅、标点、数字）：本项目训练的模型……语音包单独授权，仅供非商业使用（CC BY-NC-SA 4.0）；应用的代码仍按它自己的许可（LGPL-2.1-or-later）」许可是 CC-BY-NC-SA-4.0，链接到 creativecommons.org 的 by-nc-sa/4.0；「MagicData-RAMC (Magic Data Technology)」CC-BY-NC-ND-4.0，链接到 openslr.org/123；「RealTalk-CN (BAAI)」CC-BY-NC-SA-4.0，链接到 huggingface.co 的数据集页；「CS2W (…; sentences from MagicData-RAMC)」CC-BY-SA-4.0，链接到 github.com/guozishan/CS2W；Chinese ELECTRA 是 Apache-2.0。没导入语音包时也列着（许可跟着应用，不看有没有包）。
-- **JVM**：`SettingsPagesUatTest.theVoiceModelsDataIsCredited`（六行的许可和点开的链接）；设备上不跑。
+- **操作**：点"第三方库许可证"，找 LibriSpeech、语音整理、MagicData-RAMC、RealTalk-CN、CS2W、FineWeb-2、Chinese ELECTRA。
+- **预期**：列着 LibriSpeech，许可是 CC BY 4.0（CC-BY-4.0），链接到 openslr.org/12；「语音整理（口头禅、标点、数字）：本项目训练的模型……语音包单独授权，仅供非商业使用（CC BY-NC-SA 4.0）；应用的代码仍按它自己的许可（LGPL-2.1-or-later）」许可是 CC-BY-NC-SA-4.0，链接到 creativecommons.org 的 by-nc-sa/4.0；「MagicData-RAMC (Magic Data Technology)」CC-BY-NC-ND-4.0，链接到 openslr.org/123；「RealTalk-CN (BAAI)」CC-BY-NC-SA-4.0，链接到 huggingface.co 的数据集页；「CS2W (…; sentences from MagicData-RAMC)」CC-BY-SA-4.0，链接到 github.com/guozishan/CS2W；「……和语音整理的合成口语用的网页文本：FineWeb-2」ODC-By-1.0，链接到 huggingface.co 的 fineweb-2；Chinese ELECTRA 是 Apache-2.0。没导入语音包时也列着（许可跟着应用，不看有没有包）。
+- **JVM**：`LicensePageUatTest.theVoiceModelsDataIsCredited`（七行的许可和点开的链接）；设备上不跑。
 
 ### VO-17 [P1] 加了自己的词，平常的话照样听对
 - **前提**：B0-设置（导入了语音包），按 VO-14 加了「澜境花园」。

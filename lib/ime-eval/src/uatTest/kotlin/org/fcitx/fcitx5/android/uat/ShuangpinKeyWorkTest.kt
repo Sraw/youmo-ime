@@ -64,6 +64,8 @@ class ShuangpinKeyWorkTest {
     // [tapped]: each key tapped in a place, cleanly (TouchSim), and read as the key next to it too by where it fell;
     // [letters]: on a grouped keyboard, each key its group's code
     private fun type(inputs: List<String>, abbreviations: Boolean = true, user: UserModel? = null, tapped: Boolean = false, letters: NineKeyLetters? = null): Taken {
+        // the taps are the full keyboard's, and a grouped keyboard's segmenter reads no key next to another (R27 F8565)
+        require(letters == null || !tapped) { "tapped on the full keyboard only" }
         val segmenter = if (letters == null) {
             ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations, neighbours = tapped)
         } else {
@@ -117,6 +119,8 @@ class ShuangpinKeyWorkTest {
     // a place (what the 6T's time of a key is measured on)
     @Test
     fun aKeyTappedWithWordsTypedTakesNoMoreThanItDid() {
+        // both readings', asserted once (R27 F8564)
+        val over = ArrayList<String>()
         for (initials in listOf(false, true)) {
             val taken = type(inputs(KEYS, LINES, initials), user = typed(HISTORY), tapped = true)
             println("双拼 ${if (initials) "initials" else "whole syllables"}, $HISTORY words typed, tapped, $taken")
@@ -125,21 +129,25 @@ class ShuangpinKeyWorkTest {
             } else {
                 taken.steps <= TAPPED_WHOLE_STEPS && taken.scored <= TAPPED_WHOLE_SCORED && taken.arcs <= TAPPED_WHOLE_ARCS
             }
-            assertTrue("$taken", within)
+            if (!within) over += "${if (initials) "initials" else "whole syllables"} $taken"
         }
+        assertEquals(emptyList<String>(), over)
     }
 
     // the 18, 14 and nine keys read a key alone too since 061-sp-abbrev, the words typed only: what a key takes
     // there, whole syllables and by initials (the nine keys' codes read many syllables, so much more than the others)
     @Test
     fun aKeyOnTheGroupedKeyboardsTakesNoMoreThanItDid() {
+        // each keyboard's, asserted once: the first over its cap hid the rest (R27 F8564)
+        val over = ArrayList<String>()
         for ((letters, caps) in GROUPED_CAPS) {
             for ((initials, cap) in listOf(false to caps.first, true to caps.second)) {
                 val taken = type(inputs(KEYS, LINES, initials).map { line -> line.map(letters::key).joinToString("") }, user = typed(HISTORY), letters = letters)
                 println("双拼 $letters ${if (initials) "initials" else "whole syllables"}, $HISTORY words typed, $taken")
-                assertTrue("$letters $taken", taken.arcs <= cap.first && taken.steps <= cap.second)
+                if (taken.arcs > cap.first || taken.steps > cap.second) over += "$letters $initials $taken"
             }
         }
+        assertEquals(emptyList<String>(), over)
     }
 
     // what marking every typed word's nodes anew takes, said (the host's time; a phone's is several times

@@ -64,9 +64,9 @@
 
 ### SP-30 [P1] 第一个字打全，后面的字只打声母
 - **前提**：B0-双拼（自然码）。
-- **操作**：（没打过这两个词）点 u f m u h（自然码：shen = u f，然后 m、sh、h 各一个键），翻看候选；删光。点 u f m e u i h b（全码），选「什么时候」，清空输入框。再点 u f m u h，看第一个候选；点它。清空，点 y i v z（yi，然后 zh、z），翻看候选；删光，点 y i v i z l 选「一直在」，清空，再点 y i v z。
-- **预期**：没打过时 u f m u h 的候选里没有「什么时候」、y i v z 里没有「一直在」（只打声母只出打过的词，见 docs/pinyin.md「双拼」）。全码打过一次以后，u f m u h 的第一个候选是「什么时候」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母；这串键读不成整音节，打过的词排第一）；y i v z 的候选栏或展开后的第一页有「一直在」（词库里没有「一直在」这个词，按「一直」「在」读，不按打过的词排）。
-- **JVM**：`ShuangpinUatTest.aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack`（:lib:ime-core:test）；设备上留作冒烟（看胶水）。
+- **操作**：（没打过这两个词）点 u f m u h（自然码：shen = u f，然后 m、sh、h 各一个键），翻看候选；删光。点 u f m e u i h b（全码），选「什么时候」，清空输入框。再点 u f m u h，看第一个候选；长按它，选 **为什么排在这**，看写的原因，关掉；点它。清空，点 y i v z（yi，然后 zh、z），翻看候选；删光，点 y i v i z l 选「一直在」，清空，再点 y i v z。
+- **预期**：没打过时 u f m u h 的候选里没有「什么时候」、y i v z 里没有「一直在」（只打声母只出打过的词，见 docs/pinyin.md「双拼」）。全码打过一次以后，u f m u h 的第一个候选是「什么时候」，**为什么排在这** 里写着「你打过的词，按声母读出」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母；这串键读不成整音节，打过的词排第一）；y i v z 的候选栏或展开后的第一页有「一直在」（词库里没有「一直在」这个词，按「一直」「在」读，不按打过的词排）。
+- **JVM**：`ShuangpinUatTest.aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack`（:lib:ime-core:test）；菜单的原因（`Reason.ALONE`）由 ime-core 里标着 SP-30 的菜单测试查；设备上留作冒烟（看胶水；脚本不长按，候选的长按菜单 dump 看不见）。
 
 ### SP-31 [P1] 两个键成音节的仍先按音节读，打全码的首选不变
 - **前提**：B0-双拼（自然码）。
@@ -84,7 +84,7 @@
 - **前提**：B0-双拼（自然码）。
 - **操作**：先点 u f m e u i h b（全码）选「什么时候」，清空。点 u f m u h，看前两个候选，记下第二个（按音节读的第一个）；点它，清空；再做一次；点 u f m u h，看第一个候选；删光，点 u m u h。
 - **预期**：第一次「什么时候」第一，按音节读的第一个排第二；选过它两次以后，u f m u h 下它回到第一（不想要只打声母的词排第一时这样撤掉）；u m u h（另一串键）下「什么时候」仍是第一。
-- **JVM**：`ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+- **JVM**：`ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack`；设备上不跑。
 
 ### SP-34 [P1] 两个键成音节的码，学过的词按单个声母排第二
 - **前提**：B0-双拼（自然码）。
@@ -155,7 +155,7 @@
 
 ### SP-46 [P1] 关着「用我的输入习惯」时没有只打声母的读法
 - **前提**：B0-双拼（自然码），全码打过「什么时候」。
-- **操作**：点 u f m u h 看候选；清空，在学习设置里关掉「用我的输入习惯」，点 u f m u h；点 u f m e u i h b；打开「用我的输入习惯」，点 u f m u h。**键盘** 换成 18 键、14 键、九键（B0-18键 / B0-九键双拼）各照做一遍。
+- **操作**：点 u f m u h 看候选；清空，在学习设置里关掉「用我的输入习惯」，点 u f m u h；点 u f m e u i h b；打开「用我的输入习惯」，点 u f m u h。到 **输入法 → 双拼** 把 **键盘** 依次换成「18 键」「14 键」「九键」（只改键盘，不重置：全码打过的「什么时候」各键盘共用），回测试页按 u f m u h 等所在的键各照做一遍。
 - **预期**：开着时第一个是「什么时候」；关着时没有（按音节读），全码照常第一个是「什么时候」；再打开又是第一。四种键盘一样。
 - **JVM**：`ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone`、`ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone`、`PinyinSessionAbbrevGroupedTest.withNoHabitsAKeyIsNotReadAlone`（:lib:ime-core:test）；设备上不跑。
 
@@ -297,13 +297,13 @@
 
 ### SP-52 [P1] 18 键双拼只打声母出打过的词
 - **前提**：B0-18键（自然码）。
-- **操作**：点 u f m u h 对应的键（UI FG M UI H），翻看候选；删光，点 u f m e u i h b 选「什么时候」；删光，再点 u f m u h；删光，点 k e y i 选「可以」，删光点 k y。
+- **操作**：点 u f m u h 对应的键（U FG M U H），翻看候选；删光，点 u f m e u i h b 选「什么时候」；删光，再点 u f m u h；删光，点 k e y i 选「可以」，删光点 k y。
 - **预期**：没打过时候选里没有「什么时候」；打过以后 u f m u h 第一个是它；k y 下「可以」第二。只打声母只读打过的词，排法和全键盘一样（SP-30、SP-55）。
 - **JVM**：`ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard`、`PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone`（:lib:ime-core:test）；设备上不跑。
 
 ### SP-53 [P1] 14 键双拼只打声母出打过的词
 - **前提**：B0-18键（自然码），**键盘** 改成「14 键」。
-- **操作**：同 SP-52。
+- **操作**：同 SP-52，按 14 键的键：u f m u h 是 UI DF M UI GH（14 键是 `QW ER TY UI OP` / `AS DF GH JK L` / `ZX CV BN M`）。
 - **预期**：同 SP-52。
 - **JVM**：`ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard`、`PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone`（:lib:ime-core:test）；设备上不跑。
 
@@ -325,19 +325,19 @@
 
 ### SP-56 [P1] 打全码途中，只打声母的熟词不抢第一
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 y i r i y b 选「一日游」；删光，点 y r y，看第一个候选；删光，点 y r y n 选「原因」；删光，点 y r y，看前两个候选。18 键、14 键、九键各照做一遍。
+- **操作**：点 y i r i y b 选「一日游」；删光，点 y r y，看第一个候选；删光，点 y r y n 选「原因」；删光，点 y r y，看前两个候选。18 键、14 键、九键各照做一遍：每换一种键盘前先在 **用户词库** 点 **清空学到的**，勾 **全部清空**（打过的词各键盘共用，不清的话下一种键盘看不到只打过「一日游」那一步），再到 **输入法 → 双拼** 换 **键盘**，按这些字母所在的键打。
 - **预期**：只打过「一日游」时，y r y 第一个是「一日游」；打过「原因」以后，y r y（yuan，再打了 y 的一半，正在打的多半是「原因」）第一个是按音节读的，「一日游」第二。
-- **JVM**：`ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull`（:lib:ime-core:test）；设备上不跑。
+- **JVM**：`ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull`、`PinyinSessionAbbrevTest.theGateIsOpenedByAWordTypedPastTheFirstWordsRead`（:lib:ime-core:test）；设备上不跑。
 
-### SP-57 [P1] 有按偏的键时，打过的词、手动加的词照样按声母排上来
+### SP-57 [P1] 有按偏的键时，打过的词照样按声母排上来
 - **前提**：B0-双拼（自然码），**纠正错拼和按偏的键** 开着。
 - **操作**：点 k e y i 选「可以」；删光，点 k，再点 y 靠右边缘（靠 u），看候选；删光，两个键都点在正中再打一遍。
-- **预期**：点在正中时「可以」第二，紧跟在按音节读的第一个后面；靠边那次它在前 10 个候选里（点 ⌄ 展开看），y 读成 u 的读法（ku，例如「苦」）也在候选里，按它自己的分数排，可能排在「可以」前面。
+- **预期**：点在正中时「可以」第二，紧跟在按音节读的第一个后面；靠边那次它在前 10 个候选里（点 ⌄ 展开看），y 读成 u 的读法（ku，例如「苦」）也在候选里（展开后的前两页），按它自己的分数排，可能排在「可以」前面。
 - **JVM**：`PinyinSessionAbbrevSlipTest.wordsTypedOrAddedAreRaisedByTheirInitialsBesideASlip`、`PinyinDecoderTypedTest.wordsTypedReadAloneAreKeptPastTheCapButNotOnesSlipped`（:lib:ime-core:test）；设备上跑（看真坐标）。
 
 ### SP-58 [P1] 分隔键、九键的 1 键、微软的 ; 和只打声母一起
 - **前提**：B0-双拼（自然码）。
-- **操作**：点 x w m m 选「下面」，再做一次；删光，在九键双拼（B0-九键双拼）上点 x、1、m 对应的键（1 是分隔键）；方案换成微软，全键盘点 x ' m ;（m ; 是 ming），看候选。
+- **操作**：点 x w m m 选「下面」，再做一次；删光，点 x ' m 看第一个候选；删光，到 **输入法 → 双拼** 把 **键盘** 选成「九键」（只改键盘，不重置：打过的「下面」还在），回测试页点 x、1、m 对应的键（1 是分隔键）；再把 **键盘** 改回「全键盘」、**方案** 换成微软，点 x ' m ;（m ; 是 ming），看候选。
 - **预期**：九键上 x 1 m 第一个是「下面」，和全键盘的 x ' m 一样；微软的 x ' m ; 第一页有「小明」（分隔键后的读法照旧读全词库）。
 - **JVM**：`ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials`、`ShuangpinUatTest.microsoftsSemicolonAfterAKeyAloneReadsAsBefore`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevGroupedTest.theNineKeysOneKeyReadsAsTheSeparator`（:lib:ime-core:test）；设备上不跑。
 

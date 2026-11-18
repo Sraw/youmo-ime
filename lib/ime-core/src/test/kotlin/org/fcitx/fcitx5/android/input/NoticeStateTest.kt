@@ -81,6 +81,19 @@ class NoticeStateTest {
         assertNull(s.dismiss())
     }
 
+    // R27 F8528: another notice waits while an act's 撤销 still works, and only then
+    @Test
+    fun whetherItHoldsAnUndo() = assertRows(
+        "shown with 撤销" to { assertTrue(NoticeState<String>().apply { show("删", steady = false) }.holdsUndo) },
+        "shown without" to { assertFalse(NoticeState<String>().apply { show(null, steady = false) }.holdsUndo) },
+        "put away: lapsed" to { assertFalse(NoticeState<String>().apply { show("删", steady = false); dismiss() }.holdsUndo) },
+        "taken back" to { assertFalse(NoticeState<String>().apply { show("删", steady = false); undo("删") }.holdsUndo) },
+        "replaced by one without: the act lapsed" to {
+            assertFalse(NoticeState<String>().apply { show("删", steady = false); show(null, steady = false) }.holdsUndo)
+        },
+        "none shown yet" to { assertFalse(NoticeState<String>().holdsUndo) },
+    )
+
     // 051-fix-popup: the edit menu goes where the notices go, under their window
     @Test
     fun theEditMenuPutsAwayOrHides() = assertRows(

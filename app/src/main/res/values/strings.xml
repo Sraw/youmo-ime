@@ -797,7 +797,7 @@
     <string name="im_latin_words">Type English words</string>
     <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP</string>
     <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>
-    <string name="engine_data_fineweb">Web text the language model, the English words and handwriting\'s character frequencies are counted from: FineWeb-2</string>
+    <string name="engine_data_fineweb">Web text the language model, the English words and handwriting\'s character frequencies are counted from, and the voice polish\'s speech-like text made of: FineWeb-2</string>
     <string name="engine_data_handwriting">Handwriting recognizers: trained by this project on Make Me a Hanzi\'s strokes (from Arphic\'s fonts) and open handwriting fonts</string>
     <string name="engine_data_stroke">Stroke table: rime-stroke</string>
     <string name="engine_data_emoji">Emoji list and keywords: Unicode\'s emoji-test.txt and CLDR</string>

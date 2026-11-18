@@ -334,6 +334,7 @@ class UndoChipTest {
     // every notice one size, its words' (the user, 2026-11-17): 撤销 takes the row's height, it
     // does not stretch the chip to a 48 dp touch target
     @Test
+    @Uat("MN-04")
     fun aNoticeWithUndoIsAsTallAsOneThatOnlySays() {
         val chip = chip()
         chip.show("已复制")
@@ -348,7 +349,7 @@ class UndoChipTest {
         assertEquals(saidHeight, windows().single().height)
         val button = row.find(undoLabel)!!
         assertEquals("撤销 the row's height", saidHeight, button.height)
-        // its own padding, not the ripple's inset's (which setting the background put in its place)
+        // its own padding, not the ripple's inset's (which setting the background put in its place; c33d19e5b)
         val dp = activity.resources.displayMetrics.density
         assertEquals((12 * dp).toInt(), button.paddingStart)
         assertEquals((16 * dp).toInt(), button.paddingEnd)

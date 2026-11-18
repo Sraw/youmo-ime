@@ -702,7 +702,9 @@ back; elsewhere it closes as ever. The first three times the page
 opens drawing (`PageStrokeTouch.Hint`, counted in the internal pref `stroke_page_hint_shown`, only once said)
 `BaseExpandedCandidateWindow` says 「这里划笔画，翻页用右边 ↑↓」 in the [notice](#notices) (`BaseInputView.say`, docked above
 the bar, off the list; floating, beside the keyboard) for 2 s (`ms`; a said line's 1 s is too short for it), put away
-by a tap or typing as any line said; never with touch exploration, where the page draws none.
+by a tap or typing as any line said; never with touch exploration, where the page draws none. Not over a notice
+holding an undo (`BaseInputView.holdsUndo`: a long press's 删除 or 屏蔽), whose act it would lapse: not said nor
+counted then, said at a later opening.
 
 Writing on the keys (the toolbar's 手写; designs 060-kbd-handwriting, 061-handwriting-toolbar) is `BaseKeyboard`'s,
 with the glide's touch (`GlideInput`): while `HandwritingMode.writes` (the toggle on, an input method that writes, not a

@@ -136,12 +136,15 @@ class ShuangpinUatTest {
     @Uat("SP-31")
     fun wholeSyllablesReadAsBeforeTheAbbreviations() {
         // pinyin-chat.tsv typed whole in each scheme the app offers, on each keyboard it has (微软 no 14 keys), as
-        // `ime-eval pinyin --scheme <scheme> [--keys <keys>]` against --sp-abbrev off: the decoder and the sentence
-        // model, the first candidates the same (061-sp-abbrev §4.3: none changed when measured)
+        // `ime-eval pinyin <pinyin.data> data/pinyin-chat.tsv <result.tsv> --scheme <scheme>[-18|-14|-nine] --rerank <model>
+        // --history <words.txt>` against the same with --sp-abbrev off: the decoder and the sentence model, the first
+        // candidates the same (061-sp-abbrev §4.3: none changed when measured)
         val chat = File("data/pinyin-chat.tsv").useLines { EvalSet.parse(it) }
         val model = SentenceModel.load(UatEngines.data(InputMethodCatalog.SENTENCE_MODEL), unpack = true)
         // a key alone reads the words typed before: the 3000 likeliest typed, both ways
         val typed = TypedHistory.likeliest(UatEngines.pinyinData, HISTORY)
+        // each scheme and keyboard's, asserted once: a run takes minutes, and the first changed hid the rest (R27 F8564)
+        val changedBy = LinkedHashMap<String, List<String>>()
         for ((name, scheme) in ShuangpinSet.SCHEMES) {
             val keyboards = listOf<NineKeyLetters?>(null) + ShuangpinSet.KEYS.values.filter { it != NineKeyLetters.G14 || ImKeyboards.has14(scheme) }
             for (letters in keyboards) {
@@ -154,25 +157,32 @@ class ShuangpinUatTest {
                 val (off, on) = run(false) to run(true)
                 assertTrue("$name $letters ${samples.size}", samples.size > 1500)
                 val changed = samples.filter { s -> off.candidates(s.input, s.context).firstOrNull() != on.candidates(s.input, s.context).firstOrNull() }
-                assertEquals("$name $letters", emptyList<String>(), changed.map { it.input })
+                changedBy["$name $letters"] = changed.map { it.input }
             }
         }
-        val samples = ShuangpinSet.convert(chat, ShuangpinScheme.XIAOHE)
+        assertEquals(emptyMap<String, List<String>>(), changedBy.filterValues { it.isNotEmpty() })
         // each syllable's two keys alone, in each scheme (the three the app offers and three 0.5 dropped,
         // as ShuangpinSegmenterTest keeps them): the first never changes, and what page 1 showed it
-        // still shows first, but for a few; words fill a page a rare syllable's few characters left short
+        // still shows first, but for a few; words fill a page a rare syllable's few characters left short. Each scheme's,
+        // asserted once, as above
+        val firstChangedBy = LinkedHashMap<String, List<String>>()
+        val displacedBy = LinkedHashMap<String, String>()
         for (scheme in ShuangpinSet.SCHEMES.values + DROPPED) {
             fun twoKeys(abbreviations: Boolean) = PinyinRun(UatEngines.pinyinData, ShuangpinSegmenter(scheme, abbreviations = abbreviations), reranker = { Reranker(model) }, typed = typed)
             val (was0, now0) = twoKeys(false) to twoKeys(true)
             val codes = (0 until Syllables.count).mapNotNull { scheme.encode(it) }.distinct()
+            val firstChanged = ArrayList<String>()
             val displaced = ArrayList<String>()
             for (code in codes) {
                 val (was, now) = was0.candidates(code).take(EngineSettings.DEFAULT_PAGE_SIZE) to now0.candidates(code).take(EngineSettings.DEFAULT_PAGE_SIZE)
-                assertEquals("$scheme $code", was.firstOrNull(), now.firstOrNull())
+                if (was.firstOrNull() != now.firstOrNull()) firstChanged += "$code ${was.firstOrNull()} ${now.firstOrNull()}"
                 if (now.take(was.size) != was) displaced += "$code $was $now"
             }
-            assertTrue("$displaced of ${codes.size}", displaced.size * 100 <= codes.size)
+            firstChangedBy["$scheme"] = firstChanged
+            if (displaced.size * 100 > codes.size) displacedBy["$scheme"] = "$displaced of ${codes.size}"
         }
+        assertEquals(emptyMap<String, List<String>>(), firstChangedBy.filterValues { it.isNotEmpty() })
+        assertEquals(emptyMap<String, String>(), displacedBy)
     }
 
     // 061-sp-abbrev §5 where the order is made (code review SHOULD-4): a session that learns, HabitOrder and HabitRanker
@@ -188,6 +198,9 @@ class ShuangpinUatTest {
         val data = UatEngines.pinyinData
         val user = EvalUser(data)
         assertTrue(TypedHistory.count(user.model, data, TypedHistory.likeliest(data, HISTORY)) >= HISTORY)
+        // each scheme and keyboard's, asserted once (R27 F8564)
+        val changedBy = LinkedHashMap<String, List<String>>()
+        val pagedBy = LinkedHashMap<String, String>()
         for ((name, scheme) in ShuangpinSet.SCHEMES) {
             val keyboards = listOf<NineKeyLetters?>(null) + ShuangpinSet.KEYS.values.filter { it != NineKeyLetters.G14 || ImKeyboards.has14(scheme) }
             for (letters in keyboards) {
@@ -210,11 +223,13 @@ class ShuangpinUatTest {
                     if (was.firstOrNull() != now.firstOrNull()) changed += "$input $was $now"
                     if (now != was) paged++
                 }
-                assertEquals("$name $letters", emptyList<String>(), changed)
+                changedBy["$name $letters"] = changed
                 // the typed words read by keys alone are there: the order made over them was asked
-                assertTrue("$name $letters: $paged of ${inputs.size} pages changed", paged > 0)
+                pagedBy["$name $letters"] = if (paged > 0) "" else "no page of ${inputs.size} changed"
             }
         }
+        assertEquals(emptyMap<String, List<String>>(), changedBy.filterValues { it.isNotEmpty() })
+        assertEquals(emptyMap<String, String>(), pagedBy.filterValues { it.isNotEmpty() })
     }
 
     @Test
@@ -235,13 +250,19 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-33")
     fun aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys() = with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+        // what the syllables read first, nothing read by keys alone: the habits off (R27 F8567, not the page's own second)
+        engines.useHabits = false
+        type("ufmuh")
+        val syllables = page.first()
+        focus("")
+        engines.useHabits = true
         // typed in whole syllables once: first by keys alone from then on, what the syllables read next
         type("ufmeuihb")
         pick("什么时候")
         focus("")
         type("ufmuh")
         expectFirst("什么时候")
-        val syllables = page[1]
+        assertEquals("ufmuh: $page", 1, page.indexOf(syllables))
         // what the syllables read picked twice under these keys is first there again (061-sp-abbrev §3.3), and
         // learned under those keys only: 删光 first, as the case says (review F8113), and by initials only it stays first
         repeat(2) {

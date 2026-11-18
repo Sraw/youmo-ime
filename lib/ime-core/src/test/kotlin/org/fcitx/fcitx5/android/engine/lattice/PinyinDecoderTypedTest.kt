@@ -201,6 +201,41 @@ class PinyinDecoderTypedTest {
         assertFalse("苦" in words)
     }
 
+    // ky past the cap again, nine typed words read by k alone and y begun, more than the slots; 可 typed, by k alone, ends before
+    private val slotted = (0 until 70).map { Triple(('\u4e00' + 200 + it).toString(), "kuai", -2f - it * 0.01f) } +
+        listOf("可以" to "ke yi", "开眼" to "kai yan", "考研" to "kao yan", "苦于" to "ku yu", "恐有" to "kong you", "看样" to "kan yang", "可用" to "ke yong", "快要" to "kuai yao", "跨越" to "kua yue")
+            .mapIndexed { i, (text, reading) -> Triple(text, reading, -9f - i * 0.1f) } + Triple("可", "ke", -5f)
+
+    // the slots right after the first 64 words, as many as there are (R27 F8561), whatever the words asked: a list read on
+    // with more is the shorter one and more past it (R27 F8537). The grouped keyboards (not wholeFirst) look past a word
+    // that does not read all the keys (review NIT-1, R27 F8557): 可 ranks above the typed words there
+    @Test
+    fun theTypedWordsSlotsStayRightAfterTheFirstWordsWhateverIsAsked() {
+        val d = pinyinDataOf(*slotted.toTypedArray())
+        val user = UserModel(d.dictionary, d.vocabulary, d.wordIndex)
+        val typed = slotted.drop(70).map { it.first }
+        for ((text, reading) in slotted.drop(70).map { it.first to it.second }) {
+            val e = UserModel.Entry(text, reading.split(' ').map(Syllables::id).toIntArray())
+            user.setCount(user.id(e), 1f, e)
+        }
+        val g18 = NineKeyLetters.G18
+        val keyboards = listOf(
+            Triple("26", ziranma.segment("ky"), true),
+            Triple("$g18", GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, g18).segment("ky".map(g18::key).joinToString("")), false),
+        )
+        for ((name, graph, wholeFirst) in keyboards) {
+            val dec = PinyinDecoder(d.dictionary, d.vocabulary, WordScorer.of(d.model), user = user, wholeFirst = wholeFirst)
+            val first = dec.decode(graph).words.map { it.text }
+            assertEquals(name, PinyinDecoder.DEFAULT_WORDS + PinyinDecoder.TYPED_SLOTS, first.size)
+            assertEquals("$name $first", PinyinDecoder.TYPED_SLOTS, first.count { it in typed })
+            assertEquals("$name $first", typed.take(PinyinDecoder.TYPED_SLOTS), first.drop(PinyinDecoder.DEFAULT_WORDS))
+            assertFalse(name, "可" in first)
+            val more = dec.words(graph, words = 2 * PinyinDecoder.DEFAULT_WORDS).map { it.text }
+            assertTrue("$name ${more.size}", more.size > first.size && "可" in more && typed.last() in more)
+            assertEquals(name, first, more.take(first.size))
+        }
+    }
+
     // a decoder's every reading: its sentences, its words and the arcs between every two positions, slips held or not
     private fun lattice(d: PinyinDecoder, graph: SyllableGraph): List<String> {
         val r = d.decode(graph)
@@ -235,7 +270,7 @@ class PinyinDecoderTypedTest {
                     val keys = (1..random.nextInt(1, 5)).joinToString("") { pieces.random(random) }
                     val graph = segmenter.segment(code(keys))
                     val fast = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
-                    val each = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user).apply { walksTyped = false }
+                    val each = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user, walksTyped = false)
                     val a = lattice(fast, graph)
                     assertEquals("$name $own $keys", lattice(each, graph), a)
                     if (graph.hasAbbreviations && a.any { c -> typedWords.any { it in c } }) read++

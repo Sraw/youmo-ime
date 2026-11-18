@@ -86,7 +86,8 @@ object VoiceFeature {
         Credit("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
         // the polish tagger (0.6.0's, the voice pack v2's) is trained on data allowed for non-commercial use only
         // (RAMC, RealTalk-CN; CS2W's sentences are RAMC's): the voice pack is licensed so, apart from the app
-        // (dev/design/060-tagger-data-licenses.md); each source credited, its creator named
+        // (dev/design/060-tagger-data-licenses.md); each source credited, its creator named. Its FineWeb-2 sentences
+        // (ODC-By) are on the engine data's FineWeb-2 row (LicensesFragment), one row for both
         Credit(context.getString(R.string.voice_tagger_credit), "CC-BY-NC-SA-4.0", "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
         Credit("MagicData-RAMC (Magic Data Technology)", "CC-BY-NC-ND-4.0", "https://www.openslr.org/123/"),
         Credit("RealTalk-CN (BAAI)", "CC-BY-NC-SA-4.0", "https://huggingface.co/datasets/BAAI/RealTalk-CN"),

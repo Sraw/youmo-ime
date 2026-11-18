@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
+import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
@@ -79,9 +80,6 @@ internal fun reading(
 
 private const val MISREAD = SyllableMatches.FUZZY or SyllableMatches.TYPO or SyllableMatches.NEIGHBOUR
 
-// children walked rather than searched up to this many a match, as PinyinDecoder walks them
-private const val WALKED_PER_MATCH = 2
-
 // the trie [word] is in: the user's start-only words where it is one only imported, a merged
 // dictionary's where it is one of those, else the user's where it is theirs, else the dictionary's
 private class Spelt(private val word: Int, private val dictionary: PinyinDictionary, private val own: UserWords?) {
@@ -97,7 +95,8 @@ private class Spelt(private val word: Int, private val dictionary: PinyinDiction
         // [node] is the dictionary's only where neither trie is: a user's node may lie beyond its nodes (review SHOULD-2)
         if (starts != null || own != null) return m.byFlags()
         val children = dictionary.childCount(node)
-        if (children > WALKED_PER_MATCH * m.size) return m.byFlags()
+        // as PinyinDecoder walks them: one number, so the two never read apart (R27 F8550)
+        if (children > PinyinDecoder.WALKED_PER_MATCH * m.size) return m.byFlags()
         val first = dictionary.firstChild(node)
         val out = IntArray(children)
         var n = 0

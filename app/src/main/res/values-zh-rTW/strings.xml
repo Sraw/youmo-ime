@@ -774,7 +774,7 @@
     <string name="im_latin_words">中英混輸</string>
     <string name="im_latin_words_summary">拼音裡直接打英文單詞，比如 iphone 出 iPhone</string>
     <string name="engine_data_libime">拼音詞典和語言模型：libime</string>
-    <string name="engine_data_fineweb">語言模型、英文詞表和手寫的字頻統計用的網頁文本：FineWeb-2</string>
+    <string name="engine_data_fineweb">語言模型、英文詞表、手寫的字頻統計和語音整理的合成口語用的網頁文本：FineWeb-2</string>
     <string name="engine_data_handwriting">手寫辨識模型：本專案用 Make Me a Hanzi 的筆畫（來自文鼎字型）和開源手寫字型訓練</string>
     <string name="engine_data_stroke">筆畫表：rime-stroke</string>
     <string name="engine_data_emoji">表情列表和關鍵詞：Unicode 的 emoji-test.txt 和 CLDR</string>

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker.Item
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker.Tier
@@ -302,16 +303,17 @@ class HabitRankerTest {
     // 双拼's typed words read by keys alone (061-sp-abbrev §3.3), a row of its table each: V the decoder's first,
     // D1 D2 the dictionary's after it, A1 to A4 typed words read alone, in the decoder's order
     @Test
+    @Uat("SP-55")
     fun wordsTypedReadAloneGoBeforeOrAfterTheFirstByHowTheCodeReads() {
         val sp = Kinds.shuangpin("Ziranma")
         val half = Code(sp, "ufmuh")
         val whole = Code(sp, "umuh")
-        fun of(text: String, reading: String, alone: Int = HabitRanker.NOT_ALONE) = Item(text, Words.of(text, reading), alone = alone)
+        fun of(text: String, reading: String) = Item(text, Words.of(text, reading))
         val vItem = of("先前", "xian qian")
         val d1Item = of("现钱", "xian qian")
         val d2Item = of("线圈", "xian quan")
-        val typed = listOf(of("下面", "xia mian"), of("小明", "xiao ming"), of("学名", "xue ming"), of("熊猫", "xiong mao")).map { Item(it.value, it.words, alone = HabitRanker.ALONE_SHAPE) }
-        class Case(val why: String, val code: Code, val order: List<String>, val tiers: Map<String, Tier> = emptyMap(), val items: List<Item<String>> = listOf(vItem, d1Item, d2Item) + typed, val set: View.() -> Unit = {})
+        val typed = listOf(of("下面", "xia mian"), of("小明", "xiao ming"), of("学名", "xue ming"), of("熊猫", "xiong mao")).map { Item(it.value, it.words, alone = true) }
+        class Case(val why: String, val code: Code, val order: List<String>, val tiers: Map<String, Tier> = emptyMap(), val items: List<Item<String>> = listOf(vItem, d1Item, d2Item) + typed, val gate: Boolean = false, val set: View.() -> Unit = {})
         val a1 = "下面"; val a2 = "小明"; val a3 = "学名"; val a4 = "熊猫"; val v = "先前"; val d1 = "现钱"; val d2 = "线圈"
         val rows = listOf(
             Case("not whole: A1 V A2 A3, the fourth where it was", half, listOf(a1, v, a2, a3, d1, d2, a4), mapOf(a1 to Tier.ALONE, a3 to Tier.ALONE, a4 to Tier.DICTIONARY)),
@@ -337,30 +339,32 @@ class HabitRankerTest {
             Case("another word used here once: after V as ever", half, listOf(a1, v, a2, a3, d2, d1, a4), mapOf(d2 to Tier.USED)) {
                 used(half, d2, 1)
             },
-            Case("the gate (a typed word half typed): V A1 A2 A3", half, listOf(v, a1, a2, a3, d1, d2, a4),
-                items = listOf(vItem, Item(d1Item.value, d1Item.words, alone = HabitRanker.HALF_TYPED), d2Item) + typed),
+            Case("the gate (a typed word half typed): V A1 A2 A3", half, listOf(v, a1, a2, a3, d1, d2, a4), gate = true),
             // code review SHOULD-1 (ce8e9f5f5): V a typed word read alone was put behind the decoder's second
             Case("V itself a typed word, whole: first still, two more after it", whole, listOf(v, a1, a2, d1, d2, a3, a4), mapOf(v to Tier.ALONE),
-                items = listOf(Item(vItem.value, vItem.words, alone = HabitRanker.ALONE_SHAPE), d1Item, d2Item) + typed),
+                items = listOf(Item(vItem.value, vItem.words, alone = true), d1Item, d2Item) + typed),
             Case("V itself a typed word, the gate: first still", half, listOf(v, a1, a2, d1, d2, a3, a4), mapOf(v to Tier.ALONE),
-                items = listOf(Item(vItem.value, vItem.words, alone = HabitRanker.ALONE_SHAPE), Item(d1Item.value, d1Item.words, alone = HabitRanker.HALF_TYPED), d2Item) + typed),
+                items = listOf(Item(vItem.value, vItem.words, alone = true), d1Item, d2Item) + typed, gate = true),
             Case("H, then a typed word used here once, the gate: H V A1, the used one no V", half, listOf(d2, v, a3, a1, a2, d1, a4),
-                mapOf(d2 to Tier.FIRST_HERE, a3 to Tier.ALONE),
-                items = listOf(vItem, Item(d1Item.value, d1Item.words, alone = HabitRanker.HALF_TYPED), d2Item) + typed) {
+                mapOf(d2 to Tier.FIRST_HERE, a3 to Tier.ALONE), gate = true) {
                 firsts[half to ""] = d2Item.words
                 used(half, a3, 1)
             },
             Case("V itself a typed word, not whole: first as A1, the next as V", half, listOf(v, d1, a1, a2, d2, a3, a4), mapOf(v to Tier.ALONE),
-                items = listOf(Item(vItem.value, vItem.words, alone = HabitRanker.ALONE_SHAPE), d1Item, d2Item) + typed),
+                items = listOf(Item(vItem.value, vItem.words, alone = true), d1Item, d2Item) + typed),
             Case("a typed word used spelt in full twice: not lifted, up front already; another lifted third", half, listOf(a1, v, d2, a2, a3, d1, a4),
                 mapOf(a3 to Tier.ALONE, d2 to Tier.LIFTED)) {
                 spelled[sp to a3] = Habits.Spelled(2, 0)
                 spelled[sp to d2] = Habits.Spelled(2, 0)
             },
+            // R27 F8535: the fourth was lifted to third, ahead of the second and third read alone; §3.3 ranks it as one of them
+            Case("a fourth typed word used spelt in full twice: where it was, not lifted", half, listOf(a1, v, a2, a3, d1, d2, a4), mapOf(a4 to Tier.DICTIONARY)) {
+                spelled[sp to a4] = Habits.Spelled(2, 0)
+            },
         )
         assertRows(rows, { it.why }) { row ->
             val view = View().apply(row.set)
-            val ranked = HabitRanker.rank(row.items, row.code, "", view, readsWhole = row.code == whole)
+            val ranked = HabitRanker.rank(row.items, row.code, "", view, readsWhole = row.code == whole, gate = row.gate)
             assertEquals(row.why, row.order, ranked.map { it.value })
             for ((text, tier) in row.tiers) assertEquals("${row.why}: $text", tier, ranked.first { it.value == text }.tier)
         }

@@ -78,9 +78,10 @@ internal class HabitOrder(
 
     /**
      * A level of the input: the candidates ending at [end] (from the pieces' end), ranked under [code] after [prev]; [injected], those put in;
-     * [recorded], the texts pinned, first or used under the code itself, ranked there however the code reads them.
+     * [recorded], the texts pinned, first or used under the code itself, ranked there however the code reads them; [gate], 双拼's
+     * (061-sp-abbrev §3.4), a word the user typed reads the code as whole syllables and its last key begun.
      */
-    class Level(val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean, val recorded: Set<String>)
+    class Level(val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean, val recorded: Set<String>, val gate: Boolean = false)
 
     /** [list] as shown, how those ranked were ([ranks]: the tier, the uses); [pinned], the pin in front, if one is. */
     class Ordered(val list: List<Candidate>, val ranks: Map<Candidate, HabitRanker.Ranked<Candidate>>) {
@@ -158,7 +159,19 @@ internal class HabitOrder(
             starts.filter { !own(it.words[0]) && it.text !in present }.map { it to habits.importOrder(it.text) }.sortedBy { it.second }
                 .take(IMPORTS_PER_LEVEL).forEach { add(it.first) }
         }
-        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere, recorded.mapTo(HashSet()) { it.text })
+        val gate = gate(graph, code, end)
+        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere, recorded.mapTo(HashSet()) { it.text }, gate)
+    }
+
+    // 双拼's gate (061-sp-abbrev §3.4) by every word of the start the decoder read to [end], once a decode: by the candidates read so
+    // far it opened only once a list turned on to a typed word past the first 64, and V and the first typed word swapped (R27 F8538).
+    // Its cost, where the code does not read whole: one more pass over the start's arcs (an arc's end compared; for one to [end], a
+    // typed() lookup), and the typed words there read once each
+    private fun gate(graph: SyllableGraph, code: Code, end: Int): Boolean {
+        val user = user ?: return false
+        if (!Kinds.isShuangpin(code.kind) || readsWholeAsTyped(graph, graph.start, end)) return false
+        val readings = Readings()
+        return decoder.startWords(graph, end, { user.typed(it) }).any { aloneShape(graph, it, readings) == Shape.HALF_TYPED }
     }
 
     // each of [words] not [present] that the input reads to [end], over no slip where [slips], to [add]
@@ -358,7 +371,8 @@ internal class HabitOrder(
         val items = ArrayList<Enforced.Item>()
         for (a in bounds) for (b in bounds.tailSet(a + 1)) {
             // keys glided are no keys of a word (1b N8)
-            val arcs = if (recorder.pressed.glided(from + a, from + b)) emptyList() else decoder.arcsBetween(graph, a, b, holdsSlips(graph, a, b))
+            // where the keys read whole, not a typed word's arc over keys alone: one such took the added word's place as the only (R27 F8536)
+            val arcs = if (recorder.pressed.glided(from + a, from + b)) emptyList() else decoder.arcsBetween(graph, a, b, holdsSlips(graph, a, b), readsWholeAsTyped(graph, a, b))
             val only = arcs.singleOrNull()?.takeIf { user.addedByHand(it.words[0]) || isAddedId(it.words[0]) } ?: continue
             items += Enforced.Item(a, b, only.words, only.ends, only.text, null, Enforced.Kind.ADDED)
         }
@@ -385,16 +399,16 @@ internal class HabitOrder(
             // but for what was pinned, first or used under the code itself
             val whole = if (holdsSlips(graph, graph.start, level.end)) graph.withoutSlips() else null
             // 双拼's typed words by their keys alone (061-sp-abbrev §3.2), each candidate's shape asked once (a typed word's only)
-            val alone = if (!Kinds.isShuangpin(level.code.kind)) null else IntArray(list.size) { if (list[it].end == level.end) aloneShape(graph, list[it], readings) else HabitRanker.NOT_ALONE }
+            val alone = if (!Kinds.isShuangpin(level.code.kind)) null else BooleanArray(list.size) { list[it].end == level.end && aloneShape(graph, list[it], readings) == Shape.ALONE }
             // a typed word read alone takes its slot however the code reads (it reads over no slip)
             val slots = list.indices.filter {
-                list[it].end == level.end && (ranksHere(graph, list[it], level, whole, readings) || alone?.get(it) == HabitRanker.ALONE_SHAPE)
+                list[it].end == level.end && (ranksHere(graph, list[it], level, whole, readings) || alone?.get(it) == true)
             }
             val injected = level.injected.toHashSet()
             // whether a word reads the keys exactly is asked only where an imported word needs its slot
             val imports = slots.any { imported(list[it]) }
-            val items = slots.map { item(graph, list[it], list[it] in injected, level.habitsHere, imports, readings, alone?.get(it) ?: HabitRanker.NOT_ALONE) }
-            val ranked = HabitRanker.rank(items, level.code, level.prev, view, readsWholeAsTyped(graph, graph.start, level.end))
+            val items = slots.map { item(graph, list[it], list[it] in injected, level.habitsHere, imports, readings, alone?.get(it) == true) }
+            val ranked = HabitRanker.rank(items, level.code, level.prev, view, readsWholeAsTyped(graph, graph.start, level.end), level.gate)
             for ((i, r) in ranked.withIndex()) {
                 list[slots[i]] = r.value
                 ranks[r.value] = r
@@ -409,7 +423,7 @@ internal class HabitOrder(
         return slots.lastOrNull { it < pageSize }?.plus(1) ?: slots.firstOrNull() ?: list.size
     }
 
-    private fun item(graph: SyllableGraph, c: Candidate, injected: Boolean, habitsHere: Boolean, imports: Boolean, readings: Readings, alone: Int): HabitRanker.Item<Candidate> {
+    private fun item(graph: SyllableGraph, c: Candidate, injected: Boolean, habitsHere: Boolean, imports: Boolean, readings: Readings, alone: Boolean): HabitRanker.Item<Candidate> {
         val letters = NO_WORD in c.words
         // no habit under the code: its words' readings matter to none, the user's own words go by their text
         val words = if (letters || !habitsHere) Words.of(c.text) else words(graph, c, readings) ?: Words.of(c.text)
@@ -421,34 +435,37 @@ internal class HabitOrder(
         )
     }
 
+    /** A typed word's shape over the code (061-sp-abbrev §3.2): [ALONE], [HabitRanker.Item.alone]; [HALF_TYPED], it opens the gate (§3.4). */
+    private enum class Shape { ALONE, HALF_TYPED, NONE }
+
     /**
-     * [c]'s shape for [HabitRanker.Item.alone] (061-sp-abbrev §3.2): one word the user typed, from the start,
-     * read exactly (no fuzzy, no slip) as whole syllables then keys each alone, two or more ([HabitRanker.ALONE_SHAPE])
-     * or the last only ([HabitRanker.HALF_TYPED]); else [HabitRanker.NOT_ALONE]. By the edges' kinds, not their
+     * [c]'s [Shape] (061-sp-abbrev §3.2): one word the user typed, from the start,
+     * read exactly (no fuzzy, no slip) as whole syllables then keys each alone, two or more ([Shape.ALONE])
+     * or the last only ([Shape.HALF_TYPED]); else [Shape.NONE]. By the edges' kinds, not their
      * widths: `x'` is a key alone (its edge spans the separator), a one-key vowel syllable whole.
      * Of the first reading, the one [words] learns (review NIT-3): its shape is any exact reading's, as from a place a
      * pair's whole syllable comes before its first key alone, so a reading tries whole syllables first (a word's keys
      * and syllables fix how many of each). A vowel's key the reading takes as a lead (before its one-key syllable) is a
      * key alone: 小鹤 `el` 恶劣 typed, first as measured (§4.1, 两字词全打声母); read as the syllable e it went behind 俄罗.
      */
-    private fun aloneShape(graph: SyllableGraph, c: Candidate, readings: Readings): Int {
-        val word = c.words.singleOrNull() ?: return HabitRanker.NOT_ALONE
-        if (word == NO_WORD || user?.typed(word) != true) return HabitRanker.NOT_ALONE
+    private fun aloneShape(graph: SyllableGraph, c: Candidate, readings: Readings): Shape {
+        val word = c.words.singleOrNull() ?: return Shape.NONE
+        if (word == NO_WORD || user?.typed(word) != true) return Shape.NONE
         val r = readings.reading(graph.start, c.ends[0], word) { spelt(graph, graph.start, c.ends[0], word) }
-        if (r == null || !r.exact || r.slips.isNotEmpty()) return HabitRanker.NOT_ALONE
+        if (r == null || !r.exact || r.slips.isNotEmpty()) return Shape.NONE
         var alone = 0
         for (e in r.edges) {
             if (graph.kind(e) == Kind.SYLLABLE && !graph.isAbbreviation(e)) {
                 // a whole syllable after a key alone: no such shape
-                if (alone > 0) return HabitRanker.NOT_ALONE
+                if (alone > 0) return Shape.NONE
             } else {
                 alone++
             }
         }
         return when {
-            alone >= 2 -> HabitRanker.ALONE_SHAPE
-            alone == 1 -> HabitRanker.HALF_TYPED
-            else -> HabitRanker.NOT_ALONE
+            alone >= 2 -> Shape.ALONE
+            alone == 1 -> Shape.HALF_TYPED
+            else -> Shape.NONE
         }
     }
 

@@ -565,7 +565,7 @@ def vo55(d):
         check(median <= 1500, f"{clip}：松开到出字的中位数 {median} ms，超过 1500 ms（字对只是慢：只开一台模拟器重跑）：{took}")
     return "；".join(out)
 
-case("VO-15", needs="jvm:SettingsPagesUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
+case("VO-15", needs="jvm:LicensePageUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
 
 
 case("VO-16", needs="jvm:VoiceHoldUatTest.holdingAgainWhileDidntCatchThatShowsListens")(lambda d: None)

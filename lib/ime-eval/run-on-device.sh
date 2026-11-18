@@ -12,7 +12,9 @@
 # English's nine keys send them); GROUPED=14 or 18 a set of
 # pinyin's 14 or 18 keys' codes (--scheme g14/g18) as those keys send them; sp18, sp14 or sp9 双拼's 18, 14 or nine
 # keys' (shuangpin --keys 18|14|nine, ime=engine-shuangpin), zy9 or zy 注音九键's or 大千's (zhuyin --keys nine|full,
-# ime=engine-pinyin, which hands them on), each as its keyboard sends them.
+# ime=engine-pinyin, which hands them on), each as its keyboard sends them. HISTORY=<words.txt> types on that history,
+# words typed before the run as ime-eval's --history reads them (`ime-eval history <pinyin.data> <n> <words.txt>` makes
+# one of the dictionary's likeliest n): pushed to the app's eval dir, it replaces the app's learning record (EngineEvalRunner).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -21,6 +23,11 @@ IME=${2:-engine-pinyin}
 PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
 
+# a history named from where the script was called, before it moves to the repo
+if [ -n "${HISTORY:-}" ]; then
+    [ -f "$HISTORY" ] || { echo "HISTORY=$HISTORY: no such file" >&2; exit 1; }
+    HISTORY="$(cd "$(dirname "$HISTORY")" && pwd)/$(basename "$HISTORY")"
+fi
 cd "$REPO"
 # the runner starts its own engine in the app's process; if fcitx were the active keyboard, its
 # service would hold a second engine there, on the same data files. So another enabled keyboard
@@ -56,14 +63,25 @@ if [[ $(keyboard) == "$PKG/"* ]]; then
         exit 1
     fi
 fi
-REMOTE="/sdcard/Android/data/$PKG/files/eval/$SET-$IME.tsv"
+EVAL_DIR="/sdcard/Android/data/$PKG/files/eval"
+REMOTE="$EVAL_DIR/$SET-$IME.tsv"
 # a failed run must not leave the previous result behind to be pulled as this one
 adb shell rm -f "$REMOTE"
+HISTORY_NAME=
+if [ -n "${HISTORY:-}" ]; then
+    # the runner reads <name>.txt from its eval dir before its test assets (R27 F8530)
+    HISTORY_NAME=$(basename "$HISTORY" .txt)
+    adb shell mkdir -p "$EVAL_DIR"
+    adb push "$HISTORY" "$EVAL_DIR/$HISTORY_NAME.txt" >/dev/null
+fi
 # NINE=1 alone types the nine keys: NINE=0 is off, as INSTALL=0 is (review F8208)
 [ "${NINE:-0}" = 1 ] || NINE=
 # am instrument exits 0 even when the run fails; its report is what tells
 REPORT=$(adb shell am instrument -w -e class org.fcitx.fcitx5.android.EngineEvalRunner \
-    -e evalSet "$SET" -e evalIme "$IME" ${NINE:+-e evalNine true} ${GROUPED:+-e evalGrouped "$GROUPED"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
+    -e evalSet "$SET" -e evalIme "$IME" ${NINE:+-e evalNine true} ${GROUPED:+-e evalGrouped "$GROUPED"} \
+    ${HISTORY_NAME:+-e evalHistory "$HISTORY_NAME"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
+# not left to be read by a later run that names the same history in the assets
+[ -z "$HISTORY_NAME" ] || adb shell rm -f "$EVAL_DIR/$HISTORY_NAME.txt"
 if ! grep -q "^OK (1 test)" <<<"$REPORT"; then
     echo "$REPORT" >&2
     exit 1

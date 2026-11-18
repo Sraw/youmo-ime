@@ -72,20 +72,21 @@ class FileChecksTest(unittest.TestCase):
                         return ""
             return ""
 
-    def test_the_fixtures_files_pass_every_item(self):
+    def test_the_fixtures_files_pass_every_item_but_an_edited_punctuation_table_left(self):
         import tarfile
         v = os.path.join(gates.FIXTURES, "v0.3.2")
-        with tarfile.open(os.path.join(v, "data.tar")) as data, tarfile.open(os.path.join(v, "external.tar")) as ext:
-            res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}))
-        self.assertEqual(7, len(res))
-        self.assertEqual([], [r for r in res if not r["ok"]])
-
-    def test_an_edited_punctuation_table_left_fails(self):
-        import tarfile
-        v = os.path.join(gates.FIXTURES, "v0.3.2")
-        with tarfile.open(os.path.join(v, "data.tar")) as data, tarfile.open(os.path.join(v, "external.tar")) as ext:
-            res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}, punc_kept=True))
-        self.assertEqual(["中文标点"], [r["item"].split()[0] for r in res if not r["ok"]])
+        rows = [
+            # the first start's moves made, the edited table deleted (ST-145): every item passes
+            (False, []),
+            # the fixture's edited punctuation table still there: 0.6.1 deletes it, so its item fails
+            (True, ["中文标点"]),
+        ]
+        for punc_kept, failed in rows:
+            with self.subTest(punc_kept=punc_kept), tarfile.open(os.path.join(v, "data.tar")) as data, \
+                    tarfile.open(os.path.join(v, "external.tar")) as ext:
+                res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}, punc_kept=punc_kept))
+                self.assertEqual(7, len(res))
+                self.assertEqual(failed, [r["item"].split()[0] for r in res if not r["ok"]])
 
     def test_an_old_build_s_files_are_read_where_it_keeps_them(self):
         import tarfile
@@ -145,7 +146,7 @@ class FileChecksTest(unittest.TestCase):
             finally:
                 phase.FIXTURES = saved
 
-    def test_a_missing_file_fails_its_items(self):
+    def test_a_missing_file_fails_every_item_but_the_punctuation_table(self):
         res = phase.file_checks(self.FakeDevice({}))
         # but 中文标点: no table at all is the stock punctuation, what 0.6.1 leaves
         self.assertEqual(["中文标点"], [r["item"].split()[0] for r in res if r["ok"]])

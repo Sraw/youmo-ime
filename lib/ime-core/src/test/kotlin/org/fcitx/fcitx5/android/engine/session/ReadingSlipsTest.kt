@@ -70,8 +70,10 @@ class ReadingSlipsTest {
         val beyond = AsOwn(data.dictionary, base = data.dictionary.nodeCount + 100)
         val own = reading(graph, graph.start, graph.end, id, data.dictionary, beyond) { _, _ -> "" }
         val dictionary = reading(graph, graph.start, graph.end, id, data.dictionary, null) { _, _ -> "" }
+        // read at all first (R27 F8562): two nulls are equal
+        assertTrue("the dictionary's", dictionary != null)
+        assertTrue("the user's", own != null)
         assertEquals(dictionary?.syllables?.toList(), own?.syllables?.toList())
-        assertTrue(own != null)
     }
 
     // over a key alone the reading walks the node's children where they are few (061-sp-abbrev §3.9): the same
@@ -97,7 +99,9 @@ class ReadingSlipsTest {
             for (from in graph.start until graph.end) for (to in from + 1..graph.end) for (w in 1 until words.vocabulary.size) {
                 val walked = reading(graph, from, to, w, words.dictionary, null) { _, _ -> "" }
                 val asked = reading(graph, from, to, w, words.dictionary, asOwn) { _, _ -> "" }
-                assertEquals("$keys $from-$to $w", asked?.let { it.syllables.toList() to it.ends }, walked?.let { it.syllables.toList() to it.ends })
+                // how exactly and over which edges too: aloneShape reads those (R27 F8560)
+                fun shape(r: Reading?) = r?.let { Triple(it.syllables.toList(), it.ends, it.exact) to it.edges.toList() }
+                assertEquals("$keys $from-$to $w", shape(asked), shape(walked))
                 if (walked != null && (from until to).any { at -> graph.edges(at).any { graph.isAbbreviation(it) && graph.to(it) <= to } }) read++
             }
         }

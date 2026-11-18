@@ -76,15 +76,17 @@ class PinyinDecoder(
      * typed (any keyboard but zhuyin's), and nothing is asked.
      */
     private val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
+    /**
+     * False: over keys alone each match is looked up as everywhere else, the reading [collectTyped] must equal (tests only).
+     * Fixed for the decoder's life: set after a decode, the arcs kept from it were walked the other way (R27 F8551).
+     */
+    internal val walksTyped: Boolean = true,
 ) {
     init {
         require(beam >= 1 && wordsPerReading >= 1) { "beam $beam, words per reading $wordsPerReading" }
     }
 
     private var arcs = Lattice()
-
-    /** False: over keys alone each match is looked up as everywhere else, the reading [collectTyped] must equal (tests only). */
-    internal var walksTyped = true
 
     // per dictionary node reached by a syllable still being typed, see extensionsOf; made once
     // (a reference a node, under a megabyte) and kept when the scores change: they only pick
@@ -175,7 +177,9 @@ class PinyinDecoder(
      * @param prev2 the word before [prev] in text already committed, or [NO_WORD]
      * @param prev the last word committed, or [NO_WORD]
      * @param sentences how many readings of the whole input to return at most
-     * @param words how many words the input may start with to return at most
+     * @param words how many words the input may start with to return at most, and where the graph reads 双拼 keys alone and
+     * [words] reaches [DEFAULT_WORDS], up to [TYPED_SLOTS] more: the user's typed words so read, right after the first
+     * [DEFAULT_WORDS] (rankedWords, 061-sp-abbrev §3.5)
      */
     fun decode(
         graph: SyllableGraph,
@@ -224,6 +228,7 @@ class PinyinDecoder(
     /**
      * The first [words] words [graph] may start with, as [decode]'s are, where it gave fewer: read
      * on from those it ranked, if the last decode was of [graph] in this context, else decoded again.
+     * Up to [TYPED_SLOTS] more as [decode] says, in the same place: a shorter list is the start of a longer one.
      */
     fun words(graph: SyllableGraph, prev2: Int = NO_WORD, prev: Int = NO_WORD, words: Int): List<Candidate> {
         val ranked = graph === rankedGraph && lastEnd == graph.end && prev2 == lastPrev2 && prev == lastPrev
@@ -395,14 +400,7 @@ class PinyinDecoder(
             for (i in 0 until matches.size) step(graph, at, e, i, dictionary.child(node, matches.syllable(i)), node, userNode, -1, cost, short, limit)
             return
         }
-        val first = dictionary.firstChild(node)
-        val end = first + dictionary.childCount(node)
-        var c = user.nextTypedBelow(first)
-        while (c in first until end) {
-            val i = matches.indexOf(dictionary.syllable(c))
-            if (i >= 0) step(graph, at, e, i, c, node, userNode, -1, cost, short, limit)
-            c = user.nextTypedBelow(c + 1)
-        }
+        forEachTypedChild(dictionary, user, node, matches) { i, c -> step(graph, at, e, i, c, node, userNode, -1, cost, short, limit) }
     }
 
     /**
@@ -602,15 +600,16 @@ class PinyinDecoder(
     /**
      * The words of the last decode's arcs of [graph] from [from] to [to], each once, as [startWords]
      * gives them: what a word added by hand is the only one of (impl/design-1c.md §1). Read off the
-     * lattice the decode built, no search. [holdsSlips] as for [startWords].
+     * lattice the decode built, no search. [holdsSlips] as for [startWords]; [holdsAlone], none over a 双拼 key read alone,
+     * where the keys read whole: a typed word read so was another word there and took an added one's place as the only (R27 F8536).
      */
-    fun arcsBetween(graph: SyllableGraph, from: Int, to: Int, holdsSlips: Boolean = false): List<Candidate> {
+    fun arcsBetween(graph: SyllableGraph, from: Int, to: Int, holdsSlips: Boolean = false, holdsAlone: Boolean = false): List<Candidate> {
         if (from !in graph.start until graph.end || lastEnd != graph.end || lastStart != graph.start) return emptyList()
         val out = ArrayList<Candidate>()
         seen.clear()
         for (a in arcs.start[from] until arcs.start[from + 1]) {
             val word = arcs.word[a]
-            if (!takes(a, to, holdsSlips)) continue
+            if (!takes(a, to, holdsSlips) || holdsAlone && arcs.flags[a] and ALONE != 0) continue
             if (seen.add(word)) out += Candidate(text(word), to - from, arcs.cost[a], intArrayOf(word), intArrayOf(to))
         }
         return out
@@ -838,26 +837,33 @@ class PinyinDecoder(
 
     /**
      * The first [limit] words, each once, of the arcs from the start of [graph] as [firstWords] ranked them;
-     * then, where the graph reads keys alone, up to [TYPED_SLOTS] more of the user's typed words that read
-     * all of it so and over no slip: on the grouped keyboards a code of initials reads hundreds of
-     * syllables' words, which crowd the typed one meant out of the first [limit] (061-sp-abbrev §3.5).
+     * where the graph reads keys alone and [limit] reaches [DEFAULT_WORDS], right after the first [DEFAULT_WORDS]
+     * of them, up to [TYPED_SLOTS] more of the user's typed words that read all of it so and over no slip: on
+     * the grouped keyboards a code of initials reads hundreds of syllables' words, which crowd the typed one
+     * meant out of the first ones (061-sp-abbrev §3.5). There whatever the [limit]: put after the [limit]th,
+     * a list read on with a larger one (PinyinSession.readUntil) moved them and took others in their place (R27 F8537).
      */
     private fun rankedWords(graph: SyllableGraph, limit: Int): List<Candidate> {
         val from = arcs.start[graph.start]
         var next = 0
+        var kept = 0
         val out = ArrayList<Candidate>()
         seen.clear()
-        while (out.size < limit && next < firstRanked.size) {
-            val a = firstRanked[next++].toInt()
-            val word = arcs.word[a]
-            if (word != NO_WORD && seen.add(word)) {
-                out += Candidate(text(word), arcs.to[a], firstScores[a - from], intArrayOf(word), intArrayOf(arcs.to[a]))
+        fun rankTo(n: Int) {
+            while (out.size - kept < n && next < firstRanked.size) {
+                val a = firstRanked[next++].toInt()
+                val word = arcs.word[a]
+                if (word != NO_WORD && seen.add(word)) {
+                    out += Candidate(text(word), arcs.to[a], firstScores[a - from], intArrayOf(word), intArrayOf(arcs.to[a]))
+                }
             }
         }
-        if (graph.hasAbbreviations) {
-            var kept = 0
-            while (kept < TYPED_SLOTS && next < firstRanked.size) {
-                val a = firstRanked[next++].toInt()
+        rankTo(minOf(limit, DEFAULT_WORDS))
+        if (graph.hasAbbreviations && limit >= DEFAULT_WORDS) {
+            // looked for past the ranked words, which rankTo goes on with: those taken here are seen and skipped there
+            var at = next
+            while (kept < TYPED_SLOTS && at < firstRanked.size) {
+                val a = firstRanked[at++].toInt()
                 val to = arcs.to[a]
                 // with [wholeFirst] those reading all the input come first: none after the first that does not. The
                 // grouped keyboards (not wholeFirst) look at every arc left (review NIT-1): its end and flags each
@@ -870,6 +876,7 @@ class PinyinDecoder(
                 }
             }
         }
+        rankTo(limit)
         return out
     }
 
@@ -1221,11 +1228,11 @@ class PinyinDecoder(
 
         // syllables of the path collect is on, room for at first
         private const val PATH = 16
-        // children walked rather than searched up to this many a match: a search reads about log2 of them
-        private const val WALKED_PER_MATCH = 2
+        // children walked rather than searched up to this many a match: a search reads about log2 of them; Reading's walk the same
+        internal const val WALKED_PER_MATCH = 2
         const val DEFAULT_WORDS = 64
         // the user's typed words read alone kept past the words asked for (rankedWords); 8 till the 6T says (061-sp-abbrev §3.5)
-        private const val TYPED_SLOTS = 8
+        internal const val TYPED_SLOTS = 8
         // on the 256-sample evaluation set, 16 words are as accurate as 256 at a third of the
         // time, and a beam of 64 gains one sample of 256 at four times the time
         const val DEFAULT_WORDS_PER_READING = 16
@@ -1303,6 +1310,21 @@ private fun extensionsOf(dictionary: PinyinDictionary, vocabulary: Vocabulary, s
         }
     }
     return out
+}
+
+/**
+ * Each child of [node] in [dictionary] with a word [user] typed below it ([UserWords.nextTypedBelow] over the
+ * children, in the syllables' order) that one of [matches] reads, with that match's index: PinyinDecoder.collectTyped's walk.
+ */
+private inline fun forEachTypedChild(dictionary: PinyinDictionary, user: UserWords, node: Int, matches: SyllableMatches, visit: (match: Int, child: Int) -> Unit) {
+    val first = dictionary.firstChild(node)
+    val end = first + dictionary.childCount(node)
+    var c = user.nextTypedBelow(first)
+    while (c in first until end) {
+        val i = matches.indexOf(dictionary.syllable(c))
+        if (i >= 0) visit(i, c)
+        c = user.nextTypedBelow(c + 1)
+    }
 }
 
 private fun Penalties.ofKind(kind: Kind) = when (kind) {

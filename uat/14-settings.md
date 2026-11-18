@@ -597,7 +597,7 @@
 - 真机或模拟器上手工跑（要自己打包），不在自动跑里。
 
 ### ST-82 [P1] 导入比手机上旧的资源包：用得上的先问，用不上的直接说
-- **前提**：A、B 在 debug 包上跑（只有 debug 包认仓库里的测试密钥，发布包按签名不对拒绝），C 在发布包上跑。A：B0-设置，导入了这一版的语音包 v2；"下载"里有用 `TestShelves` 的做法以测试密钥签的语音包 v1（这一版要 v2 或更新的，用不上；做不出就记阻塞）。B（做得出时）：导入了文字包 v2，"下载"里有文字包 v1（这一版用得上。`:app:packs` 没有改版本号的参数：照 `TestShelves` 的做法，把正式 v1 的文件放进一个 version 为 2 的包，用仓库里的测试密钥 `app/pack-keys/test-ed25519.pem` 签名；只有 debug 包认测试密钥，所以 B 在 debug 包上跑；做不出就记阻塞）。C（发版时，在发布包上）：装着 0.6.1 测试版导入的语音包 v3（0.6.1 退回了 0.6.0 的 v2）；"下载"里有发布的 `youmo-voice-v2.youmopack`。
+- **前提**：A、B 在 debug 包上跑（只有 debug 包认仓库里的测试密钥，发布包按签名不对拒绝），C 在发布包上跑。A：B0-设置，导入了这一版的语音包 v2；"下载"里有用 `TestShelves` 的做法以测试密钥签的语音包 v1（这一版要 v2 或更新的，用不上；做不出就记阻塞）。B（做得出时）：导入了文字包 v2，"下载"里有文字包 v1（这一版用得上。`:app:packs` 没有改版本号的参数：照 `TestShelves` 的做法，把正式 v1 的文件放进一个 version 为 2 的包，用仓库里的测试密钥 `app/pack-keys/test-ed25519.pem` 签名；只有 debug 包认测试密钥，所以 B 在 debug 包上跑；做不出就记阻塞）。C（发版时，在发布包上）：装着 0.6.1 测试版导入的语音包 v3（0.6.1 退回了 0.6.0 的 v2）；"下载"里有发布的 `youmo-voice-v2.youmopack`（`dev/old-apks/v0.6.0/`）。v3 和测试版 1 的 APK 从 GitHub 上 0.6.1 测试版 1 的草稿发布拿（`gh release download v0.6.1-beta1 -p youmo-voice-v3.youmopack -p youmo-0.6.1-beta1.apk`，正式签名）：装测试版 1、导入 v3，再覆盖安装这一版的发布包；草稿删了、拿不到就 C 记阻塞，靠 JVM 的 `PackStoreChangedTest.aTestBuildsVoicePackV3StaysInUseTillTheReleasedV2ReplacesIt`。
 - **操作**：A：**资源包 → 导入资源包** 选语音包 v1。B：选文字包 v1；在问的框里点 **保留**；再导入一次 v1，这次点 **替换**；再导一次 v1，问框出来时转屏。C：先看资源包页和语音输入；再导入 `youmo-voice-v2.youmopack`，在问的框里点 **替换**。
 - **预期**：A：不弹问框，直接是结果框「<文件名> 是语音包 v1，这个版本的应用需要 v2 或更新的。」，下面写「原来的资源包没有变化。」，页上语音包仍是 v2（以前先问「手机上是更新的 v2，要换成 v1 吗？」，点 **替换** 后才说用不了）。B：复制开始前先弹框：第一行是选的文件名（如 `youmo-text-v1.youmopack`），空一行后是「手机上是更新的 v2，要换成 v1 吗？」，按钮 **替换**、**保留**；点 **保留** 后结果框是「文字包：保留了更新的 v2，没有导入 v1」，下面写「原来的资源包没有变化。」，没有「导入完成…可以删掉」，页上文字包仍是 v2；点 **替换** 后照常导入，结果「文字包：已用 v1 替换了更新的 v2」，下面是「导入完成。选的 .youmopack 文件已经用不到了，可以删掉。」；转屏后问框还在（只一个），按返回算保留。导入更新的或手机上没有的包不问。C：导入前页上语音包写「已导入 v3」，语音输入照常能用（不崩、不提示更新）；导入时先问「手机上是更新的 v3，要换成 v2 吗？」，点 **替换** 后结果「语音包：已用 v2 替换了更新的 v3」，页上变成「已导入 v2」，语音输入照常。
 - **JVM**：`PackStoreChangedTest.anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes`（问、保留、替换、新的不问）、`PackStoreChangedTest.anOlderPackThisBuildCannotUseIsRefusedWithoutAsking`（用不上的旧包不问、直接说要哪一版、什么都不复制；用得上的照问）；`PackStoreChangedTest.aTestBuildsVoicePackV3StaysInUseTillTheReleasedV2ReplacesIt`（C：测试版的 v3 照用、页上写 v3，导入 v2 先问、替换后用 v2）；`PacksUatTest.eachFilesOutcomeIsToldAndTheUserMayDeleteTheirFiles`（都保留时结果框说原来的没有变化、不说可以删掉）；`PackImportsTest.theReplaceQuestionWaitsForThePagesAnswerOneFileAtATime`（页上一次只问一个文件，等回答）、`aCancelledImportTakesItsQuestionDown`（取消导入时问框收起）；ime-core `PackShelfTest`（只读包头的清单、包头看得出这一版用不用得上）；问框是界面，设备上跑。
@@ -607,6 +607,12 @@
 - **操作**：覆盖安装要测的版本；弹出键盘；导入文字包；在 **备份与恢复** 里导入那份 0.5.2 的备份，按提示重启；打出学过的词；再覆盖安装一次（同一版或更新的版本）。
 - **预期**：第一次升级后，设置都在，键盘提示导入文字包；导入后能打字；导入 0.5.2 的备份后学过的词照常靠前。再升级一次，资源包还在，不用重新导入，学过的词仍靠前。
 - **JVM**：`PacksUatTest` 不覆盖升级；设备上见发版时的升级检查（用 debug 包从 0.5.2 的源码构建覆盖安装，方法见 `dev/design/060-asset-packs.md` 的「实现记录」）。
+
+### ST-195 [P0] 从 0.6.0 升级：文字包和语音包 v2 都还在，语音照常
+- **前提**：真机或模拟器上装 0.6.0 正式版（`dev/old-apks/v0.6.0/youmo-0.6.0.apk`，或 0.6.0 发布页的 APK），导入 0.6.0 发布的文字包 v1 和语音包 v2（0.6.0 发布页的 `youmo-text-v1.youmopack`、`youmo-voice-v2.youmopack`：`gh release download v0.6.0 -p 'youmo-*-v*.youmopack' -D dev/old-apks/v0.6.0`），给过麦克风权限，说一句确认语音能用；"下载"里有要测的版本的发布包 APK（正式签名，和 0.6.0 同一个签名，才能覆盖安装）。
+- **操作**：覆盖安装要测的版本；弹出键盘打几个字；打开 **资源包** 页；点麦克风说一句「今天天气不错」。
+- **预期**：升级后键盘直接能打字（不出「需要导入文字包」）；资源包页两行都写「已导入」（文字包 v1，语音包 v2），没有「需要更新到 vN」；麦克风照常听写，框里出现说的话（不提示要导入或更新语音包）。这一版的 `voice.minVersion` 是 2（`app/packs.properties`），0.6.0 的语音包 v2 用得上（docs/getting-started.md「从 0.6.0 升级：文字包和语音包都不用重新导入」）。
+- **JVM**：只读版本号的那一半见 ST-82 的 `PackStoreChangedTest`；覆盖安装要正式签名的两个版本，设备上发版时手工跑。
 
 ### ST-65 [P1] 资源包文件被改坏后提示重新导入
 - **前提**：B0（debug 包，导入了两个包）；用 `adb shell run-as` 把文字包里某个文件改掉一个字节（大小不变）。

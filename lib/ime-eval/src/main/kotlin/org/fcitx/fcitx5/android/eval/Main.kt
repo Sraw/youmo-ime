@@ -187,6 +187,13 @@ internal val COMMANDS = listOf(
         lines.forEach(out::appendLine)
         0
     },
+    Command("history", "<pinyin.data> <words> <history.txt>", 3..3) { args, _, _ ->
+        val (dataPath, words, outPath) = args.operands
+        // a history from the tree, for --history and run-on-device.sh's HISTORY (R27 F8530): the dictionary's likeliest words
+        val n = words.toIntOrNull()?.takeIf { it > 0 } ?: return@Command null
+        File(outPath).printWriter().use { w -> TypedHistory.likeliest(loadData(dataPath), n).forEach(w::println) }
+        0
+    },
     Command("predict-set", "<pinyin.data> <set.tsv> <predict.tsv>", 3..3) { args, _, _ ->
         val (dataPath, setPath, outPath) = args.operands
         // after each word of a pinyin set's sentences, what follows: for `predict`

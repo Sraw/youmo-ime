@@ -134,8 +134,11 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    dev/design/061-sp-abbrev.md §3.3): one word typed, read exactly as whole syllables then two or more keys alone
    (`HabitOrder.aloneShape`), goes first where the code reads no whole syllables to its end (`ufmuh`, `umuh`,
    `x'm`) and right after the first where it does (`ky` kuai, `xm` xian), or where a word typed reads whole
-   syllables then the last key alone (`yr|y` with 原因 typed: the gate, §3.4); up to three, the pins and the first
-   learned here before them, `FLOORED` after them, never `LIFTED`; such a word takes a slot of the order though
+   syllables then the last key alone (`yr|y` with 原因 typed: the gate, §3.4, decided once a decode over the
+   start's words typed, `HabitOrder.gate`, not by the candidates read so far, so a page further on never swaps the
+   first two); up to three, the pins and the first learned here before them, `FLOORED` still second (after the
+   first of them, or before them all where the code reads whole), never `LIFTED`, and none past the three lifted
+   either (`spellings` leaves a word read alone where it is); such a word takes a slot of the order though
    `ranksHere` fails (its reading has no slip). The review's M3 (no word typed under a code read whole) is gone.
    `GroupedShuangpinSegmenter` reads the keys alone too (§3.1), `T9Segmenter` (digits; with 连按
    on, off by default, a key pressed again soon is its next letter and nothing else, `MultiTap`: the
@@ -282,7 +285,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
 
 - **Kept in sentences** (`session/Enforced`, from `HabitOrder.enforce`): pins and the user's firsts
   of two or more characters (a first only after its word), and a word added by hand that is the only
-  word over its keys (`PinyinDecoder.arcsBetween`), are put into the decoder's sentences where the
+  word over its keys (`PinyinDecoder.arcsBetween`; where those keys read whole, 双拼's arcs over a key read alone
+  are not counted, so a word typed so read leaves the added one alone there), are put into the decoder's sentences where the
   sentence has word ends at both of theirs; two that overlap, neither. The sentences are taken of
   `moreSentences` (the beam's) so as many stay. This runs right after decoding, before the habit
   levels and the sentence models, so a pause cannot undo it. A pin or first over the whole input is
@@ -323,7 +327,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   `ALONE` where its path reads a key alone and `SLIPPED` where it reads a slip too (`Lattice.mark`); `takes()`
   holds back only `SLIPPED` under a code read whole. The words from the start are the best `DEFAULT_WORDS` (64) by
   score and, where the graph reads keys alone, up to `TYPED_SLOTS` (8) more of the words typed read with no slip
-  (`rankedWords`): on the grouped keyboards a word typed is otherwise not among the 64. Over a key alone the
+  (`rankedWords`): on the grouped keyboards a word typed is otherwise not among the 64. The slots stay right after
+  the first 64 whatever more is asked, so a list read further (`PinyinSession.readUntil`) begins with the one before. Over a key alone the
   decoder walks the dictionary node's children that have a word typed below (`collectTyped`,
   `UserWords.nextTypedBelow`, `TypedNodes.nextBelow`) instead of looking up each of the key's 20–60 syllables;
   `Reading.matched` walks a node's children the same way where they are few (`WALKED_PER_MATCH`). The lattice is
@@ -656,8 +661,8 @@ setting either: it reads the codes.
   spelling slip, not even ü typed with its own key (the user's 2026-11-03). With `neighbours` (纠错 on,
   061-neighbour-groups) it reads a key tapped by its neighbour's edge as that key, as `T9Segmenter` does
   over pinyin's groups: each key's touch onto the key meant (`slipped`), its cost `SlipCost`'s (floor −5 on the
-  18 and 14 keys, −3 on the nine keys' digits as on pinyin's; above); a pair read through a slip is marked `ABBREVIATED` and
-  carries its slips, as 全键盘 双拼's do.
+  18 and 14 keys, −3 on the nine keys' digits as on pinyin's; above); a pair read through a slip carries its slips,
+  its arc marked `SLIPPED`, as 全键盘 双拼's are.
   It and `T9Segmenter` are `KeyedSegmenter`s: `letters`, `isKey`, `asTyped`, `initialsOf` (the
   bar's initials: the scheme's initials on the key's letters, 自然码's v zh) and `started` (a
   syllable not whole yet shows as its initial in 双拼, as many letters on the nine keys).
@@ -1344,4 +1349,6 @@ candidates and pages the same as the design's prototype at every key. The cost i
 grouped keyboards; the nine and 14 keys' figures were accepted by the user 2026-11-17, optimisation later.
 `ShuangpinKeyWorkTest` holds the grouped keyboards' arcs and steps a quarter above what they read with 3000 words
 typed; the 6T is timed against `dev/design/061-sp-abbrev/6t-base.md` (p50, 小鹤, w3000: 18 keys 13.6 ms,
-14 keys 16.0, nine keys 21.3).
+14 keys 16.0, nine keys 21.3). w3000 is the design's draw of 3000 words by frequency (not in the tree); a history
+from the tree is `ime-eval history <pinyin.data> 3000 <words.txt>`, the likeliest 3000, typed on a device with
+`HISTORY=<words.txt> lib/ime-eval/run-on-device.sh` (specs/testing.md).

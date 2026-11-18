@@ -13,6 +13,7 @@ import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import androidx.lifecycle.lifecycleScope
 import androidx.paging.CombinedLoadStates
+import androidx.paging.LoadState
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -75,8 +76,12 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
     private var adapterSubmitJob: Job? = null
 
     private val loadStateListener: (CombinedLoadStates) -> Unit = {
-        val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
-        stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
+        // not while a load is under way: its append is not at the end only because no page is in yet, which taken for
+        // a list turned the empty history's hint into the bar's clear button over no rows till Room's query came back
+        if (it.refresh !is LoadState.Loading) {
+            val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
+            stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
+        }
     }
 
     private val adapter: ClipboardAdapter by lazy {

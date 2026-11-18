@@ -98,6 +98,9 @@ class UndoChip(
     /** Whether one is up, coming or going. */
     val showing: Boolean get() = window?.isShowing == true
 
+    /** Whether the one up holds an act 撤销 still takes back: one said in its place would lapse it. */
+    val holdsUndo: Boolean get() = state.holdsUndo
+
     /**
      * [message] said, with 撤销 doing [undo] if there is one. [aboveKeys]: docked, above the keyboard
      * whether or not the bar shows candidates (what the keyboard says, BaseInputView.say), not over the bar.

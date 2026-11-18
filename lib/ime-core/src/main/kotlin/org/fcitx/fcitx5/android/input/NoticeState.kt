@@ -16,6 +16,9 @@ class NoticeState<U : Any> {
 
     private var pending: U? = null
 
+    /** An act is still pending behind the notice shown (its 撤销 still works). */
+    val holdsUndo: Boolean get() = pending != null
+
     // the one shown is not put away by typing
     private var steady = false
 

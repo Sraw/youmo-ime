@@ -163,12 +163,18 @@ class PacksUatTest {
             TestShelves.use(text = true, voice = false)
             h.idle()
             assertNull("the keyboard types without the voice pack", gate(h))
-            // holding the space (voice input, the default): nothing, as 0.5.x's text build; no notice, nothing opened
+            // holding the space (voice input, the default): nothing, as 0.5.x's text build; no notice, nothing opened,
+            // and lifted it types one space as a tap would (R27 F8580: none or two passed before)
             val space = h.keyNamed("space")
+            h.api.calls.clear()
             val f = h.finger(space, h.at(space))
             h.advance(700)
             f.up(h.at(space))
             h.idle()
+            val spaces = h.api.calls.filter {
+                it.startsWith("sendKey") && "up=false" in it && ("sym=32," in it || "char= ," in it || "key=space," in it)
+            }
+            assertEquals(h.api.calls.toString(), 1, spaces.size)
             assertEquals(emptyList<String>(), h.noticeTexts())
             assertNull(opened())
             // the bar's microphone: the notice says which pack, and the page opens; no permission asked

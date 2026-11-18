@@ -640,8 +640,8 @@
 ### PY-147 [P1] 展开候选的翻页提示：头 3 次出，提示条停 2 秒，不盖候选
 - **前提**：B0（清过数据：提示还没出过），另外笔画筛选。
 - **操作**：在键上划先选滑行输入，打 shi 展开候选；收起，在键上划改回笔画筛选，打 shi 展开（第 1 次）；收起再展开两次（第 2、3 次）；再收起展开（第 4 次）。
-- **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，键盘上方弹出提示条「这里划笔画，翻页用右边 ↑↓」（在候选栏上面，不盖展开的候选），约 2 秒后收起（比只说一句的 1 秒长；划一笔就收起）。第 4 次起不再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
-- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、提示条在候选栏上面、2 秒）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上不跑。
+- **预期**：滑行输入时不出提示。笔画筛选的第 1–3 次展开，键盘上方弹出提示条「这里划笔画，翻页用右边 ↑↓」（在候选栏上面，不盖展开的候选），约 2 秒后收起（比只说一句的 1 秒长；划一笔就收起）。第 4 次起不再出。展开时如果正显示着带「撤销」的提示条（比如刚长按删了一个词），这次不出提示、也不算一次（不顶掉那条，撤销照样能点），下次展开再出。没有设置项。开着 TalkBack 触摸浏览时这一页不画笔画（AX-20），提示也不出、不计数。
+- **JVM**：`StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn`（计数、只在笔画筛选时算、提示条在候选栏上面、2 秒）、`StrokePageUatTest.theHintGoesAsAStrokeIsDrawnAndIsCountedOnlyOnceSaid`（划一笔收起；键盘没显示、有带撤销的提示条时不出不计，撤销还能点）；ime-core `PageStrokeTouchTest.theHintShowsTheFirstThreeTimesAPageDraws`；设备上不跑。
 
 ### PY-148 [P1] 键上不画笔画的时候，展开候选照旧拖着翻
 - **前提**：B0。

@@ -51,7 +51,6 @@ import org.fcitx.fcitx5.android.ui.main.settings.UserWordsFragment
 import org.fcitx.fcitx5.android.until as waitUntil
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -421,37 +420,6 @@ class SettingsPagesUatTest {
         until("recent first") { shown().indexOf("鲸喵屿") in 0 until shown().indexOf("汪小明") }
         open(SettingsRoute.UserWordList(UserWord.Kind.BLOCKED.name))
         until("blocked") { "是" in shown() }
-    }
-
-    @Test
-    @Uat("VO-15")
-    fun theVoiceModelsDataIsCredited() {
-        open(SettingsRoute.License)
-        until("listed") { preferences((page as PreferenceFragmentCompat).preferenceScreen ?: return@until false).size > 3 }
-        val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        // credited in every build: the voice input is (its models the voice pack's)
-        fun credited(title: String, licence: String, url: String): () -> Unit = {
-            val pref = prefs.firstOrNull { it.title == title }
-            assertNotNull(title, pref)
-            assertEquals(title, licence, pref!!.summary.toString())
-            pref.performClick()
-            idle()
-            assertEquals(title, url, shadowOf(activity).nextStartedActivity.dataString)
-        }
-        assertRows(
-            "the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice" to
-                credited("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
-            "the polish tagger is trained on non-commercial data: the voice pack is CC BY-NC-SA, apart from the app's code" to
-                credited(s(R.string.voice_tagger_credit), "CC-BY-NC-SA-4.0", "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
-            "MagicData-RAMC, its transcripts trained on: non-commercial, no derivatives" to
-                credited("MagicData-RAMC (Magic Data Technology)", "CC-BY-NC-ND-4.0", "https://www.openslr.org/123/"),
-            "RealTalk-CN, trained on: non-commercial, share-alike" to
-                credited("RealTalk-CN (BAAI)", "CC-BY-NC-SA-4.0", "https://huggingface.co/datasets/BAAI/RealTalk-CN"),
-            "CS2W, trained on: its sentences RAMC's" to
-                credited("CS2W (Guo et al., EMNLP 2023; sentences from MagicData-RAMC)", "CC-BY-SA-4.0", "https://github.com/guozishan/CS2W"),
-            "the tagger was fine-tuned from Chinese ELECTRA small, Apache-2.0" to
-                credited("Chinese ELECTRA (hfl/chinese-electra-180g-small-ex-discriminator)", "Apache-2.0", "https://github.com/ymcui/Chinese-ELECTRA"),
-        )
     }
 
     private fun listedPage(what: LearningOp.Listed, items: List<ListedItem>) {

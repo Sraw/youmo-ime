@@ -24,20 +24,13 @@ import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.learn.Code
-import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
-import org.fcitx.fcitx5.android.engine.learn.Row
-import org.fcitx.fcitx5.android.engine.learn.Word
-import org.fcitx.fcitx5.android.engine.learn.Words
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
-import org.fcitx.fcitx5.android.engine.user.HabitCounts
+import org.fcitx.fcitx5.android.engine.user.HistoryLines
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.junit.Assert.assertEquals
@@ -59,10 +52,12 @@ import java.io.File
  * anything learned, the counts typing adds to the dictionary's own words among it (`learnedLogs`),
  * unless `-e evalLearned true` asks to score on them.
  *
- * `-e evalHistory <name>` types on a history instead: the test assets' <name>.txt, words typed before the run as
- * `ime-eval pinyin --history` reads them (TypedHistory), each counted once as typed. It replaces the app's
- * learning record with them before the engine starts, so it implies `evalLearned`; for timing what hangs on
- * typed words (双拼's keys read alone, 简拼 in the middle, HabitOrder) on a phone.
+ * `-e evalHistory <name>` types on a history instead: <name>.txt in the app's eval dir (run-on-device.sh's
+ * HISTORY pushes it there) or else in the test assets, words typed before the run as `ime-eval pinyin --history`
+ * reads them (HistoryLines), each counted once as typed; for timing what hangs on typed words (双拼's keys read
+ * alone, 简拼 in the middle, HabitOrder) on a phone. It replaces the app's learning record with them before the
+ * engine starts, so a learning record is no reason to stop then; words of the app's own or other logs still are,
+ * unless `evalLearned`: the history does not replace them (R27 F8531).
  */
 class EngineEvalRunner {
 
@@ -108,7 +103,7 @@ class EngineEvalRunner {
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
         val out = File(dir, "$set-$ime.tsv")
         history?.let { name ->
-            val lines = testContext.assets.open("$name.txt").bufferedReader().readLines()
+            val lines = historyLines(dir, testContext, name)
             val counted = writeHistory(File(context.filesDir, ENGINE_USER_DIR), lines)
             android.util.Log.i("EngineEvalRunner", "history $name: $counted words of ${lines.count { it.isNotBlank() }} lines")
         }
@@ -127,9 +122,10 @@ class EngineEvalRunner {
                 // scores of an app that learned are not comparable: see the class's KDoc
                 val ownWords = fcitx.userWordCounts().filterValues { it > 0 }
                 // read after userWordCounts, which opens pinyin's log and fills a new one from libime's
-                val logs = learnedLogs(File(context.filesDir, ENGINE_USER_DIR))
+                // the history's own record is the one learning there may be
+                val logs = learnedLogs(File(context.filesDir, ENGINE_USER_DIR)).filter { history == null || it.name != LearnLog.FILE }
                 val learned = ownWords.isNotEmpty() || logs.isNotEmpty()
-                check(!learned || history != null || args.getString("evalLearned") == "true") {
+                check(!learned || args.getString("evalLearned") == "true") {
                     "the app has learned (words $ownWords, logs ${logs.map { it.name }}): clear its data (adb shell pm clear), " +
                         "or pass -e evalLearned true to score on them"
                 }
@@ -213,51 +209,30 @@ class EngineEvalRunner {
         return fcitx.getCandidates(0, CANDIDATES).map { it.text }
     }
 
+    // the history [name]: pushed to the eval dir [dir] by run-on-device.sh's HISTORY, or a test asset
+    private fun historyLines(dir: File, testContext: android.content.Context, name: String): List<String> {
+        val pushed = File(dir, "$name.txt")
+        if (pushed.isFile) return pushed.readLines()
+        val asset = runCatching { testContext.assets.open("$name.txt") }.getOrNull()
+        return requireNotNull(asset) { "evalHistory $name: no $name.txt in ${dir.path} nor in lib/ime-eval/data (run-on-device.sh HISTORY=<file.txt> pushes one)" }
+            .bufferedReader().use { it.readLines() }
+    }
+
     /**
-     * Replaces the learning record in [dir] with [lines], a history as `TypedHistory.count` in :lib:ime-eval counts
-     * it (this APK cannot depend on it): each word committed whole once, today, at the reading given or at each
-     * reading the dictionary has of a text alone; a text the dictionary lacks so read is none.
+     * Replaces the learning record in [dir] with [lines], a history counted as `ime-eval --history` counts it
+     * (HistoryLines, shared: the timings compare only so): each word committed whole once, today.
      * @return how many were counted
      */
     private fun writeHistory(dir: File, lines: List<String>): Int {
         val data = PinyinData.load(AppData.map(InputMethodCatalog.PINYIN_DATA), verify = false)
-        val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
-        val wanted = lines.filter { it.isNotBlank() }.map { it.split('\t') }
-        val readings = HashMap<String, ArrayList<String>>()
-        wanted.filter { it.size == 1 }.forEach { readings[it[0]] = ArrayList(1) }
-        if (readings.isNotEmpty()) {
-            // each word of the dictionary at its reading, as TypedHistory.forEachWord walks it
-            val dictionary = data.dictionary
-            val path = ArrayList<String>()
-            fun walk(node: Int) {
-                if (path.isNotEmpty()) {
-                    val reading = path.joinToString(" ")
-                    for (w in 0 until dictionary.wordCount(node)) readings[data.vocabulary.word(dictionary.word(node, w))]?.add(reading)
-                }
-                val first = dictionary.firstChild(node)
-                for (child in first until first + dictionary.childCount(node)) {
-                    path += Syllables.spelling(dictionary.syllable(child))
-                    walk(child)
-                    path.removeAt(path.size - 1)
-                }
-            }
-            walk(dictionary.root)
-        }
+        val rows = HistoryLines.rows(UserModel(data.dictionary, data.vocabulary, index = data.wordIndex), data, lines)
         dir.mkdirs()
-        val file = File(dir, LearnLog.FILE)
-        file.delete()
-        var counted = 0
+        File(dir, LearnLog.FILE).delete()
         LearnLog(JvmFiles(dir).file(LearnLog.FILE)).use { log ->
             log.open()
-            for (line in wanted) {
-                for (reading in if (line.size > 1) listOf(line[1]) else readings.getValue(line[0])) {
-                    if (HabitCounts.entry(line[0], reading)?.let(user::known) ?: NO_WORD == NO_WORD) continue
-                    log.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.FULL, reading.replace(" ", "")), "", Words(listOf(Word(line[0], reading))), 'A', Row.DICTIONARY, "")))
-                    counted++
-                }
-            }
+            rows.forEach { log.record(listOf(it)) }
         }
-        return counted
+        return rows.size
     }
 
     /** Same layout and cleaning as `RunResultFormat` in :lib:ime-eval, which this APK cannot depend on. */

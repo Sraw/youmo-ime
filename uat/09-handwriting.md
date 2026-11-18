@@ -180,7 +180,7 @@
 ### HW-41 [P0] 点工具栏「手写」开、关
 - **前提**：B0。
 - **操作**：点「普通文本」框，点工具栏的 **手写**；在 26 键字母上写「人」，停笔，点空格；再点工具栏的 **手写**，点 q。
-- **预期**：点后按钮亮起，字母变淡；写出「人」，空格后框里是「人」。再点按钮熄灭，字母恢复，点 q 打出 q（编码处是 q）。
+- **预期**：点后按钮亮起，字母变淡；写出「人」，空格后框里是「人」。再点 **手写**（空格后候选栏出联想时，它在候选栏右端）：按钮不见了（在工具栏上点的是熄灭），字母恢复，点 q 打出 q（编码处是 q）。
 - **JVM**：`HandwritingUatTest.theToolbarsButtonTurnsHandwritingOffAndOn`（点了关：按钮不再勾选、字母不淡；再点：开）、`KeyHandwritingUatTest.aStrokeOnTheLettersIsReadAsTheInputMethodsHandwritingNoKeyPressed`、`KeyHandwritingUatTest.turnedOffTheLettersAreTyped`；设备上也跑（截图给人看淡掉的字母）。
 
 ### HW-42 [P0] 点一下字母区是一个点，接着写成「主」

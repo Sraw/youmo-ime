@@ -11,7 +11,7 @@ case("MN-02", needs="jvm:MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOl
 case("MN-03", needs="jvm:MotionNoticeUatTest.floatingAtTheLeftTheNoticeGoesRight")(lambda d: None)
 
 
-case("MN-04", needs="jvm:MotionNoticeUatTest.clipboardDeleteUndoneOnTheNoticeInEitherTheme")(lambda d: None)
+case("MN-04", needs="jvm:MotionNoticeUatTest.clipboardDeleteUndoneOnTheNoticeInEitherTheme、UndoChipTest.aNoticeWithUndoIsAsTallAsOneThatOnlySays")(lambda d: None)
 
 
 case("MN-10", needs="jvm:MotionNoticeUatTest.theDockedHandleUnderOrOverTheKeysTheKeysAsTall")(lambda d: None)

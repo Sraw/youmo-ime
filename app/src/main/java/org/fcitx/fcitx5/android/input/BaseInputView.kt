@@ -265,6 +265,9 @@ abstract class BaseInputView(
     fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false, ms: Long? = null) =
         notice(message, undo, aboveKeys = true, steady, ms)
 
+    /** Whether the notice up holds an act its 撤销 still takes back ([UndoChip.holdsUndo]): a tip [say]s nothing over it. */
+    val holdsUndo: Boolean get() = undoChip?.holdsUndo == true
+
     private val chipTyping = ChipTyping()
 
     private fun typed(event: HostEvent) {

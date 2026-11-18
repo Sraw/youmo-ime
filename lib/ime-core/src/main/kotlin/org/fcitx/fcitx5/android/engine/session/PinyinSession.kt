@@ -883,7 +883,7 @@ class PinyinSession(
         // a sentence the user blocked whole as it reads (its words blocked one by one are the decoder's to leave out)
         // left out of what the habits put in too: a sentence used before would come back by them
         val sentenceBlocked = { c: Candidate -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }
-        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere, l.recorded) }, pageSize)
+        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere, l.recorded, l.gate) }, pageSize)
         val read = ordered.list
         // a phrase of order k a place down where a pin leads: the pin stays first (U-83)
         val withPhrases = { list: List<Candidate> ->

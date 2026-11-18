@@ -83,6 +83,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 打开 **自定义短语** 或 **常用词** 页时，底部会弹「已添加 N 个项目 / 撤销」，点了撤销就把已有的短语、常用词全删了（0.6.0 就有）。现在打开不再弹；常用词导入后也不再弹那个连导入前的词一起删掉的撤销。
 - 导入比手机上旧、这个版本又用不了的资源包（比如手机上是语音包 v2，选了 0.6.0 测试版 1 的 v1）时，会先问要不要替换，点了 **替换** 才说用不了；现在不问，直接说需要哪一版。
 - 笔画筛选按大陆规范笔顺筛（和字卡上的笔顺一样）：以前也算笔画表里的台湾笔顺，九键打 wang 画一撇还留着「艳」（大陆一横起笔），画一折会留下「小」「少」这类字，常用字里约 470 个这样多出来。表里没有大陆笔顺的一些字（大多是繁体和生僻字）照旧几种笔顺哪种都算。
+- 剪贴板是空的时候打开剪贴板，不再先闪一下「清空」按钮再出「试着复制些东西」。
 
 ### Main changes
 
@@ -157,6 +158,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Opening **Custom phrases** or **Common words** showed "Added N item(s) / Undo" at the bottom, and Undo deleted the phrases or words already there (in 0.6.0 too). Opening them no longer shows it, nor does importing common words, whose Undo deleted the words there before the import as well.
 - Importing a resource pack older than the phone's that this version cannot use (0.6.0 test build 1's voice pack v1 over v2) first asked whether to replace it, and said it could not be used only after **Replace**; it now says at once which version is needed.
 - The stroke filter goes by the mainland's stroke order (the one the character card shows): it used to take the stroke table's Taiwan orders as well, so on the nine keys wang with a 撇 still kept 艳 (whose mainland order starts with 横), and a 折 kept 小, 少 and the like, some 470 common characters in all. Characters with no mainland order (most of them traditional or rare) still count in any of their orders.
+- Opening an empty clipboard no longer flashes the clear button before the "Try copying something" hint.
 
 ---
 

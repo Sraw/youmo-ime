@@ -860,6 +860,9 @@ case("ST-67", needs="release:覆盖安装 0.5.x→0.6.0 和恢复 0.5.x 的备�
 case("ST-64", needs="release:要上一版（0.5.2）的包覆盖安装、它导出的备份带学过的词；方法见 dev/design/060-asset-packs.md 的实现记录")(lambda d: None)
 
 
+case("ST-195", needs="release:发版时手工跑：装 0.6.0 正式版并导入它的文字包 v1、语音包 v2（dev/old-apks/v0.6.0），覆盖安装这一版的发布包，两个包都还在、语音照常")(lambda d: None)
+
+
 case("ST-65", needs="jvm:PacksUatTest.aPackDamagedSinceItsImportIsSaidSoAndImportedAgainMended")(lambda d: None)
 
 
@@ -2307,9 +2310,13 @@ def st149(d):
     import_layout(d, "uat-not-text")
     check(d.wait_text("这个文件不是布局", timeout=8, where="all", contains=True), f"没说不是布局：{d.screen().texts('all')[:10]}")
     d.tap_text("确定", where="all", scroll=False, after=1.5)
-    debuggable(d, "看 files/layouts")
+    said = "不合格的列出「显示的字太长」；不是文字的说不是布局"
+    # the files only: a release build has no run-as, and what is seen above stands on it (R27 F8533)
+    import uat
+    if uat.BUILD == "release":
+        return said + "；正式包不能 run-as，没查 files/layouts（JVM 的 CustomLayoutsTest 查不留文件）"
     check(d.sh(f"run-as {PKG} ls files/layouts 2>/dev/null").strip() == "", "拒绝后留下了文件")
-    return "不合格的列出「显示的字太长」；不是文字的说不是布局；什么都没留下"
+    return said + "；什么都没留下"
 
 
 @case("ST-150", base="B0-设置", mutates=True)

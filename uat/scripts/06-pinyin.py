@@ -844,7 +844,7 @@ case("PY-145", needs="jvm:StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePag
 case("PY-146", needs="jvm:StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing、StrokePageUatTest.aLongPressStillOpensTheCandidatesMenu")(lambda d: None)
 
 
-case("PY-147", needs="jvm:StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn")(lambda d: None)
+case("PY-147", needs="jvm:StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn、StrokePageUatTest.theHintGoesAsAStrokeIsDrawnAndIsCountedOnlyOnceSaid")(lambda d: None)
 
 
 case("PY-148", needs="jvm:StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore、StrokePageUatTest.aMouseDragOrATrackpadSwipeDrawsNone")(lambda d: None)

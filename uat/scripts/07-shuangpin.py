@@ -61,7 +61,7 @@ case("SP-31", needs="jvm:ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllab
 case("SP-32", needs="jvm:ShuangpinUatTest.aWordTypedByItsInitialsOnly")(lambda d: None)
 
 
-case("SP-33", needs="jvm:ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys")(lambda d: None)
+case("SP-33", needs="jvm:ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys、PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack")(lambda d: None)
 
 
 case("SP-34", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
@@ -88,7 +88,7 @@ case("SP-46", needs="jvm:ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone、Shu
 case("SP-55", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell、HabitRankerTest.wordsTypedReadAloneGoBeforeOrAfterTheFirstByHowTheCodeReads")(lambda d: None)
 
 
-case("SP-56", needs="jvm:ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull")(lambda d: None)
+case("SP-56", needs="jvm:ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.theGateIsOpenedByAWordTypedPastTheFirstWordsRead")(lambda d: None)
 
 
 case("SP-58", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、ShuangpinUatTest.microsoftsSemicolonAfterAKeyAloneReadsAsBefore、PinyinSessionAbbrevGroupedTest.theNineKeysOneKeyReadsAsTheSeparator")(lambda d: None)
@@ -207,20 +207,23 @@ def sp47(d):
 @case("SP-57", base="B0-双拼", mutates="learn")
 def sp57(d):
     # 自然码 ky (kuai), 可以 typed: y tapped by its right edge (toward u, ky read as ku too) and in its middle; the word
-    # typed among the first 10 by the edge (uat/07-shuangpin.md), right after the first in the middle
+    # typed among the first 10 by the edge with ku's 苦 there too (uat/07-shuangpin.md), right after the first in the middle
     d.type("keyi")
     d.pick("可以")
     d.clear()
     keys_at(d, "ky", [None, (0.95, 0.5)])
-    edge = d.all_cands()
+    # two pages: the slip's own reading, ku, is ranked by its score, maybe past the first (R27 F8572)
+    edge = d.all_cands(pages=2)
     d.shot("kb", "自然码 k、y 靠 u 点（打过「可以」）：第一页有「可以」")
     d.clear()
     keys_at(d, "ky", [None, None])
     mid = d.all_cands()
     d.clear()
     check("可以" in edge[:10], f"y 靠 u 点的 k y，前 10 个没有「可以」：{edge[:12]}")
+    # 苦 alone is ku's only: the slip's reading kept beside the word typed, not dropped for it
+    check("苦" in edge, f"y 靠 u 点的 k y，候选里没有 ku 的「苦」：{edge[:24]}")
     check(mid[1:2] == ["可以"], f"两个键都点在正中的 k y，「可以」不是第二：{mid[:6]}")
-    return f"靠边 {edge[:6]}；正中 {mid[:3]}"
+    return f"靠边 {edge[:6]}（有「苦」）；正中 {mid[:3]}"
 
 
 @case("SP-51", base="B0-18键", mutates=True, visual=True)

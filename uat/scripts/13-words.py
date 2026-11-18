@@ -748,15 +748,16 @@ def wd37(d):
     pick_in_download(d, "phrases.txt", after=0.1)
     bar = d.wait(lambda x: x if x.find(contains="导入了 1 条短语") else None, timeout=5, step=0.2,
                  what="提示条「导入了 1 条短语」")
-    d.shot("full", "导入后页底一个提示条：导入了 1 条短语 / 撤销",
-           png=d.adb("exec-out", "screencap", "-p", binary=True))
-    check(not bar.find(contains="已添加"), f"没有「已添加」：{bar.texts()}")
-    check(bar.find(text="撤销"), f"提示条带撤销：{bar.texts()}")
-    shown = d.all_texts()
+    # the bar is up 2.75 s (LENGTH_LONG): the list read off the screen the wait returned (two phrases, one
+    # screen), 撤销 tapped at once; its picture is taken at the second import, raced by nothing (R27 F8547)
+    shown = bar.texts()
+    undo = bar.find(text="撤销")
+    check(not bar.find(contains="已添加"), f"没有「已添加」：{shown}")
+    check(undo, f"提示条带撤销：{shown}")
     check(sum("北京市海淀区" in t for t in shown) == 1, f"导入后 dz 只有一条：{shown}")
     check(any("上海" in t for t in shown), f"导入后有 sh →「上海」：{shown}")
     d.step("撤销")
-    d.tap_text("撤销", after=0.8)
+    d.tap(undo.c, 0.8)
     shown = d.all_texts()
     check(not any("上海" in t for t in shown), f"撤销后 sh 没了：{shown}")
     check(sum("北京市海淀区" in t for t in shown) == 1, f"撤销后 dz 还在：{shown}")
@@ -766,6 +767,8 @@ def wd37(d):
     pick_in_download(d, "phrases.txt", after=0.1)
     d.wait(lambda x: x if x.find(contains="导入了 1 条短语") else None, timeout=5, step=0.2,
            what="再导入的提示条")
+    d.shot("full", "导入后页底一个提示条：导入了 1 条短语 / 撤销",
+           png=d.adb("exec-out", "screencap", "-p", binary=True))
     shown = d.all_texts()
     check(any("上海" in t for t in shown) and sum("北京市海淀区" in t for t in shown) == 1, f"再导入后列表 {shown}")
     d.step("离开再回来")

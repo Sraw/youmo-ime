@@ -9,10 +9,12 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.WordLayers
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -432,6 +434,19 @@ class MainTest {
         assertTrue(toldCrashed, "readings: the run failed" in toldCrashed)
     }
 
+    // a history made from the tree (R27 F8530): the likeliest words with their readings, as --history and the device read them
+    @Test
+    fun aHistoryIsTheDictionarysLikeliestWords() {
+        val data = dataFile()
+        val history = File(tmp.root, "history.txt")
+        assertEquals(0, exit("history", data.path, "2", history.path))
+        assertEquals(listOf("你\tni", "好\thao"), history.readLines())
+        // read back as --history reads it: each line a word of the dictionary counted
+        val read = PinyinData.load(ByteBuffer.wrap(data.readBytes()))
+        assertEquals(2, TypedHistory.count(UserModel(read.dictionary, read.vocabulary, index = read.wordIndex), read, history.readLines()))
+        assertNotEquals(0, exit("history", data.path, "0", history.path))
+    }
+
     // a dictionary's text compiled as the app compiles one: its words typed as the app offers them
     @Test
     fun aMergedDictionarysWordsAreOffered() {
@@ -512,6 +527,16 @@ class MainTest {
         val free = candidates("--sp-abbrev", "0")
         val dear = candidates("--sp-abbrev", "-4")
         assertTrue("$free $dear", free.indexOf("什么时候") in 0 until dear.indexOf("什么时候"))
+        // a grouped keyboard's segmenter takes it too (R27 F8542): off was measured on, had it dropped it. On the 18 keys
+        // u, m and h are keys of one letter, so ufmuh reads as on the 26 (only f shares fg): off, no whole syllable reaches it
+        assertEquals(listOf("u", "m", "h"), "umh".map { NineKeyLetters.G18.letters(NineKeyLetters.G18.key(it)) })
+        val g18 = tmp.newFile("set18.tsv").apply { writeText("${"ufmuh".map(NineKeyLetters.G18::key).joinToString("")}\t什么时候\tdaily\n") }
+        fun grouped(vararg abbrev: String): List<String> {
+            assertEquals(0, exit("pinyin", data.path, g18.path, result.path, "--scheme", "ziranma-18", *abbrev, "--history", history.path, "--threads", "1"))
+            return result.useLines { RunResultFormat.parse(it) }.single().candidates
+        }
+        grouped().let { assertTrue("$it", "什么时候" in it) }
+        assertFalse("什么时候" in grouped("--sp-abbrev", "off"))
     }
 
     @Test
