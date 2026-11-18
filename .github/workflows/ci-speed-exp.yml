@@ -1,0 +1,42 @@
+name: CI speed experiment
+on:
+  push:
+    branches: [ci/speed-exp]
+permissions:
+  contents: read
+jobs:
+  exp:
+    name: ${{ matrix.id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: a35-base,      sdk: robolectric-35, task: ":app:testDebugUnitTest :app:koverLogDebug", props: "-PtestForks=2" }
+          - { id: a35-forks3,    sdk: robolectric-35, task: ":app:testDebugUnitTest :app:koverLogDebug", props: "-PtestForks=3" }
+          - { id: a35-forks3-fe150, sdk: robolectric-35, task: ":app:testDebugUnitTest :app:koverLogDebug", props: "-PtestForks=3 -PtestForkEvery=150" }
+          - { id: a35-nokover,   sdk: robolectric-35, task: ":app:testDebugUnitTest", props: "-PtestForks=2 -PnoKover" }
+          - { id: a29-base,      sdk: robolectric-29, task: ":app:testDebugUnitTestAt29", props: "-PtestForks=2" }
+          - { id: a29-nokover,   sdk: robolectric-29, task: ":app:testDebugUnitTestAt29", props: "-PtestForks=2 -PnoKover" }
+          - { id: a29-forks3-fe150-nokover, sdk: robolectric-29, task: ":app:testDebugUnitTestAt29", props: "-PtestForks=3 -PtestForkEvery=150 -PnoKover" }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+      - uses: ./.github/actions/setup-build
+        with:
+          cmake: "true"
+          downloads: restore
+          robolectric: ${{ matrix.sdk }}
+      - name: Build what the tests need
+        env: { BUILD_ABI: x86_64 }
+        run: ./gradlew --build-cache ${{ matrix.props }} :app:compileDebugUnitTestKotlin :app:compileEngineData :app:compileEngineTables :app:processDebugUnitTestJavaRes
+      - name: Tests
+        env: { BUILD_ABI: x86_64 }
+        run: |
+          (while sleep 3; do free -m | awk 'NR==2{print $3}'; done > mem.txt) &
+          ./gradlew --build-cache --continue -PskipExhaustive ${{ matrix.props }} ${{ matrix.task }} || echo "::warning::tests failed"
+          echo "peak used MB: $(sort -n mem.txt | tail -1)"
+          nproc; free -m

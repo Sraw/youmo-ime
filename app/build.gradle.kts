@@ -18,10 +18,12 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
+if (project.hasProperty("noKover")) kover { currentProject { instrumentation { disabledForAll.set(true) } } }
+
 // What every app unit test task runs with, AGP's (testOptions.unitTests.all) and testDebugUnitTestAt29
 fun Test.unitTestSettings() {
     maxHeapSize = "3g"
-    forkEvery = 40
+    forkEvery = project.findProperty("testForkEvery")?.toString()?.toLong() ?: 40
     // two test JVMs at once (-PtestForks=<n>): CI's runner has 4 cores and 16 GB, each JVM up to 3 GB
     // beside Gradle's 2; a run one at a time took 14 min there
     maxParallelForks = project.findProperty("testForks")?.toString()?.let {
