@@ -655,6 +655,12 @@
 - **预期**：筛空时这一页留着，是空的（以前会收起）；⌫ 撤回最后一笔，候选回来；拼音删完时收起，回到键盘。
 - **JVM**：`StrokePageUatTest.aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack`。
 
+### PY-157 [P1] 画完笔画停一下再点候选：上屏的就是点的那个
+- **前提**：B0，另外笔画筛选；**通用输入 → 性能档位** 是默认的高档。先让 nizai 的第一页被学过的词占满：打 nizai，选「你在」并在长按菜单里置顶；再选几次别的 nizai 候选（如「你再」「拟在」）。
+- **操作**：打 nizai，在键上划一撇（「你」开头的词都留下），看候选；停 2 秒（等高档把候选再精挑一遍）；再看候选，点一个不是第一个的。重复几次，每次点不同位置。
+- **预期**：停顿后候选可以重新筛一遍、顺序可以变，但点哪个就上屏哪个，不会上屏一个没显示过或笔画不符的词（0.6.1 用户实录：九键微软双拼 gj 划折，点「好看」上屏「估计」、点「敢」上屏「参加」）。
+- **JVM**：`StrokeFilterRefineTest.aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped`（ime-core：真 PinyinSession，置顶词占满第一页，Refine 只重排第一页之后）、`StrokeFilterTest`（只重排第一页之后时重新筛并用 Select 点；会话悄悄错位时 Pick/Forget/why 仍落在原来的词上；候选消失时不上屏并重新筛）；设备上停顿时机不好控制，只做冒烟。
+
 ### PY-105 [P1] 拼音 18 键
 - **前提**：B0，在 **输入法 → 拼音** 里把 **键盘** 选成「18 键」，回测试页点「普通文本」框。
 - **操作**：看键盘；点 N（BN 键）I（IO 键）H（H 键）A（A 键）O（IO 键），看编码行和候选；点「你好」。

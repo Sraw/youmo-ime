@@ -252,7 +252,9 @@ class StrokeFilterTest {
         val looked = pinyin.asked.size
         assertTrue(looked > 0)
         assertEquals("yang 乛", filter.apply(Action.Refine).preedit)
-        assertEquals(looked, pinyin.asked.size)
+        // one read of those looked through, to tell they are as they were
+        assertEquals(looked + 1, pinyin.asked.size)
+        assertEquals(0 to yang.size, pinyin.asked.last())
         // a reread may change the order anywhere: looked through again, the same as before
         assertEquals("yang 乛", filter.reread()?.preedit)
         val reread = pinyin.asked.size
@@ -283,6 +285,61 @@ class StrokeFilterTest {
         assertEquals(listOf("望", "养", "羊", "🐑"), f.candidates(0, 10).map { it.text })
         f.apply(Action.Select(0))
         assertEquals(Action.Pick(5), p.actions.last())
+    }
+
+    @Uat("PY-157")
+    @Test
+    fun aRefineThatReordersOnlyPastThePageTheSessionShowsIsFilteredAgain() {
+        val p = FakePinyin(mapOf("yang" to yang))
+        val f = StrokeFilter(p, { strokes }, pageSize = 3)
+        "yang".forEach { f.apply(Action.Key(it)) }
+        f.apply(Action.Stroke('n'))
+        assertEquals(listOf("养", "羊", "🐑", "望"), f.candidates(0, 10).map { it.text })
+        // the session's first page as it was, 🐑 moved after 网 past it
+        p.words["yang"] = listOf("样", "杨", "Yang", "养", "羊", "王", "望", "网", "🐑")
+        f.apply(Action.Refine)
+        assertEquals(listOf("养", "羊", "望"), f.candidates(0, 10).map { it.text })
+        assertEquals("望", f.apply(Action.Select(2)).commit)
+        assertEquals(Action.Pick(6), p.actions.last())
+    }
+
+    @Uat("PY-157")
+    @Test
+    fun aCandidateGoneFromTheSessionUnderTheStrokesPutsNothingUpAndIsLookedForAgain() {
+        val p = FakePinyin(mapOf("yang" to yang))
+        val f = StrokeFilter(p, { strokes }, pageSize = 3)
+        "yang".forEach { f.apply(Action.Key(it)) }
+        f.apply(Action.Stroke('n'))
+        assertEquals("羊", f.candidates(1, 1).single().text)
+        // the session dropped 羊 with nothing told
+        p.words["yang"] = yang - "羊"
+        val actions = p.actions.size
+        assertEquals("", f.apply(Action.Pick(1)).commit)
+        assertEquals(actions, p.actions.size)
+        assertTrue(f.filtering)
+        assertEquals(listOf("养", "🐑", "望"), f.candidates(0, 10).map { it.text })
+    }
+
+    @Uat("PY-157")
+    @Test
+    fun aCandidateTheSessionMovedUnderTheStrokesIsPickedAndPressedWhereItIsNow() {
+        val p = FakePinyin(mapOf("yang" to yang))
+        val f = StrokeFilter(p, { strokes }, pageSize = 3)
+        "yang".forEach { f.apply(Action.Key(it)) }
+        f.apply(Action.Stroke('n'))
+        // the session's list moved with nothing told: each kept is one place down
+        p.words["yang"] = listOf("王") + yang
+        f.why(1)
+        assertEquals(listOf(5), p.whys)
+        f.apply(Action.Forget(2))
+        assertEquals(Action.Forget(6), p.actions.last())
+        val q = FakePinyin(mapOf("yang" to yang))
+        val g = StrokeFilter(q, { strokes }, pageSize = 3)
+        "yang".forEach { g.apply(Action.Key(it)) }
+        g.apply(Action.Stroke('n'))
+        q.words["yang"] = listOf("王") + yang
+        assertEquals("羊", g.apply(Action.Pick(1)).commit)
+        assertEquals(Action.Pick(5), q.actions.last())
     }
 
     @Test

@@ -63,6 +63,8 @@ class StrokeFilter(
     // [session]'s candidates kept so far, of the first [scanned] looked through; [done] once there are no more to look at
     private val kept = ArrayList<Kept>()
     private var scanned = 0
+    // the texts of [session]'s first [scanned], as looked through: a refine may reorder them past the page it shows
+    private val seen = ArrayList<String>()
     private var done = false
 
     // whether the candidate before the next to look at was kept: a mark or an emoji goes as it went
@@ -103,15 +105,15 @@ class StrokeFilter(
         if (!filtering) session.candidates(from, count) else (from until from + count).mapNotNull { keptAt(it)?.choice }
 
     override fun offers(index: Int): Set<Offer> =
-        if (!filtering) session.offers(index) else keptAt(index)?.let { session.offers(it.index) }.orEmpty()
+        if (!filtering) session.offers(index) else at(index)?.let { session.offers(it) }.orEmpty()
 
-    override fun readingOf(index: Int): List<WordReading>? = if (!filtering) session.readingOf(index) else keptAt(index)?.let { session.readingOf(it.index) }
+    override fun readingOf(index: Int): List<WordReading>? = if (!filtering) session.readingOf(index) else at(index)?.let { session.readingOf(it) }
 
-    override fun why(index: Int): Why? = if (!filtering) session.why(index) else keptAt(index)?.let { session.why(it.index) }
+    override fun why(index: Int): Why? = if (!filtering) session.why(index) else at(index)?.let { session.why(it) }
 
-    override fun blockScope(index: Int): BlockScope? = if (!filtering) session.blockScope(index) else keptAt(index)?.let { session.blockScope(it.index) }
+    override fun blockScope(index: Int): BlockScope? = if (!filtering) session.blockScope(index) else at(index)?.let { session.blockScope(it) }
 
-    override fun lookedUp(index: Int): String? = if (!filtering) session.lookedUp(index) else keptAt(index)?.let { session.lookedUp(it.index) }
+    override fun lookedUp(index: Int): String? = if (!filtering) session.lookedUp(index) else at(index)?.let { session.lookedUp(it) }
 
     override fun reread(): Snapshot? {
         val s = session.reread() ?: return null
@@ -156,14 +158,24 @@ class StrokeFilter(
     }
 
     private fun pick(index: Int): Snapshot {
-        val k = keptAt(index) ?: return snapshot()
+        // gone from the session under the strokes: nothing goes up, and what is kept is looked for again
+        val k = at(index) ?: return if (keptAt(index) != null) refilter(keepPage = true) else snapshot()
         end()
-        return shown(session.apply(Action.Pick(k.index)))
+        return shown(session.apply(Action.Pick(k)))
     }
 
-    private inline fun pressed(index: Int, at: (Int) -> Action): Snapshot {
-        val k = keptAt(index) ?: return snapshot()
-        return after(session.apply(at(k.index)))
+    private inline fun pressed(index: Int, action: (Int) -> Action): Snapshot {
+        val k = at(index) ?: return snapshot()
+        return after(session.apply(action(k)))
+    }
+
+    // where the [i]th candidate shown is in [session]'s list now: where it was kept, else where its text is, the list
+    // having moved under the strokes since (a 0.6.1 user's tap on 好看 committed 估计, a word the strokes do not keep)
+    private fun at(i: Int): Int? {
+        val k = keptAt(i) ?: return null
+        if (session.candidates(k.index, 1).firstOrNull()?.text == k.choice.text) return k.index
+        // among those looked through: a reorder keeps it there, and no further read is forced (up to LOOK_AHEAD)
+        return session.candidates(0, scanned).indexOfFirst { it.text == k.choice.text }.takeIf { it >= 0 }
     }
 
     // [s], what [session] shows after an action taken under the strokes: filtered again, or itself once nothing is typed
@@ -181,11 +193,13 @@ class StrokeFilter(
     // [s], what [session] shows refined under the strokes (the host sends Refine at each pause):
     // what was kept stays where it shows as before, a pause in the sentence models' work then no look
     // through as many as LOOK_AHEAD again; else kept again, the page as it was if it is still there.
-    // A refine moves the sentence it picks first (PinyinSession.refine), so an order it changed shows
-    // on the first page; a reread may change any, and is kept again whole
+    // A refine moves the sentence it picks first among those the habits do not rank (PinyinSession.refine),
+    // past the first page where they fill it: what was looked through is compared, not the page shown.
+    // A reread may change any, and is kept again whole
     private fun again(s: Snapshot): Snapshot {
         val before = under
-        val same = before != null && s.preedit == before.preedit && s.candidates == before.candidates && s.total == before.total
+        val same = before != null && s.preedit == before.preedit && s.candidates == before.candidates && s.total == before.total &&
+            session.candidates(0, scanned).map { it.text } == seen
         if (!same || !typing(s)) return after(s)
         shown(s)
         return snapshot()
@@ -207,6 +221,7 @@ class StrokeFilter(
 
     private fun clearKept() {
         kept.clear()
+        seen.clear()
         scanned = 0
         done = false
         order.clear()
@@ -267,6 +282,7 @@ class StrokeFilter(
             for (choice in chunk) {
                 val keep = keeps(choice.text, table)
                 if (keep) kept += Kept(scanned, choice)
+                seen += choice.text
                 lastKept = keep
                 scanned++
             }

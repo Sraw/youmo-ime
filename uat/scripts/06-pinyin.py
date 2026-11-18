@@ -851,3 +851,4 @@ case("PY-148", needs="jvm:StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrol
 
 
 case("PY-149", needs="jvm:StrokePageUatTest.aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack")(lambda d: None)
+case("PY-157", needs="jvm:StrokeFilterRefineTest.aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped、StrokeFilterTest.aRefineThatReordersOnlyPastThePageTheSessionShowsIsFilteredAgain、StrokeFilterTest.aCandidateTheSessionMovedUnderTheStrokesIsPickedAndPressedWhereItIsNow、StrokeFilterTest.aCandidateGoneFromTheSessionUnderTheStrokesPutsNothingUpAndIsLookedForAgain")(lambda d: None)
