@@ -29,6 +29,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
  * named after [name], the caller. One that never comes up throws with `notRun` set (the smoke tests' "not run", exit 2).
  */
 export async function browser(shell, name) {
+  // a second try: a runner's first Chrome now and then takes longer than the wait to come up (cold disk),
+  // the next one starts at once
+  try {
+    return await launch(shell, name);
+  } catch (e) {
+    if (!e.notRun) throw e;
+    console.log(e.message + ': trying once more');
+    return launch(shell, name);
+  }
+}
+
+async function launch(shell, name) {
   const dir = mkdtempSync(join(tmpdir(), name + '-'));
   // CI only: GitHub's Ubuntu 24.04 runners keep unprivileged user namespaces from Chrome's sandbox (AppArmor), and
   // the page is this checkout's own; a local run keeps the sandbox
@@ -37,8 +49,8 @@ export async function browser(shell, name) {
   const file = join(dir, 'DevToolsActivePort');
   let ws;
   try {
-    for (let i = 0; i < 100 && !existsSync(file); i++) await wait(100);
-    if (!existsSync(file)) throw new Error(shell + ' did not start (no DevToolsActivePort in 10 s)');
+    for (let i = 0; i < 300 && !existsSync(file); i++) await wait(100);
+    if (!existsSync(file)) throw new Error(shell + ' did not start (no DevToolsActivePort in 30 s)');
     const port = readFileSync(file, 'utf8').split('\n')[0];
     const pages = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
     ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
