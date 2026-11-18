@@ -407,6 +407,7 @@
     <string name="learning_why_pinned">固定了：在這串鍵下總排第一</string>
     <string name="learning_why_first_here">在這個前文後面連著選過兩次</string>
     <string name="learning_why_across">你常改選它、最近用得多</string>
+    <string name="learning_why_alone">你打過的詞，按聲母讀出</string>
     <string name="learning_why_floored">在簡拼下改選過它</string>
     <string name="learning_why_lifted">這種鍵盤上打全時常選它</string>
     <string name="learning_why_mine">你的詞</string>

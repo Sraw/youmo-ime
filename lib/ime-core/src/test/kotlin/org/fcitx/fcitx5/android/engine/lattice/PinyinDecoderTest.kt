@@ -433,7 +433,7 @@ class PinyinDecoderTest {
             }
             val graph = segmenter.segment(input)
             assertEquals("step $step: $input", read(decoder(), graph), read(kept, graph))
-            went.count(kept, graph, typed)
+            went.count(kept, graph, typed, if (readsAlone) decoder() else null)
         }
         assertTrue("went on over words read by a key alone ${went.alone} times", went.alone >= if (readsAlone) steps / 20 else 0)
         // going on from the last decode's steps (collectOn) was among what was compared, where it may be:
@@ -780,11 +780,15 @@ private class WentOn {
     var typed = 0
     var alone = 0
 
-    fun count(d: PinyinDecoder, graph: SyllableGraph, keptTyped: Boolean) {
+    // [whole], a decoder to read [graph] without its keys read alone on, when those are counted
+    fun count(d: PinyinDecoder, graph: SyllableGraph, keptTyped: Boolean, whole: PinyinDecoder?) {
         times += d.collectedOn
         if (d.collectedOn == 0) return
         if (keptTyped) typed++
-        // between two positions, more words than in whole syllables
-        if ((graph.start until graph.end).any { a -> (a + 1..graph.end).any { b -> d.arcsBetween(graph, a, b).size > d.arcsBetween(graph, a, b, true).size } }) alone++
+        if (whole == null || !graph.hasAbbreviations) return
+        // between two positions the whole syllables reach, more words than in whole syllables
+        val w = graph.withoutOtherReadings().also { whole.decode(it) }
+        val reached = (graph.start until graph.end).filter { a -> a == w.start || (w.start until a).any { p -> w.edges(p).any { w.to(it) == a } } }
+        if (reached.any { a -> (a + 1..graph.end).any { b -> d.arcsBetween(graph, a, b).size > whole.arcsBetween(w, a, b).size } }) alone++
     }
 }

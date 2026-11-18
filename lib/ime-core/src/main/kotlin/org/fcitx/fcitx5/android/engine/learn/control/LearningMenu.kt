@@ -73,6 +73,9 @@ object LearningMenu {
         PINNED,
         FIRST_HERE,
         ACROSS,
+
+        /** 双拼: a word the user typed, read by its keys alone, put up front (061-sp-abbrev §3.3). */
+        ALONE,
         USED,
 
         /** No lower than second: picked over the first under its 简拼 (U-20, D32 B). */
@@ -110,6 +113,7 @@ object LearningMenu {
         HabitRanker.Tier.PINNED -> Reason.PINNED
         HabitRanker.Tier.FIRST_HERE -> Reason.FIRST_HERE
         HabitRanker.Tier.ACROSS -> Reason.ACROSS
+        HabitRanker.Tier.ALONE -> Reason.ALONE
         HabitRanker.Tier.USED -> Reason.USED
         HabitRanker.Tier.FLOORED -> Reason.FLOORED
         HabitRanker.Tier.LIFTED -> Reason.LIFTED

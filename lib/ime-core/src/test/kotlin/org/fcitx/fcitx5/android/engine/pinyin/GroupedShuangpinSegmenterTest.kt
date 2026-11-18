@@ -111,4 +111,36 @@ class GroupedShuangpinSegmenterTest {
         assertEquals("a", segmenter.started(Syllables.id("an"), 1))
         assertEquals("b", segmenter.asTyped(codes("b", G18)))
     }
+
+    // 061-sp-abbrev §3.1: where a key and the next make a syllable, the key is also read alone, an INITIAL of the
+    // syllables it leads, each ABBREV; two keys too; and the graph without them is the one with none
+    @Test
+    fun aKeyThatMakesASyllableWithTheNextIsReadAloneToo() {
+        for (letters in listOf(G18, G14, NINE_SP)) {
+            val on = GroupedShuangpinSegmenter(ZIRANMA, letters)
+            val off = GroupedShuangpinSegmenter(ZIRANMA, letters, abbreviations = false)
+            for (keys in listOf("ky", "ufmuh", "xm", "nihk")) {
+                val g = on.segment(codes(keys, letters))
+                val alone = (0 until g.edgeCount).filter(g::isAbbreviation)
+                // every pair before the last key reads a syllable on the grouped keys: each such key alone
+                assertTrue("$letters $keys", alone.isNotEmpty())
+                for (e in alone) {
+                    assertEquals(Kind.INITIAL, g.kind(e))
+                    assertEquals(1, g.to(e) - g.from(e))
+                    val m = g.matches(e)
+                    assertTrue((0 until m.size).all { m.flags(it) and SyllableMatches.ABBREV != 0 })
+                    // the syllables the key leads, as its INITIAL or PARTIAL reading at the end has
+                    val lead = on.segment(codes(keys, letters).take(g.from(e) + 1))
+                    val led = lead.edges(g.from(e)).filter { lead.kind(it) != Kind.SYLLABLE && !lead.isAbbreviation(it) }.flatMap { x ->
+                        lead.matches(x).let { mm -> (0 until mm.size).map { mm.syllable(it) } }
+                    }.toSet()
+                    assertEquals("$letters $keys ${g.from(e)}", led, (0 until m.size).map { m.syllable(it) }.toSet())
+                }
+                val without = g.withoutOtherReadings()
+                val none = off.segment(codes(keys, letters))
+                assertEquals("$letters $keys", none.toString(), without.toString())
+                assertFalse((0 until none.edgeCount).any(none::isAbbreviation))
+            }
+        }
+    }
 }

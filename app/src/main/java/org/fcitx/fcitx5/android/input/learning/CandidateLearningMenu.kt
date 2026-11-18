@@ -142,6 +142,7 @@ class CandidateLearningMenu(
         Reason.PINNED -> context.getString(R.string.learning_why_pinned)
         Reason.FIRST_HERE -> context.getString(R.string.learning_why_first_here)
         Reason.ACROSS -> context.getString(R.string.learning_why_across)
+        Reason.ALONE -> context.getString(R.string.learning_why_alone)
         Reason.USED -> (why?.uses ?: 0).let { context.resources.getQuantityString(R.plurals.learning_why_used, it, it) }
         Reason.FLOORED -> context.getString(R.string.learning_why_floored)
         Reason.LIFTED -> context.getString(R.string.learning_why_lifted)

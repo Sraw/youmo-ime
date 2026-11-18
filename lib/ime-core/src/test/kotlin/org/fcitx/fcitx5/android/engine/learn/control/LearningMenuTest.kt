@@ -50,7 +50,7 @@ class LearningMenuTest {
     @Test
     fun eachTierHasItsReason() {
         val reasons = mapOf(
-            Tier.PINNED to Reason.PINNED, Tier.FIRST_HERE to Reason.FIRST_HERE, Tier.ACROSS to Reason.ACROSS, Tier.USED to Reason.USED, Tier.FLOORED to Reason.FLOORED, Tier.LIFTED to Reason.LIFTED,
+            Tier.PINNED to Reason.PINNED, Tier.FIRST_HERE to Reason.FIRST_HERE, Tier.ACROSS to Reason.ACROSS, Tier.ALONE to Reason.ALONE, Tier.USED to Reason.USED, Tier.FLOORED to Reason.FLOORED, Tier.LIFTED to Reason.LIFTED,
             Tier.MINE to Reason.MINE, Tier.DICTIONARY to Reason.DICTIONARY, Tier.IMPORTED to Reason.IMPORTED,
         )
         assertEquals(HabitRanker.Tier.entries.toSet(), reasons.keys)

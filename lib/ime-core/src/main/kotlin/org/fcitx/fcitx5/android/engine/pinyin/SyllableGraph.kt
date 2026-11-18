@@ -127,20 +127,6 @@ class SyllableGraph internal constructor(
     val hasOtherReadings: Boolean by lazy(LazyThreadSafetyMode.NONE) { hasAbbreviations || edgeSlips != null }
 
     /**
-     * Whether an edge from [from] up to [to] (not from [to]) [readsOtherwise]: where none does, every
-     * path from [from] to [to] reads the keys as typed, and [withoutOtherReadings] has those paths if it
-     * reaches [from].
-     */
-    fun readsOtherwiseWithin(from: Int, to: Int): Boolean = hasOtherReadings && otherwiseBefore.let { it[to] > it[from] }
-
-    // how many edges [readsOtherwise] from the positions before each: made once a graph, where it has any
-    private val otherwiseBefore: IntArray by lazy(LazyThreadSafetyMode.NONE) {
-        IntArray(end + 1).also { n ->
-            for (at in 0 until end) n[at + 1] = n[at] + edges(at).count(::readsOtherwise)
-        }
-    }
-
-    /**
      * This graph without the edges that [readsOtherwise], nor what only they reach: the input read
      * in whole syllables as typed, a key alone an initial only where it and the next make none, as
      * before 简拼 in the middle, and no key read as the key next to it. Itself where it has none.
@@ -155,7 +141,34 @@ class SyllableGraph internal constructor(
         if (hasOtherReadings) dropOtherReadings() else this
     }
 
-    private fun dropOtherReadings(): SyllableGraph {
+    /** Whether any edge [isSlip]. */
+    val hasSlips: Boolean get() = edgeSlips != null
+
+    /**
+     * Whether an edge from [from] up to [to] (not from [to]) [isSlip]: where none does, every path from [from] to [to]
+     * reads the keys with no slip, and [withoutSlips] has those paths if it reaches [from]. What HabitOrder holds back
+     * where a code reads whole; a key read alone is the user's 简拼, no slip (061-sp-abbrev §3.6).
+     */
+    fun readsSlipWithin(from: Int, to: Int): Boolean = hasSlips && slipsBefore.let { it[to] > it[from] }
+
+    // how many edges [isSlip] from the positions before each: made once a graph, where it has any
+    private val slipsBefore: IntArray by lazy(LazyThreadSafetyMode.NONE) {
+        IntArray(end + 1).also { n ->
+            for (at in 0 until end) n[at + 1] = n[at] + edges(at).count(::isSlip)
+        }
+    }
+
+    /**
+     * This graph without the edges that [isSlip], nor what only they reach: [withoutOtherReadings] keeping the keys
+     * read alone. Itself where it has none.
+     */
+    fun withoutSlips(): SyllableGraph = noSlips
+
+    private val noSlips: SyllableGraph by lazy(LazyThreadSafetyMode.NONE) {
+        if (hasSlips) dropOtherReadings(::isSlip) else this
+    }
+
+    private fun dropOtherReadings(drop: (Int) -> Boolean = ::readsOtherwise): SyllableGraph {
         val reached = BooleanArray(end + 1).also { it[start] = true }
         val kept = ArrayList<Int>(edgeCount)
         val first = IntArray(end + 2)
@@ -163,7 +176,7 @@ class SyllableGraph internal constructor(
             first[at] = kept.size
             if (!reached[at]) continue
             for (e in edges(at)) {
-                if (readsOtherwise(e)) continue
+                if (drop(e)) continue
                 kept += e
                 reached[edgeTo[e]] = true
             }
@@ -173,7 +186,7 @@ class SyllableGraph internal constructor(
             input, start, first, IntArray(kept.size) { edgeFrom[kept[it]] }, IntArray(kept.size) { edgeTo[kept[it]] },
             Array(kept.size) { edgeKind[kept[it]] }, Array(kept.size) { edgeMatches[kept[it]] },
             edgeAgainst?.let { a -> Array(kept.size) { a[kept[it]] } },
-            // no edge kept is a slip: none, or the graph had other readings still (review F8203)
+            // no edge kept is a slip (both ways drop them all): none, or the graph had other readings still (review F8203)
             null,
         )
     }
@@ -181,8 +194,9 @@ class SyllableGraph internal constructor(
     /**
      * Whether the input from [from] to [to] reads as whole syllables, by [Kind.SYLLABLE] and
      * [Kind.LETTER] edges that are no [isAbbreviation] nor [isSlip]: `xm` (xian) and `xwmm` (xia mian) in 自然码,
-     * not `ufmuh`, whose h is only begun. A code so read is the user's whole syllables: the words
-     * their habits raise under it are read so too, not by its keys as initials (HabitOrder).
+     * not `ufmuh`, whose h is only begun. A code so read is likely the user's whole syllables: the
+     * words they typed read by its keys alone go after its first reading there, not before it, and
+     * no slip raises a word under it (HabitOrder, 061-sp-abbrev §3.3, §3.6).
      */
     fun readsWhole(from: Int, to: Int): Boolean {
         if (from >= to) return false

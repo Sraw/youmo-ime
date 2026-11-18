@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.engine.lattice.Decoding
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -59,9 +61,14 @@ class ShuangpinKeyWorkTest {
     }
 
     // types [inputs] a key at a time on one decoder: each key read as a decoder made afresh reads it, and what a key took
-    // [tapped]: each key tapped in a place, cleanly (TouchSim), and read as the key next to it too by where it fell
-    private fun type(inputs: List<String>, abbreviations: Boolean = true, user: UserModel? = null, tapped: Boolean = false): Taken {
-        val segmenter = ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations, neighbours = tapped)
+    // [tapped]: each key tapped in a place, cleanly (TouchSim), and read as the key next to it too by where it fell;
+    // [letters]: on a grouped keyboard, each key its group's code
+    private fun type(inputs: List<String>, abbreviations: Boolean = true, user: UserModel? = null, tapped: Boolean = false, letters: NineKeyLetters? = null): Taken {
+        val segmenter = if (letters == null) {
+            ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations, neighbours = tapped)
+        } else {
+            GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters, abbreviations = abbreviations)
+        }
         val touches = if (tapped) TouchSim.convert(inputs.map { Sample(it, it, "") }, "qwerty:s0.2:clean").associate { it.input to it.touches!! } else null
         val kept = decoder(user)
         var arcs = 0L
@@ -119,6 +126,19 @@ class ShuangpinKeyWorkTest {
                 taken.steps <= TAPPED_WHOLE_STEPS && taken.scored <= TAPPED_WHOLE_SCORED && taken.arcs <= TAPPED_WHOLE_ARCS
             }
             assertTrue("$taken", within)
+        }
+    }
+
+    // the 18, 14 and nine keys read a key alone too since 061-sp-abbrev, the words typed only: what a key takes
+    // there, whole syllables and by initials (the nine keys' codes read many syllables, so much more than the others)
+    @Test
+    fun aKeyOnTheGroupedKeyboardsTakesNoMoreThanItDid() {
+        for ((letters, caps) in GROUPED_CAPS) {
+            for ((initials, cap) in listOf(false to caps.first, true to caps.second)) {
+                val taken = type(inputs(KEYS, LINES, initials).map { line -> line.map(letters::key).joinToString("") }, user = typed(HISTORY), letters = letters)
+                println("双拼 $letters ${if (initials) "initials" else "whole syllables"}, $HISTORY words typed, $taken")
+                assertTrue("$letters $taken", taken.arcs <= cap.first && taken.steps <= cap.second)
+            }
         }
     }
 
@@ -201,6 +221,14 @@ class ShuangpinKeyWorkTest {
         const val WHOLE_FIRST = 68.0
         const val INITIALS_FIRST = 79.0
         const val OFF_FIRST = 68.0
+
+        // a quarter over what each was when measured (arcs, steps), whole syllables and by initials: 18 keys 3138, 139
+        // and 3867, 173; 14 keys 4344, 215 and 4661, 221; nine keys 8426, 495 and 8166, 513
+        val GROUPED_CAPS = mapOf(
+            NineKeyLetters.G18 to ((3920.0 to 174.0) to (4830.0 to 216.0)),
+            NineKeyLetters.G14 to ((5430.0 to 269.0) to (5830.0 to 276.0)),
+            NineKeyLetters.NINE_SP to ((10530.0 to 619.0) to (10210.0 to 641.0)),
+        )
 
         val extensions: Array<IntArray?> by lazy { arrayOfNulls<IntArray>(UatEngines.pinyinData.dictionary.nodeCount) }
     }

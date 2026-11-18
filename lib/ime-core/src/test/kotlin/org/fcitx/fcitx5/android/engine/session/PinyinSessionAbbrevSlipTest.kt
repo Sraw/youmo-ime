@@ -13,6 +13,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
+import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.Uat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,7 +31,7 @@ class PinyinSessionAbbrevSlipTest {
     private val data = pinyinDataOf(
         Triple("你", "ni", -2f), Triple("看", "kan", -2.5f), Triple("完", "wan", -2.5f), Triple("了", "le", -2f),
         Triple("你看完了", "ni kan wan le", -2.5f), Triple("课", "ke", -3.5f), Triple("剋", "kei", -4.5f),
-        Triple("他", "ta", -2.5f),
+        Triple("他", "ta", -2.5f), Triple("快", "kuai", -2f), Triple("可以", "ke yi", -3f), Triple("苦", "ku", -3f),
     )
 
     private val kind = Kinds.shuangpin("Ziranma")
@@ -74,5 +76,33 @@ class PinyinSessionAbbrevSlipTest {
         val edge = s.tap("nikwl", at("nikwl", slipped = 3, dx = 0.42f))
         assertEquals("$edge", "你看完了", edge.first())
         assertTrue("$edge", edge.any { it.startsWith("你课") })
+    }
+
+    // a slip in a code read whole holds back only what the slip reads (061-sp-abbrev §3.6, review r2 M1): the words
+    // typed and added by hand read by the keys alone are raised there all the same. ky is kuai; y tapped by u, ku
+    @Test
+    @Uat("SP-57")
+    fun wordsTypedOrAddedAreRaisedByTheirInitialsBesideASlip() {
+        val touches = at("ky", slipped = 1, dx = 0.45f)
+        val learner = Learner(data)
+        val fresh = session(learner).tap("ky", touches)
+        assertTrue("$fresh", "可以" !in fresh && "苦" in fresh)
+        // added by hand
+        learner.model.listByHand(UserModel.Entry("可以", intArrayOf(Syllables.id("ke"), Syllables.id("yi"))))
+        val added = PinyinSession(
+            data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, neighbours = true), pageSize = 20, prediction = false, user = learner.model,
+            learnTo = learner.learnTo(kind), addedWords = { setOf("可以") },
+        )
+        // 苦, which only the slip reads, is neither raised nor moved: where the decoder put it, the words ranked around it
+        val shown = added.tap("ky", touches)
+        assertEquals("$shown", listOf("快", "苦", "可以"), shown.take(3))
+        assertEquals(listOf("快", "可以"), added.tap("ky", at("ky")).take(2))
+        // typed: the same
+        val typing = Learner(data)
+        val s = session(typing)
+        val whole = "keyi"
+        s.apply(Select(whole.indices.map { s.apply(Key(whole[it])) }.last().candidates.indexOf("可以")))
+        s.apply(Reset)
+        assertEquals(listOf("快", "苦", "可以"), s.tap("ky", touches).take(3))
     }
 }

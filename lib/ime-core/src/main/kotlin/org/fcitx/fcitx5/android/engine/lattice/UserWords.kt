@@ -121,6 +121,12 @@ interface UserWords {
      */
     fun typedBelow(node: Int): Boolean = true
 
+    /**
+     * The first of the dictionary's nodes from [from] on that is [typedBelow]; past the last node
+     * (or -1) for none. [from] itself unless the model keeps track.
+     */
+    fun nextTypedBelow(from: Int): Int = from
+
     /** [typedBelow] for a node of [mergedWords]. */
     fun mergedTypedBelow(node: Int): Boolean = true
 

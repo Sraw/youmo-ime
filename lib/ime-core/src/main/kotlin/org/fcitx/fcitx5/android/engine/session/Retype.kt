@@ -127,7 +127,9 @@ internal object Retype {
      * Pinyin's matcher: [graph], the deleted commit's keys read as syllables, a syllable an edge,
      * taking the units' syllables from its start to its end. Keys that read as whole syllables are
      * not read by 简拼 in the middle (`xm` takes 先, not 下面), nor as slipped keys (`ta` takes 他, not
-     * 呀), as HabitOrder ranks them (061-shuangpin-abbrev review M3; 061-neighbour-correction §8.2).
+     * 呀), as the first HabitOrder keeps there is the syllables' (061-sp-abbrev §3.3; 061-neighbour-correction §8.2).
+     * On purpose (review NIT-2): a word typed before goes second there by its keys alone and is learned when picked
+     * there, as any pick; a delete and the same keys again is no correction to it, so it never takes such a code's first.
      */
     fun byReading(graph: SyllableGraph): Matcher {
         val whole = graph.hasOtherReadings && graph.readsWhole(graph.start, graph.end)

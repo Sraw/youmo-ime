@@ -173,7 +173,6 @@ class MainTest {
             arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "NaN"),
             arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "-Infinity"),
             arrayOf("pinyin", "d", "s", "r", "--sp-abbrev", "off"), // 双拼's only: full pinyin reads 简拼 anyway
-            arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe-18", "--sp-abbrev", "off"), // nor the grouped keys
             arrayOf("slips", "s", "o", "--scheme", "t9"), // 双拼's schemes only
             arrayOf("predict-learn", "d", "s", "--user-weight", "much"),
             // a weight, as --weight's: not negative, nor endless

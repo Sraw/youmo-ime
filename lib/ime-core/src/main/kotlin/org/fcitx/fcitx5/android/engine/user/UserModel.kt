@@ -322,6 +322,8 @@ class UserModel(
 
     override fun typedBelow(node: Int): Boolean = typedNodes.below(node)
 
+    override fun nextTypedBelow(from: Int): Int = typedNodes.nextBelow(from)
+
     override fun mergedTypedBelow(node: Int): Boolean = typedNodes.mergedBelow(node)
 
     // [ownedBase] and [mergedChosen] kept in step with [owned], for [id] just owned or disowned

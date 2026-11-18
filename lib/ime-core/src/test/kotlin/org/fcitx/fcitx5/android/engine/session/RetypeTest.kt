@@ -127,7 +127,7 @@ class RetypeTest {
     }
 
     // 双拼 keys deleted, then a word typed again: whole syllables take only what they read whole, as
-    // HabitOrder ranks them (061-shuangpin-abbrev review M3); keys not all pairs are read by initials too
+    // HabitOrder keeps the syllables' first there (061-sp-abbrev §3.3); keys not all pairs are read by initials too
     @Test
     fun shuangpinKeysThatReadWholeTakeNoWordTheirKeysAloneSpell() {
         val ziranma = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA)

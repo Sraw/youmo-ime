@@ -104,6 +104,12 @@ internal class TypedNodes(
         return base[node]
     }
 
+    /** The first node from [from] on that is [below]; -1 for none. */
+    fun nextBelow(from: Int): Int {
+        if (stale) index()
+        return base.nextSetBit(from)
+    }
+
     /** [below], of a node of the merged file. */
     fun mergedBelow(node: Int): Boolean {
         if (stale) index()

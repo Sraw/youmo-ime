@@ -496,8 +496,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
     ).all { it }
 }
 
-/** Whether `--sp-abbrev` [spec] is off or a penalty (finite, not above 0), under a scheme of the full keyboard's 双拼 (the grouped ones read none). */
-private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.toFloatOrNull()?.let { it.isFinite() && it <= 0f } == true) && scheme in ShuangpinSet.SCHEMES
+/** Whether `--sp-abbrev` [spec] is off or a penalty (finite, not above 0), under a scheme of 双拼, the full keyboard's or the grouped ones' (061-sp-abbrev). */
+private fun readsAbbrev(spec: String, scheme: String?) = (spec == "off" || spec.toFloatOrNull()?.let { it.isFinite() && it <= 0f } == true) && (scheme in ShuangpinSet.SCHEMES || scheme in ShuangpinSet.GROUPED)
 
 /** Whether [scheme]'s segmenter reads a key as the one beside it: every one, 双拼's groups and zhuyin's too (061-neighbour-correction, 061-neighbour-groups). */
 private fun readsNeighbours(scheme: String?) = scheme == null || scheme == NO_LATIN || scheme in ShuangpinSet.SCHEMES || scheme in T9Set.SCHEMES ||
@@ -612,7 +612,7 @@ private class RunOptions(options: Map<String, String>) {
         NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows, neighbours = neighbours)
         in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme), neighbours = neighbours)
-        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, neighbours = neighbours) }
+        in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, neighbours = neighbours, abbreviations = abbreviations) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations, neighbours = neighbours)
     }
 }

@@ -29,9 +29,10 @@ import kotlin.random.Random
 
 /**
  * [HabitOrder.readsAlong] reads each word at its place once an order and walks the code read whole only where it must:
- * held to what it did before, every word of a candidate walked on the graph without 简拼 in the middle nor slips, on
- * random keys of 全拼, 小鹤 and 自然码 (简拼 in the middle on), the nine keys, tapped anywhere on their keys, the
- * decoder's candidates, each cut short and each with a word kept as typed in its place.
+ * held to what it did before, every word of a candidate walked on the graph without slips (061-sp-abbrev §3.6: 简拼 in
+ * the middle is no slip, kept), on random keys of 全拼, 小鹤 and 自然码 (简拼 in the middle on, on the grouped keyboards
+ * too), the nine keys, tapped anywhere on their keys, the decoder's candidates, each cut short and each with a word kept
+ * as typed in its place.
  */
 class HabitOrderReadsAlongTest {
 
@@ -64,7 +65,7 @@ class HabitOrderReadsAlongTest {
         return true
     }
 
-    // readsAlong without its walk past text kept as typed: a word read over no edge read otherwise taken to read along
+    // readsAlong without its walk past text kept as typed: a word read over no slip taken to read along
     // [whole] wherever it starts. Where this says yes and [walked] no, only that walk tells them apart
     private fun trustingPastKept(graph: SyllableGraph, whole: SyllableGraph, c: Candidate): Boolean {
         var from = whole.start
@@ -72,7 +73,7 @@ class HabitOrderReadsAlongTest {
             val word = c.words[i]
             if (word != NO_WORD) {
                 val r = reading(graph, from, c.ends[i], word, data.dictionary, null) { _, _ -> "" } ?: return false
-                if (r.otherwise && reading(whole, from, c.ends[i], word, data.dictionary, null) { _, _ -> "" } == null) return false
+                if (r.slips.isNotEmpty() && reading(whole, from, c.ends[i], word, data.dictionary, null) { _, _ -> "" } == null) return false
             }
             from = c.ends[i]
         }
@@ -103,7 +104,7 @@ class HabitOrderReadsAlongTest {
 
     private fun check(what: String, segmenter: Segmenter, keys: String, touches: Array<Touch?>, counts: Counts) {
         val graph = segmenter.segment(keys, null, touches)
-        val whole = graph.withoutOtherReadings()
+        val whole = graph.withoutSlips()
         // one for every candidate, as an order has: a word's place read for one is what the next finds
         val readings = HabitOrder.Readings()
         if (graph.hasOtherReadings) counts.graphs++
@@ -168,20 +169,20 @@ class HabitOrderReadsAlongTest {
         assertTrue("${counts.read} of ${counts.candidates} read", counts.read > 5000 && counts.read < counts.candidates)
         assertTrue("${counts.pastKept} read past text kept as typed", counts.pastKept > 200)
         // and ones that read only if the word after text kept as typed is not walked again
-        assertTrue("${counts.onlyWalked} told apart by the walk past text kept as typed", counts.onlyWalked > 500)
+        assertTrue("${counts.onlyWalked} told apart by the walk past text kept as typed", counts.onlyWalked > 40)
     }
 
-    // a word over keys nothing reads otherwise is not read: on a long input most are, and reading every one of
+    // a word over keys nothing reads slipped is not read: on a long input most are, and reading every one of
     // every candidate took most of what the nine keys' slips cost a key (061-nine-perf-impl-report)
     @Test
-    fun onlyTheWordsOverKeysReadOtherwiseAreRead() {
+    fun onlyTheWordsOverKeysReadSlippedAreRead() {
         // 我们在家里 and 99, its second 9 tapped at its top, toward 6: wo (T9-68)
         val keys = "womenzaijiali".map { NineKeyLetters.STANDARD.key(it) }.joinToString("") + "99"
         val touches = Array<Touch?>(keys.length) { TouchBoxes.tap(TouchBoxes.NINE, keys[it]) }
         touches[keys.length - 1] = TouchBoxes.tap(TouchBoxes.NINE, '9', dy = -0.42f)
         val graph = T9Segmenter(abbreviations = false, neighbours = true).segment(keys, null, touches)
-        assertTrue("a slip read", graph.hasOtherReadings)
-        val whole = graph.withoutOtherReadings()
+        assertTrue("a slip read", graph.hasSlips)
+        val whole = graph.withoutSlips()
         val readings = HabitOrder.Readings()
         val words = HashSet<Triple<Int, Int, Int>>()
         val over = HashSet<Triple<Int, Int, Int>>()
@@ -191,7 +192,7 @@ class HabitOrderReadsAlongTest {
             for (i in c.words.indices) {
                 val word = Triple(from, c.ends[i], c.words[i])
                 words += word
-                if (graph.readsOtherwiseWithin(from, c.ends[i])) over += word
+                if (graph.readsSlipWithin(from, c.ends[i])) over += word
                 from = c.ends[i]
             }
         }
@@ -200,7 +201,7 @@ class HabitOrderReadsAlongTest {
     }
 
     // the skip takes each word for one the graph reads at its place, as every candidate an order ranks is (the decoder's,
-    // or one walked on the graph there): a word it does not read, over keys nothing reads otherwise, is taken to read
+    // or one walked on the graph there): a word it does not read, over keys nothing reads slipped, is taken to read
     // along unread. Before, it was read and the candidate turned away. No such candidate comes from the session
     @Test
     fun aWordOverKeysNothingReadsOtherwiseIsTakenToReadThereUnread() {
@@ -209,14 +210,33 @@ class HabitOrderReadsAlongTest {
         val touches = Array<Touch?>(keys.length) { TouchBoxes.tap(TouchBoxes.NINE, keys[it]) }
         touches[keys.length - 1] = TouchBoxes.tap(TouchBoxes.NINE, '9', dy = -0.42f)
         val graph = T9Segmenter(abbreviations = false, neighbours = true).segment(keys, null, touches)
-        assertTrue("a slip read", graph.hasOtherReadings && graph.readsOtherwiseWithin(2, 4) && !graph.readsOtherwiseWithin(0, 2))
-        val whole = graph.withoutOtherReadings()
+        assertTrue("a slip read", graph.hasSlips && graph.readsSlipWithin(2, 4) && !graph.readsSlipWithin(0, 2))
+        val whole = graph.withoutSlips()
         val ta = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "他" }
         // 他 (82) over 64
         val c = Candidate("他", 2, 0f, intArrayOf(ta), intArrayOf(2))
         assertEquals("walked, it does not read", false, walked(whole, c))
         val readings = HabitOrder.Readings()
         assertEquals("taken to read, unread", true, order.readsAlong(graph, whole, c, readings))
+        assertEquals(0, readings.read)
+    }
+
+    // on the grouped keyboards nearly every place has a key read alone (061-sp-abbrev §3.1): those are no slips, so
+    // with no tap's place no candidate is read at all, as before the keys alone were read there
+    @Test
+    fun keysReadAloneOnlyReadNoCandidate() {
+        val letters = NineKeyLetters.NINE_SP
+        // 小鹤 xm: 下面 by x and m alone, then 我们在家里 in whole syllables
+        val keys = ("xm" + "womfzdjxli").map(letters::key).joinToString("")
+        val graph = GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters, neighbours = true).segment(keys, null, null)
+        assertTrue("keys read alone", graph.hasAbbreviations && !graph.hasSlips)
+        val xiaMian = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "下面" }
+        // past text kept as typed a word is read anyway: none such here
+        val candidates = candidates(graph).filter { NO_WORD !in it.words } + Candidate("下面", 2, 0f, intArrayOf(xiaMian), intArrayOf(2))
+        assertTrue("${candidates.size} candidates", candidates.size > 5)
+        assertTrue("下面 read by the keys alone", walked(graph, candidates.last()))
+        val readings = HabitOrder.Readings()
+        for (c in candidates) assertEquals(c.text, walked(graph, c), order.readsAlong(graph, graph.withoutSlips(), c, readings))
         assertEquals(0, readings.read)
     }
 }

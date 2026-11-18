@@ -33,10 +33,20 @@ package org.fcitx.fcitx5.android.engine.learn
  *
  * Text kept as letters (U-27) is never put first, by 1 or 2; V, it is put after only by 1 (the
  * user corrected it twice there), not by 2.
+ *
+ * 双拼's typed words read by their keys alone ([Item.alone], 061-sp-abbrev §3.3): up to [ALONE_WORDS] of them,
+ * in the order above, go right after the pin and the first by 1 or 2, before V where the caller says
+ * the code does not read whole (`ufmuh`: V is a reading of syllables, nearly never meant), after it
+ * where it does (`umuh`, `ky`) or a typed word reads it as whole syllables and its last key begun
+ * (the gate, §3.4: the code is likely that word half typed). They show [Tier.ALONE], what they were
+ * besides; a floored word still goes right behind the pin, the typed words after it, and none is lifted.
  */
 object HabitRanker {
-    /** Why an item is where it is: the order of the tiers is the order of the list, but for V's. */
-    enum class Tier { PINNED, FIRST_HERE, ACROSS, USED, FLOORED, LIFTED, MINE, DICTIONARY, IMPORTED }
+    /**
+     * Why an item is where it is: the order of the tiers is the order of the list, but for V's and
+     * ALONE's: V is wherever [rank]'s first puts it, ALONE right before V or after it by how the code reads.
+     */
+    enum class Tier { PINNED, FIRST_HERE, ACROSS, ALONE, USED, FLOORED, LIFTED, MINE, DICTIONARY, IMPORTED }
 
     /** Corrected to this often under a code, a word used there more than V goes first after any word before it. */
     const val CORRECTIONS = 2
@@ -50,10 +60,15 @@ object HabitRanker {
     /** The lowest place (from 0) of a word corrected to under its 简拼, spelt in full or in part: second. */
     const val FLOOR = 1
 
+    /** The most typed words read alone ([Item.alone]) put up front under a code. */
+    const val ALONE_WORDS = 3
+
     /**
      * A candidate as ranking sees it: [words], read so; [single] one Han character; [letters] text
      * kept as letters; [imported] a word only an import has; [injected] put in by the session, the
-     * decoder not having it; [exact] its keys are the code's, spelt out (an import's place).
+     * decoder not having it; [exact] its keys are the code's, spelt out (an import's place); [alone],
+     * under 双拼 one word the user typed read as whole syllables then two keys or more each alone
+     * ([ALONE_SHAPE]), as whole syllables then the last key alone ([HALF_TYPED]), or neither ([NOT_ALONE]).
      */
     class Item<T>(
         val value: T,
@@ -63,7 +78,17 @@ object HabitRanker {
         val imported: Boolean = false,
         val injected: Boolean = false,
         val exact: Boolean = false,
+        val alone: Int = NOT_ALONE,
     )
+
+    /** [Item.alone]: a typed word read by keys alone, put up front. */
+    const val ALONE_SHAPE = 1
+
+    /** [Item.alone]: a typed word whose last key alone is begun (`uf|m`), ranked as any word; it opens the gate. */
+    const val HALF_TYPED = 0
+
+    /** [Item.alone]: neither. */
+    const val NOT_ALONE = -1
 
     /** [original]: V, the decoder's own first, wherever it was ranked (F2739). */
     class Ranked<T>(val item: Item<T>, val tier: Tier, val uses: Int, val original: Boolean = false) {
@@ -89,8 +114,11 @@ object HabitRanker {
         fun spelled(kind: String, words: Words): Habits.Spelled = Habits.Spelled.NONE
     }
 
-    /** [items] of [code], after [prev], as shown. */
-    fun <T> rank(items: List<Item<T>>, code: Code, prev: String, view: View): List<Ranked<T>> {
+    /**
+     * [items] of [code], after [prev], as shown; [readsWhole], whether the code reads as whole syllables as
+     * typed: the typed words read alone go after V there, else before it (but for the gate).
+     */
+    fun <T> rank(items: List<Item<T>>, code: Code, prev: String, view: View, readsWhole: Boolean = false): List<Ranked<T>> {
         if (items.isEmpty()) return emptyList()
         val uses = uses(items, code, view)
         val tiers = tiers(items, view, uses)
@@ -106,8 +134,30 @@ object HabitRanker {
             val pinned = ranked.removeAt(pin)
             ranked.add(0, Ranked(pinned.item, Tier.PINNED, pinned.uses, pinned.original))
         }
+        alone(ranked, readsWhole || items.any { it.alone == HALF_TYPED })
         spellings(ranked, code, view)
         return ranked
+    }
+
+    // the typed words read alone, up to ALONE_WORDS, right after the pin and the first by 1 or 2 ([heads]):
+    // before the next ([after] false: A1 V A2 A3) or after it (V A1 A2 A3), in their order. V itself one of
+    // them stays where it is there, the rest right after it: the first is unchanged where the code reads
+    // whole (§5: under 自然码 `ky` a typed 可以 read by k and y alone, were it the decoder's first, stays before 快)
+    private fun <T> alone(ranked: MutableList<Ranked<T>>, after: Boolean) {
+        val heads = ranked.indexOfFirst { it.tier > Tier.ACROSS }.let { if (it < 0) ranked.size else it }
+        val alone = ranked.subList(heads, ranked.size).filter { it.item.alone == ALONE_SHAPE }.take(ALONE_WORDS)
+        if (alone.isEmpty()) return
+        // V at heads (no first by 1 or 2 before it) and one of them
+        val vAlone = alone[0] === ranked[heads] && ranked[heads].original
+        ranked.removeAll(alone.toSet())
+        val words = alone.map { Ranked(it.item, Tier.ALONE, it.uses, it.original) }
+        // the first of them before the next where the code does not read whole: only that one, the rest after it
+        if (!after && heads < ranked.size) {
+            ranked.add(heads, words[0])
+            ranked.addAll(heads + 2, words.drop(1))
+        } else {
+            ranked.addAll(if (vAlone) heads else minOf(heads + 1, ranked.size), words)
+        }
     }
 
     // U-20 across the keyboard's spellings: those corrected to under a 简拼 to FLOOR (right after a
@@ -120,8 +170,10 @@ object HabitRanker {
         for (r in ranked.filter { !it.item.letters && it.tier != Tier.PINNED }) {
             val form = SpelledForm.of(code.kind, code.keys, r.item.words.reading) ?: continue
             val s = view.spelled(code.kind, r.item.words)
+            // a typed word read alone is up front already (061-sp-abbrev §3.3)
+            val upFront = r.tier == Tier.USED || r.tier == Tier.ALONE
             if (form != SpelledForm.INITIALS && s.initialsCorrections > 0) floor += r to s.initialsCorrections
-            else if (form != SpelledForm.FULL && r.tier != Tier.USED && s.fullUses >= FULL_USES) lift += r to s.fullUses
+            else if (form != SpelledForm.FULL && !upFront && s.fullUses >= FULL_USES) lift += r to s.fullUses
         }
         val floored = raise(ranked, floor, FLOOR, Tier.FLOORED)
         val pinned = if (ranked[0].tier == Tier.PINNED) 1 else 0

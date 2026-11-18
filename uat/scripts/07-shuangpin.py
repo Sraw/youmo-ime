@@ -39,8 +39,8 @@ def sp30(d):
     d.clear()
     d.type("ufmuh")
     c = d.all_cands()
-    d.shot("kb", "自然码 ufmuh（全码打过一次以后）：候选栏或展开后的第一页有「什么时候」")
-    check("什么时候" in c, f"ufmuh 的候选栏和展开后的第一页都没有「什么时候」：{c[:14]}")
+    d.shot("kb", "自然码 ufmuh（全码打过一次以后）：第一个候选是「什么时候」")
+    check(c[:1] == ["什么时候"], f"ufmuh 的第一个候选不是「什么时候」：{c[:14]}")
     d.pick("什么时候")
     t = d.field_text()
     check(t == "什么时候", f"点「什么时候」后框里是「{t}」")
@@ -55,7 +55,7 @@ def sp30(d):
     return f"框里是「{t}」；yivz 候选 {c2[:8]}"
 
 
-case("SP-31", needs="jvm:ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations")(lambda d: None)
+case("SP-31", needs="jvm:ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviationsInASessionThatLearns")(lambda d: None)
 
 
 case("SP-32", needs="jvm:ShuangpinUatTest.aWordTypedByItsInitialsOnly")(lambda d: None)
@@ -64,10 +64,10 @@ case("SP-32", needs="jvm:ShuangpinUatTest.aWordTypedByItsInitialsOnly")(lambda d
 case("SP-33", needs="jvm:ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys")(lambda d: None)
 
 
-case("SP-34", needs="jvm:ShuangpinUatTest.aWordUsedInFullIsNotRaisedUnderAPairItsInitialsSpell")(lambda d: None)
+case("SP-34", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
 
 
-case("SP-35", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsNotPutInUnderAPairItsInitialsSpell")(lambda d: None)
+case("SP-35", needs="jvm:ShuangpinUatTest.aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
 
 
 case("SP-36", needs="jvm:ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere")(lambda d: None)
@@ -82,10 +82,31 @@ case("SP-44", needs="jvm:PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDay
 case("SP-45", needs="jvm:PinyinDecoderTypedTest.aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped、PinyinDecoderTypedTest.aKeyReadAloneReadsOnlyTheWordsTypedOrChosen")(lambda d: None)
 
 
-case("SP-46", needs="jvm:ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone、PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone")(lambda d: None)
+case("SP-46", needs="jvm:ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone、ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone、PinyinSessionAbbrevGroupedTest.withNoHabitsAKeyIsNotReadAlone")(lambda d: None)
+
+
+case("SP-55", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell、HabitRankerTest.wordsTypedReadAloneGoBeforeOrAfterTheFirstByHowTheCodeReads")(lambda d: None)
+
+
+case("SP-56", needs="jvm:ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull")(lambda d: None)
+
+
+case("SP-58", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、ShuangpinUatTest.microsoftsSemicolonAfterAKeyAloneReadsAsBefore、PinyinSessionAbbrevGroupedTest.theNineKeysOneKeyReadsAsTheSeparator")(lambda d: None)
+
+
+case("SP-59", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
 
 
 # ---------------------------------------------------------------- 18 键 and 九键双拼 (B0-18键, B0-九键双拼)
+
+
+case("SP-52", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
+
+
+case("SP-53", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
+
+
+case("SP-54", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、ShuangpinUatTest.theNineKeysPutAWordTypedSecondUnderACodeTheyReadWhole、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
 
 
 case("SP-14", needs="jvm:ShuangpinUatTest.theEighteenKeysInXiaoheTypeASentenceAndOfferTheSyllables、ShuangpinKeysUatTest.theEighteenKeysAreThreeRowsOfCapitalsAndTheCodeRowOffersTheSyllables")(lambda d: None)
@@ -181,6 +202,25 @@ def sp47(d):
     check(edge.replace(" ", "") == "ta", f"q 靠 a 点的 t q，编码行是「{edge}」，候选 {c[:6]}")
     check(mid.replace(" ", "") != "ta", f"两个键都点在正中的 t q，编码行是「{mid}」")
     return f"靠边「{edge}」{c[:3]}；正中「{mid}」"
+
+
+@case("SP-57", base="B0-双拼", mutates="learn")
+def sp57(d):
+    # 自然码 ky (kuai), 可以 typed: y tapped by its right edge (toward u, ky read as ku too) and in its middle; the word
+    # typed among the first 10 by the edge (uat/07-shuangpin.md), right after the first in the middle
+    d.type("keyi")
+    d.pick("可以")
+    d.clear()
+    keys_at(d, "ky", [None, (0.95, 0.5)])
+    edge = d.all_cands()
+    d.shot("kb", "自然码 k、y 靠 u 点（打过「可以」）：第一页有「可以」")
+    d.clear()
+    keys_at(d, "ky", [None, None])
+    mid = d.all_cands()
+    d.clear()
+    check("可以" in edge[:10], f"y 靠 u 点的 k y，前 10 个没有「可以」：{edge[:12]}")
+    check(mid[1:2] == ["可以"], f"两个键都点在正中的 k y，「可以」不是第二：{mid[:6]}")
+    return f"靠边 {edge[:6]}；正中 {mid[:3]}"
 
 
 @case("SP-51", base="B0-18键", mutates=True, visual=True)

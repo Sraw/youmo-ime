@@ -14,8 +14,8 @@ import java.util.TreeMap
  * 双拼 on a keyboard of letter groups ([NineKeyLetters.G18], [NineKeyLetters.NINE_SP]): each
  * syllable typed as [ShuangpinSegmenter] has it, by the scheme's two keys, each key then the code
  * of the group it is in. Cut the same way, two keys a syllable where they make one, one key alone
- * otherwise or at the end, so the graph is still one path: what a group leaves open is in each
- * edge's syllables (BN BN: bin, biao, nin … in 小鹤), for the decoder to weigh by the words.
+ * otherwise or at the end, so the graph is one path but for the keys read alone too ([abbreviations]):
+ * what a group leaves open is in each edge's syllables (BN BN: bin, biao, nin … in 小鹤), for the decoder to weigh by the words.
  *
  * As on [T9Segmenter], a syllable taken off the bar is in the input as its letters, then a
  * separator: read as that syllable alone, or an initial taken as that initial. No Latin letters,
@@ -31,6 +31,11 @@ import java.util.TreeMap
  * typed on target turns wrong to -6 (σ 0.15, the user's 11-16 rule), but past -5 a key took a sixth more arcs
  * on the 18 keys (NeighbourKeyWorkTest; a tenth allowed, 061-neighbour-18key-impl-report §5); the nine keys' digits none past -3,
  * as pinyin's nine keys (6T, 061-neighbour-correction §7.2). A key with no place reads no slip.
+ *
+ * With [abbreviations], a key and the next that make a syllable read too as the key alone, an
+ * initial, every match [SyllableMatches.ABBREV]: 简拼 in the middle, as [ShuangpinSegmenter] reads
+ * it, over which the decoder reads only the words the user typed (061-sp-abbrev §3.1). Off, the
+ * reading before 0.6.1, for measuring.
  */
 class GroupedShuangpinSegmenter(
     private val scheme: ShuangpinScheme,
@@ -38,6 +43,7 @@ class GroupedShuangpinSegmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
     private val neighbours: Boolean = false,
     private val slipCost: SlipCost = if (letters == NineKeyLetters.NINE_SP) SlipCost(floor = -3f) else SlipCost(floor = -5f),
+    private val abbreviations: Boolean = true,
 ) : KeyedSegmenter {
 
     override val spellsFullPinyin: Boolean get() = false
@@ -48,6 +54,7 @@ class GroupedShuangpinSegmenter(
 
     private val pairs = HashMap<String, SyllableMatches>()
     private val leads = HashMap<Char, SyllableMatches>()
+    private val abbrevs = HashMap<Char, SyllableMatches>()
     private val vowels = HashMap<Char, SyllableMatches>()
 
     // an initial taken off the bar (zh for 自然码's v): its syllables
@@ -93,7 +100,10 @@ class GroupedShuangpinSegmenter(
             val lead = byLead.getOrPut(code[0]) { TreeMap() }
             syllables.forEach { (s, f) -> keepBest(lead, s, f or SyllableMatches.COMPLETION) }
         }
-        byLead.forEach { (key, syllables) -> leads[key] = toMatches(syllables) }
+        byLead.forEach { (key, syllables) ->
+            leads[key] = toMatches(syllables)
+            if (abbreviations) abbrevs[key] = toMatches(TreeMap(syllables.mapValues { it.value or SyllableMatches.ABBREV }))
+        }
         for (vowel in "aeo") {
             for (key in scheme.finalKeys(vowel.toString())) {
                 if (!scheme.typesInitial(key) && letters.isCode(letters.key(key))) vowels[letters.key(key)] = single(Syllables.id(vowel.toString()))
@@ -162,6 +172,7 @@ class GroupedShuangpinSegmenter(
         if (touches != null && next != null && letters.isCode(next)) slipped(input, at, pair, touches, edges)
         if (pair != null) {
             edges.add(at, 2, Kind.SYLLABLE, pair)
+            abbrevs[key]?.let { edges.add(at, 1, Kind.INITIAL, it) }
             return
         }
         leads[key]?.let { edges.add(at, 1, if (at + 1 == input.length) Kind.PARTIAL else Kind.INITIAL, it) }

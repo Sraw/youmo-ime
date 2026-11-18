@@ -25,8 +25,9 @@ import org.junit.Test
 
 /**
  * 双拼's 简拼 in the middle in a session (自然码): what the user's habits do with it, and editing over
- * it. A code that reads as whole syllables (`xm`, xian) is ranked as before it: what is learned
- * raises nothing there that only the keys read alone read (061-shuangpin-abbrev review M3).
+ * it. A word typed before read by keys alone goes first where the code reads no whole syllables, and
+ * second, after its first reading, where it does (`xm`, xian); what is learned elsewhere raises it there
+ * as anywhere (061-sp-abbrev §3.3, §3.6: review M3's exception is gone).
  */
 class PinyinSessionAbbrevTest {
 
@@ -35,10 +36,13 @@ class PinyinSessionAbbrevTest {
         Triple("先", "xian", -2f), Triple("现", "xian", -2.1f), Triple("线", "xian", -2.2f), Triple("县", "xian", -2.3f),
         Triple("显", "xian", -2.4f), Triple("仙", "xian", -2.5f), Triple("鲜", "xian", -2.6f), Triple("险", "xian", -2.7f),
         Triple("下面", "xia mian", -3f), Triple("下", "xia", -2.5f), Triple("面", "mian", -2.5f),
-        Triple("小", "xiao", -2.5f), Triple("明", "ming", -2.5f),
+        Triple("小", "xiao", -2.5f), Triple("明", "ming", -2.5f), Triple("小米", "xiao mi", -3.5f),
         Triple("什么", "shen me", -2f), Triple("时候", "shi hou", -2f), Triple("什么时候", "shen me shi hou", -3f),
         // ky is kuai; 可以 by k and y alone
         Triple("快", "kuai", -2f), Triple("块", "kuai", -2.1f), Triple("筷", "kuai", -2.2f), Triple("可以", "ke yi", -3f),
+        // yry: yuan and y begun, 原因 so; y r y alone, 一日游
+        Triple("原因", "yuan yin", -2.5f), Triple("元", "yuan", -2.5f), Triple("一日游", "yi ri you", -4f),
+        Triple("一", "yi", -2f), Triple("日", "ri", -2.5f), Triple("游", "you", -2.5f),
     )
 
     // the whole list in a page: what the bar shows first is the app's page of 7
@@ -58,7 +62,8 @@ class PinyinSessionAbbrevTest {
     }
 
     @Test
-    fun aWordPickedInFullRaisesNothingUnderAPairItsInitialsSpell() {
+    @Uat("SP-34", "SP-55", "SP-59")
+    fun aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell() {
         val learner = Learner(data)
         val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
         val fresh = s.page("xm")
@@ -67,25 +72,29 @@ class PinyinSessionAbbrevTest {
         // xia mian, twice: 下面 the user's, used spelt in full (U-20)
         repeat(2) { s.pick("xwmm", "下面") }
         assertEquals("下面", s.page("xwmm").first())
-        assertEquals(fresh, s.page("xm"))
-        // where the code does not read whole the user's word is still raised by its initials: x then m begun
-        assertTrue("x'm", "下面" in s.page("x'm"))
+        // xm reads xian whole: 下面 after its first reading
+        assertEquals(listOf("先", "下面") + fresh.drop(1).take(5), s.page("xm"))
+        // where the code does not read whole, x then m begun, the user's word goes first: the whole dictionary read still
+        val apart = s.page("x'm")
+        assertEquals("下面", apart.first())
+        assertTrue("小米, never typed", "小米" in s.type("x'm").candidates.also { s.apply(Reset) })
     }
 
     @Test
-    fun aWordAddedByHandIsNotPutInUnderAPairItsInitialsSpell() {
-        val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
-        model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
+    @Uat("SP-35")
+    fun aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell() {
         val learner = Learner(data)
+        learner.model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
         fun session(added: Set<String>) = PinyinSession(
-            data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = model, learnTo = learner.learnTo(kind), addedWords = { added },
+            data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind), addedWords = { added },
         )
         val none = session(emptySet()).page("xm")
         val added = session(setOf("小明"))
-        assertEquals(none, added.page("xm"))
+        assertEquals("先", none.first())
+        assertEquals("小明", added.page("xm")[1])
         // in full and by its initials apart it is put in, as any word added by hand
         assertEquals("小明", added.page("xcmy").first())
-        assertTrue("x'm", "小明" in added.page("x'm"))
+        assertEquals("小明", added.page("x'm").first())
     }
 
     @Test
@@ -96,9 +105,8 @@ class PinyinSessionAbbrevTest {
         assertTrue("可以" !in s.type("ky").candidates.also { s.apply(Reset) })
         s.pick("keyi", "可以")
         val fresh = s.type("ky").candidates.also { s.apply(Reset) }
-        assertEquals("快", fresh.first())
-        val at = fresh.indexOf("可以")
-        assertTrue("$fresh", at > 0)
+        // typed, it is read by k and y alone; ky reads kuai whole, so second
+        assertEquals(listOf("快", "可以"), fresh.take(2))
         // pinned under ky itself: first there, though ky reads kuai
         val pinned = s.type("ky").let { s.apply(Pin(it.candidates.indexOf("可以"))) }
         assertEquals("可以", pinned.candidates.first())
@@ -107,10 +115,11 @@ class PinyinSessionAbbrevTest {
         s.type("ky").let { s.apply(Unpin(it.candidates.indexOf("可以"))) }
         s.apply(Reset)
         assertEquals(fresh, s.type("ky").candidates.also { s.apply(Reset) })
-        // picked there: it goes up
-        repeat(2) { s.pick("ky", "可以") }
-        val picked = s.type("ky").candidates.also { s.apply(Reset) }
-        assertTrue("$picked", picked.indexOf("可以") < at)
+        // picked there once it stays where it was; twice, first
+        s.pick("ky", "可以")
+        assertEquals(listOf("快", "可以"), s.page("ky").take(2))
+        s.pick("ky", "可以")
+        assertEquals(listOf("可以", "快"), s.page("ky").take(2))
     }
 
     @Test
@@ -147,7 +156,7 @@ class PinyinSessionAbbrevTest {
         assertTrue("下面" !in s.page("xmm"))
         s.pick("xwmm", "下面")
         assertTrue("下面" in s.page("xmm"))
-        // in whole syllables nothing was ever held back
+        // where whole syllables read the code, their first is still first
         assertEquals("先", s.page("xm").first())
     }
 
@@ -260,5 +269,55 @@ class PinyinSessionAbbrevTest {
         assertTrue("小明" !in session().page("xmy"))
         model.listByHand(UserModel.Entry("小明", intArrayOf(Syllables.id("xiao"), Syllables.id("ming"))))
         assertTrue("小明" in session().page("xmy"))
+    }
+
+    // keys read alone all through a word typed go first where the code reads no whole syllables; but where a word
+    // typed reads it as whole syllables and the last key begun (the gate, §3.4), likely the word being typed in full,
+    // they go second: yry on the way to 原因 keeps 原因's first
+    @Test
+    @Uat("SP-30", "SP-56")
+    fun wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        val fresh = s.page("yry")
+        s.pick("yiriyb", "一日游")
+        assertEquals("一日游", s.page("yry").first())
+        s.pick("yryn", "原因")
+        assertEquals(listOf(fresh.first(), "一日游"), s.page("yry").take(2))
+    }
+
+    @Test
+    @Uat("SP-30")
+    fun aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        val fresh = s.page("yry")
+        s.pick("yiriyb", "一日游")
+        assertEquals(listOf("一日游", fresh.first()), s.page("yry").take(2))
+        // accepted with space: first still
+        s.type("yry")
+        s.apply(Select(0))
+        s.apply(Reset)
+        assertEquals(listOf("一日游", fresh.first()), s.page("yry").take(2))
+        // the first by syllables picked twice: first again. 原因 typed now reads yr whole and y begun, the gate
+        // (§3.4): the next by syllables, then the word typed by initials
+        repeat(2) { s.pick("yry", fresh.first()) }
+        assertEquals(listOf(fresh.first(), fresh[1], "一日游"), s.page("yry").take(3))
+    }
+
+    // code review NIT-3 (ce8e9f5f5): the reading's shape is the first exact one's. A vowel's key read as a lead (自然码 a,
+    // then y begun) is a key alone there, not a's one-key syllable whole: 阿姨 typed goes first, as 小鹤 `el` 恶劣 was
+    // measured (§4.1 两字词全打声母: taken for the syllable, 6 such samples lost their first)
+    @Test
+    fun aVowelsKeyReadAsALeadIsAKeyAlone() {
+        val vowels = pinyinDataOf(
+            Triple("啊", "a", -2f), Triple("一", "yi", -2f), Triple("呀", "ya", -2.2f), Triple("啊呀", "a ya", -3.5f), Triple("阿姨", "a yi", -4f),
+        )
+        val learner = Learner(vowels)
+        val s = PinyinSession(vowels, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        val fresh = s.page("ay")
+        assertEquals("啊呀", fresh.first())
+        s.pick("aayi", "阿姨")
+        assertEquals(listOf("阿姨", "啊呀"), s.page("ay").take(2))
     }
 }

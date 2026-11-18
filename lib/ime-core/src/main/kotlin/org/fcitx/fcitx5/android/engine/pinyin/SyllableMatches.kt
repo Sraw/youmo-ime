@@ -26,6 +26,13 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
     /** These with [flag] on each. */
     internal fun with(flag: Int) = SyllableMatches(syllables, IntArray(size) { flags[it] or flag })
 
+    // byFlags's, made at the first ask: a reading walks an edge's matches at each node it tries
+    @Volatile
+    private var byFlags: IntArray? = null
+
+    /** The indexes, exact ones first: by [flags], ties in syllable order. */
+    internal fun byFlags(): IntArray = byFlags ?: (0 until size).sortedBy { flags[it] }.toIntArray().also { byFlags = it }
+
     /** @return the index of [syllable], or -1 */
     fun indexOf(syllable: Int): Int = syllables.binarySearch(syllable).let { if (it >= 0) it else -1 }
 

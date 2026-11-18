@@ -7,9 +7,15 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
+import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
+import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.session.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
@@ -17,12 +23,15 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 /**
  * 双拼's keys read alone where a key and the next make a syllable (简拼 in the middle) read only the
- * words the user typed or chose ([UserWords.typed]; DECISIONS 0.6.1 双拼中间简拼改 U), 自然码.
+ * words the user typed or chose ([UserWords.typed]; DECISIONS 0.6.1 双拼中间简拼改 U), 自然码, on all four
+ * keyboards (061-sp-abbrev §3.1); the arcs so read told apart from slips, and kept past the words' cap (§3.5).
  */
 class PinyinDecoderTypedTest {
 
@@ -114,5 +123,125 @@ class PinyinDecoderTypedTest {
         // the imported one, made the user's own
         user.own(UserModel.Entry("妮好", syl("ni", "hao")))
         assertEquals(setOf("泥", "倪", "妮好"), alone().toSet())
+    }
+
+    // the 18, 14 and nine keys read keys alone as 26 keys do: the words typed only
+    @Test
+    @Uat("SP-52", "SP-53", "SP-54")
+    fun theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone() {
+        val nihao = UserModel.Entry("你好", syl("ni", "hao"))
+        for (letters in listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP)) {
+            val segmenter = GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, letters)
+            fun over(user: UserModel?, keys: String): List<String> {
+                val graph = segmenter.segment(keys.map(letters::key).joinToString(""))
+                val d = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), user = user)
+                d.decode(graph)
+                return d.arcsBetween(graph, 0, keys.length).map { it.text }
+            }
+            assertTrue("$letters", "你好" in over(null, "nihk"))
+            assertTrue("$letters", "你好" !in over(null, "nhk"))
+            val user = UserModel(data.dictionary, data.vocabulary, data.wordIndex)
+            assertTrue("$letters", "你好" !in over(user, "nhk"))
+            user.setCount(user.id(nihao), 1f, nihao)
+            assertTrue("$letters", "你好" in over(user, "nhk"))
+            // n and h each alone too
+            assertTrue("$letters", "你好" in over(user, "nh"))
+        }
+    }
+
+    // ky: kuai, more of it than the words' cap, below them 可以 by k and y alone; y tapped by u is ku too, 苦 by the slip
+    private val many = pinyinDataOf(
+        *(0 until 70).map { Triple(('\u4e00' + 200 + it).toString(), "kuai", -2f - it * 0.01f) }.toTypedArray(),
+        Triple("可以", "ke yi", -9f), Triple("苦", "ku", -9f), Triple("你", "ni", -2f),
+    )
+
+    private fun typed(vararg words: Pair<String, String>) = UserModel(many.dictionary, many.vocabulary, many.wordIndex).also { user ->
+        for ((text, reading) in words) {
+            val e = UserModel.Entry(text, reading.split(' ').map(Syllables::id).toIntArray())
+            if (user.id(e) < 0) user.own(e) else user.setCount(user.id(e), 1f, e)
+        }
+    }
+
+    private fun slipped(keys: String, at: Int): Array<Touch?> =
+        Array(keys.length) { if (it == at) TouchBoxes.tap(TouchBoxes.QWERTY, keys[it], dx = 0.45f) else TouchBoxes.tap(TouchBoxes.QWERTY, keys[it]) }
+
+    private val neighbours = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, neighbours = true)
+
+    // an arc over a key alone is told from one over a slip (review r2 M1): held back where slips are, only the slipped
+    @Test
+    fun arcsOverAKeyAloneAreHeldBackOnlyWhereTheyAreSlippedToo() {
+        val user = typed("可以" to "ke yi", "苦" to "ku", "你快" to "ni kuai", "你苦" to "ni ku")
+        val d = PinyinDecoder(many.dictionary, many.vocabulary, UserScorer(many.model, user), user = user)
+        fun between(graph: SyllableGraph, to: Int, holdsSlips: Boolean) = d.arcsBetween(graph, 0, to, holdsSlips).map { it.text }.toSet()
+        // ky, y by u: 可以 alone, 苦 slipped
+        val ky = neighbours.segment("ky", null, slipped("ky", 1))
+        d.decode(ky)
+        assertTrue(between(ky, 2, false).containsAll(listOf("可以", "苦")))
+        assertTrue("可以" in between(ky, 2, true))
+        assertFalse("苦" in between(ky, 2, true))
+        // nky: n alone, then ky; 你快 alone, 你苦 alone and slipped
+        val nky = neighbours.segment("nky", null, slipped("nky", 2))
+        d.decode(nky)
+        assertTrue(between(nky, 3, false).containsAll(listOf("你快", "你苦")))
+        assertTrue("你快" in between(nky, 3, true))
+        assertFalse("你苦" in between(nky, 3, true))
+    }
+
+    // past the words' cap the typed words read alone to the end still come (§3.5), not one read over a slip
+    @Test
+    @Uat("SP-57")
+    fun wordsTypedReadAloneAreKeptPastTheCapButNotOnesSlipped() {
+        val user = typed("可以" to "ke yi", "苦" to "ku")
+        val d = PinyinDecoder(many.dictionary, many.vocabulary, UserScorer(many.model, user), user = user)
+        val graph = neighbours.segment("ky", null, slipped("ky", 1))
+        val words = d.decode(graph).words.map { it.text }
+        assertTrue("${words.size}", words.size > PinyinDecoder.DEFAULT_WORDS)
+        assertTrue("可以" in words)
+        assertTrue("苦" in d.arcsBetween(graph, 0, 2).map { it.text })
+        assertFalse("苦" in words)
+    }
+
+    // a decoder's every reading: its sentences, its words and the arcs between every two positions, slips held or not
+    private fun lattice(d: PinyinDecoder, graph: SyllableGraph): List<String> {
+        val r = d.decode(graph)
+        return (r.sentences + r.words).map { "${it.text} ${it.score} ${it.ends.toList()}" } + (graph.start until graph.end).flatMap { a ->
+            (a + 1..graph.end).flatMap { b -> listOf(false, true).flatMap { h -> d.arcsBetween(graph, a, b, h).map { "$a-$b $h ${it.text} ${it.score}" } } }
+        }
+    }
+
+    // §3.9: over keys alone only the children with a typed word below are walked; they read what looking each
+    // match up reads (collectMatches, the decoder's way before; code review SHOULD-3: not the walk against itself)
+    @Test
+    fun walkingOnlyTheChildrenWithATypedWordBelowReadsTheSame() {
+        val pieces = listOf("ni", "hk", "vs", "hw", "rf", "mn", "n", "h", "v", "r", "m", "k")
+        val keyboards: List<Pair<String, (String) -> String>> = listOf("26" to { k: String -> k }) +
+            listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP).map { l -> l.toString() to { k: String -> k.map(l::key).joinToString("") } }
+        val segmenters: List<Segmenter> = listOf(ziranma) +
+            listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP).map { GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, it) }
+        for (own in listOf(false, true)) {
+            val user = UserModel(data.dictionary, data.vocabulary, data.wordIndex)
+            for ((text, reading) in listOf("你好" to "ni hao", "中华" to "zhong hua", "人民" to "ren min", "你" to "ni")) {
+                val e = UserModel.Entry(text, reading.split(' ').map(Syllables::id).toIntArray())
+                user.setCount(user.id(e), 1f, e)
+            }
+            // the user's own trie has children: those steps go by the match
+            if (own) user.own(UserModel.Entry("你中", syl("ni", "zhong")))
+            val random = Random(39)
+            var read = 0
+            for ((k, segmenter) in segmenters.withIndex()) {
+                val (name, code) = keyboards[k]
+                val typedWords = listOf("你好", "中华", "人民", "你中")
+                repeat(150) {
+                    val keys = (1..random.nextInt(1, 5)).joinToString("") { pieces.random(random) }
+                    val graph = segmenter.segment(code(keys))
+                    val fast = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
+                    val each = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user).apply { walksTyped = false }
+                    val a = lattice(fast, graph)
+                    assertEquals("$name $own $keys", lattice(each, graph), a)
+                    if (graph.hasAbbreviations && a.any { c -> typedWords.any { it in c } }) read++
+                }
+            }
+            assertTrue("$own: $read read over keys alone", read > 100)
+        }
     }
 }
