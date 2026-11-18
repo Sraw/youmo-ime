@@ -8,7 +8,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
-## 0.6.1（开发中）
+## 0.6.1（2026-11-17）
 
 ### 主要变化
 
