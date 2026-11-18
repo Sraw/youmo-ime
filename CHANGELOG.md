@@ -8,6 +8,18 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.6.2（2026-11-18）
+
+### 修复
+
+- 笔画筛选后点候选，偶尔上屏的是别的词（比如点「好看」上了「估计」，上的词可能连笔画都不符）：画完笔画停一下，高档会把候选再精挑一遍、重新排序，排序变在第一页之后时，筛出来的候选还记着旧的位置，点下去按旧位置取词。现在候选重排后会重新筛，点候选时也按字核对，对不上就按字重新找，找不到就不上屏。0.6.1 起就有，和键盘布局无关。
+
+### Fixes
+
+- After a stroke filter, a tapped candidate sometimes committed another word (tapping 好看 committed 估计, a word the strokes do not even keep): at a pause the high performance level picks again among the candidates and reorders them, and where that reorder fell past the first page, the filtered candidates still pointed at the old places. The filter now looks through the candidates again after a reorder, and a tap checks the word itself, finding it again where it moved and committing nothing when it is gone. In since 0.6.1, with any keyboard layout.
+
+---
+
 ## 0.6.1（2026-11-17）
 
 ### 主要变化
