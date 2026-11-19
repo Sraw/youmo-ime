@@ -79,8 +79,11 @@ class KotlinHostTest {
 
     private fun start(side: (ScriptedEngine) -> KotlinHost.EngineSide = { it }) {
         engine = ScriptedEngine(home)
+        val readies = events.list().count { it is HostEvent.Ready }
         // the first run is the case's setUp's (or the case's own) to set: a restart is none
         fcitx = startedHost(side(engine), firstRun = false) { host -> scope.launch { host.eventFlow.collect(events::add) } }
+        // isReady turns a few calls before Ready is emitted on the host thread: a slow runner read no event yet
+        until("the Ready event") { events.list().count { it is HostEvent.Ready } > readies }
     }
 
     private fun restart() {
