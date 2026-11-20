@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.editing
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -163,16 +164,20 @@ class EditorInfoTraitsTest {
     fun aNumbersPhonesOrDatesFieldSaysWhichNumbers() {
         val n = InputType.TYPE_CLASS_NUMBER
         val d = InputType.TYPE_CLASS_DATETIME
-        fun kind(type: Int) = info { inputType = type }.number
-        assertEquals(NumberKind.INTEGER, kind(n))
-        assertEquals(NumberKind.SIGNED, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED))
-        assertEquals(NumberKind.DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_DECIMAL))
-        assertEquals(NumberKind.SIGNED_DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL))
-        assertEquals(NumberKind.PIN, kind(n or InputType.TYPE_NUMBER_VARIATION_PASSWORD or InputType.TYPE_NUMBER_FLAG_DECIMAL))
-        assertEquals(NumberKind.PHONE, kind(InputType.TYPE_CLASS_PHONE))
-        assertEquals(NumberKind.DATE, kind(d or InputType.TYPE_DATETIME_VARIATION_DATE))
-        assertEquals(NumberKind.TIME, kind(d or InputType.TYPE_DATETIME_VARIATION_TIME))
-        assertEquals(NumberKind.DATETIME, kind(d))
-        assertNull(kind(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
+        assertRows(
+            listOf(
+                Triple("a number field", n, NumberKind.NUMBER),
+                // an amount declared decimal takes a minus: the flags say nothing of what it takes
+                Triple("a signed one, a number still", n or InputType.TYPE_NUMBER_FLAG_SIGNED, NumberKind.NUMBER),
+                Triple("a decimal one, a number still", n or InputType.TYPE_NUMBER_FLAG_DECIMAL, NumberKind.NUMBER),
+                Triple("a PIN, a number still", n or InputType.TYPE_NUMBER_VARIATION_PASSWORD or InputType.TYPE_NUMBER_FLAG_DECIMAL, NumberKind.NUMBER),
+                Triple("a phone", InputType.TYPE_CLASS_PHONE, NumberKind.PHONE),
+                Triple("a date", d or InputType.TYPE_DATETIME_VARIATION_DATE, NumberKind.DATETIME),
+                Triple("a time", d or InputType.TYPE_DATETIME_VARIATION_TIME, NumberKind.DATETIME),
+                Triple("both", d, NumberKind.DATETIME),
+                Triple("a password is text: no number", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, null),
+            ),
+            { it.first },
+        ) { (_, type, kind) -> assertEquals(kind, info { inputType = type }.number) }
     }
 }

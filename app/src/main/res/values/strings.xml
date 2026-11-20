@@ -1463,10 +1463,6 @@
     <string name="layout_im_english">English</string>
     <string name="layout_im_table">Wubi and other tables</string>
     <string name="layout_pad_full">123</string>
-    <string name="layout_pad_digits">digits</string>
-    <string name="layout_pad_signed">signed</string>
-    <string name="layout_pad_decimal">decimal</string>
-    <string name="layout_pad_signed_decimal">signed decimal</string>
     <string name="layout_pad_phone">phone</string>
     <string name="layout_pad_datetime">date and time</string>
     <string name="layout_info_description">Description: %1$s</string>
@@ -1540,6 +1536,7 @@
     <string name="layout_board_number_row">Number row</string>
     <string name="layout_finding_gap_look">look= and class= of a gap do nothing</string>
     <string name="layout_finding_pad_lacks">The number keyboard %1$s lacks %2$s: it cannot be typed in such fields</string>
+    <string name="layout_finding_full_lacks">The number keyboard lacks %1$s: number fields cannot take it (an amount\'s minus, a decimal point)</string>
     <string name="layout_finding_bottom_left">The bottom left is usually %1$s (as in the app’s)</string>
     <string name="layout_finding_split_scaled">Split, this row has %1$s keys in %2$s, not 9 or 10: it cannot be halved and is scaled instead</string>
 </resources>

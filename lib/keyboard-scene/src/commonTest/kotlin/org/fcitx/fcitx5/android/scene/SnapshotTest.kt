@@ -184,7 +184,7 @@ object Shots {
 
     private fun styled(vararg styles: String, fonts: String = "") = ThemeSource("material-light.xml", styles.toList(), fonts)
 
-    private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
+    private val PADS = listOf("phone", "datetime")
 }
 
 /** The JVM writes them (-Psnapshots.record=true) and both targets compare with what is committed, so the JVM and JS agree. */

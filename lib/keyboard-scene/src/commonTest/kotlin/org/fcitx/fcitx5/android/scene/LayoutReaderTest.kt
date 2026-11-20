@@ -240,11 +240,11 @@ class LayoutReaderTest {
 
     @Test
     fun anIdTwiceIsFineWhereEachHasACondition() {
-        val ok = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\" when=\"pad=phone\"/></row>")
+        val ok = board("<row><key id=\"a\" label=\"a\" when=\"pad=datetime\"/></row>\n<row><key id=\"a\" label=\"b\" when=\"pad=phone\"/></row>")
         assertEquals(emptyList(), problems(ok))
-        val half = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\"/></row>")
+        val half = board("<row><key id=\"a\" label=\"a\" when=\"pad=datetime\"/></row>\n<row><key id=\"a\" label=\"b\"/></row>")
         assertTrue(problems(half).single().contains("used twice"))
-        val rows = board("<row when=\"pad=signed\"><key id=\"a\" label=\"a\"/></row>\n<row when=\"pad=phone\"><key id=\"a\" label=\"b\"/></row>")
+        val rows = board("<row when=\"pad=datetime\"><key id=\"a\" label=\"a\"/></row>\n<row when=\"pad=phone\"><key id=\"a\" label=\"b\"/></row>")
         assertEquals(emptyList(), problems(rows))
     }
 
@@ -266,7 +266,16 @@ class LayoutReaderTest {
         assertTrue(problems(board("<meta><x/></meta>\n$row")).single().contains("not allowed"))
         assertTrue(problems(board(row, " based-on=\"Qwerty\"")).single().contains("based-on"))
         val number = { pads: String -> board(row, " pads=\"$pads\"").replace("family=\"symbols\"", "family=\"number\"") }
-        assertEquals(listOf("full", "decimal"), LayoutReader.layout(number("full decimal")).ok().pads)
+        assertEquals(listOf("full", "phone"), LayoutReader.layout(number("full phone")).ok().pads)
+        // the fields of the pads merged have the full one: a board for them is for it, with a warning
+        val merged = LayoutReader.layout(number("full digits decimal phone"))
+        assertEquals(listOf("full", "phone"), merged.ok().pads)
+        assertEquals(listOf("digits", "decimal"), merged.warnings().map { Regex("\"(.*?)\"").find(it.message)!!.groupValues[1] })
+        assertEquals(listOf("full"), LayoutReader.layout(number("signed signed-decimal")).ok().pads)
+        // a key only for a pad merged shows nowhere now: told, still read
+        val old = LayoutReader.layout(number("full").replace("<key ", "<key when=\"pad=full|digits, !pad=decimal\" "))
+        assertEquals(listOf("pad=digits", "pad=decimal"), old.warnings().map { Regex("pad=[a-z-]+").find(it.message)!!.value })
+        assertEquals(emptyList(), LayoutReader.layout(number("full").replace("<key ", "<key when=\"pad=full|phone\" ")).warnings())
         assertTrue(problems(number("full abacus")).single().contains("abacus"))
         assertTrue(problems(number("full full")).single().contains("twice"))
         assertTrue(problems(board(row, " pads=\"full\"")).single().contains("number board"))

@@ -127,8 +127,13 @@ def testbed_field(d, rid):
     from uat import TESTBED
     d.sh(f"am force-stop {TESTBED}")
     d.testbed("types")
-    n = d.wait(lambda s: next((x for x in s.app() if x.rid == rid and x.pkg == TESTBED), None), 15,
-               what=f"the testbed's {rid} field")
+    def field(s):
+        n = next((x for x in s.app() if x.rid == rid and x.pkg == TESTBED), None)
+        # the date and later fields are below the first screen
+        if not n and any(x.pkg == TESTBED for x in s.app()):
+            d.scroll(s)
+        return n
+    n = d.wait(field, 15, what=f"the testbed's {rid} field")
     d.tap(n.c, 1.5)
     d.page = None
     d.host = None

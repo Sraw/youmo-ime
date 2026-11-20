@@ -58,7 +58,7 @@ test("the engine says what the page offers: the app's version, families, bases, 
   assert.equal(FORMAT.version, '0.6.1');
   assert.deepEqual([...FORMAT.families], ['letters', 'grouped', 'nine', 'number', 'symbols']);
   assert.deepEqual([...FORMAT.bases], ['qwerty', 'k14', 'k18', 'nine', 'number', 'symbols']);
-  assert.deepEqual([...FORMAT.pads], ['full', 'digits', 'signed', 'decimal', 'signed-decimal', 'phone', 'datetime']);
+  assert.deepEqual([...FORMAT.pads], ['full', 'phone', 'datetime']);
   assert.deepEqual([...FORMAT.prefixes], ['full', 'g14', 'g18', 't9', 'zy9', 'zyfull', 'num', 'fn']);
   assert.deepEqual({ ...FORMAT.limits }, { bytes: 65536, id: 32, name: 24 });
   // the ids the checker's id-built-in refuses: the app's boards and the fragments they include
@@ -79,6 +79,9 @@ test('each finding is said in Chinese with what it names; one the table lacks as
   assert.equal(LM.words({ key: 'bottom-left', args: ['back numbers'] }), '左下角通常是 返回、123（和 App 自带的一样）');
   assert.equal(LM.words({ key: 'label-long', args: ['hjk', '16'] }), '键「hjk」显示的字太长：最多 16 个字符');
   assert.equal(LM.words({ key: 'gap-look', args: [] }), '空位（gap）的 look=、class= 不起作用');
+  // the full pad is every number field's: said as no kind of field, as the app says it
+  assert.equal(LM.words({ key: 'pad-lacks', args: ['full', '- .'] }), '数字键盘缺 - .：数字框里打不出来（比如金额的负号、小数点）');
+  assert.equal(LM.words({ key: 'pad-lacks', args: ['phone', '#'] }), '数字键盘「电话」缺 #：这种输入框里打不出来');
   assert.equal(LM.words({ key: 'held', args: ['g18/h', 'k18'] }), 'g18/h 是 18 键的键，这里写的长按、角标、滑动不起作用');
   assert.equal(LM.words({ key: 'held', args: ['fn/x', 'number-row'] }), 'fn/x 是数字行的键，这里写的长按、角标、滑动不起作用');
   assert.equal(LM.words({ key: 'held-letters', args: ['g18/h', 'k18'] }), 'g18/h 是 18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名');
@@ -716,7 +719,7 @@ const drawn = (l, input) => {
 
 test('the examples: 17 键, AZERTY, 大按键数字键盘, each its name its label, checked clean where it says it is used', () => {
   assert.deepEqual(EXAMPLES.map((x) => [x.id, x.label]), [['k17', '17 键'], ['azerty', 'AZERTY'], ['big-number', '大按键数字键盘']]);
-  const used = { k17: [['pinyin'], []], azerty: [['pinyin', 'shuangpin', 'english', 'table'], []], 'big-number': [[], ['full', 'digits', 'decimal']] };
+  const used = { k17: [['pinyin'], []], azerty: [['pinyin', 'shuangpin', 'english', 'table'], []], 'big-number': [[], ['full']] };
   for (const x of EXAMPLES) {
     assert.ok(x.note, x.id);
     assert.equal(LM.info(x.xml).id, x.id, 'the file is its id');
@@ -759,16 +762,16 @@ test("AZERTY: the French rows, the app's letter keys, ' after N; ; and * after i
   assert.equal(drawn(l, { ime: 'english' }).find((k) => k.id === 'a').label, 'a');
 });
 
-test('大按键数字键盘: four columns, ⏎ two rows high, . only where the field takes one, 符 返回 bottom left', () => {
+test('大按键数字键盘: four columns, ⏎ two rows high, . and - half a column each, 符 返回 bottom left', () => {
   const l = E.readOwnLayout(example('big-number').xml).layout;
   const full = drawn(l, { field: 'number', pad: 'full' });
-  assert.deepEqual(full.map((k) => k.id), ['1', '2', '3', 'backspace', '4', '5', '6', '.', '7', '8', '9', 'enter', 'symbols', 'back', '0', 'space']);
+  assert.deepEqual(full.map((k) => k.id), ['1', '2', '3', 'backspace', '4', '5', '6', '.', '-', '7', '8', '9', 'enter', 'symbols', 'back', '0', 'space']);
   const enter = full.find((k) => k.id === 'enter');
   assert.deepEqual(enter.bounds.map(Math.round), [810, 350, 1080, 700]);
   assert.deepEqual(full.find((k) => k.id === '5').bounds.map(Math.round), [270, 175, 540, 350]);
-  assert.ok(!drawn(l, { field: 'number', pad: 'digits' }).some((k) => k.id === '.'));
-  assert.ok(drawn(l, { field: 'number', pad: 'decimal' }).some((k) => k.id === '.'));
-  assert.deepEqual([full[12].label, full[13].label], ['符', '返回']);
+  // every number field has the full pad: the minus an amount takes beside the point
+  assert.deepEqual(full.find((k) => k.id === '-').bounds.map(Math.round), [945, 175, 1080, 350]);
+  assert.deepEqual([full[13].label, full[14].label], ['符', '返回']);
 });
 
 test('the id and name offered are cut to the format\'s limits', () => {

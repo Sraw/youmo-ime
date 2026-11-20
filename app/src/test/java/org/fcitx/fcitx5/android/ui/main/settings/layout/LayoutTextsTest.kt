@@ -50,6 +50,8 @@ class LayoutTextsTest {
         assertEquals("第 30 行：g18/h 是 18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名", LayoutTexts.finding(zh(), LayoutCheck.Finding(30, "held-letters", listOf("g18/h", "k18"))))
         assertEquals("这里写的 popups= 不起作用，跟 18 键一样", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "held-popups", listOf("k18"))))
         assertEquals("数字键盘「电话」缺 + *：这种输入框里打不出来", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "pad-lacks", listOf("phone", "+ *"))))
+        // the full pad is no kind of field: every number field has it
+        assertEquals("数字键盘缺 - .：数字框里打不出来（比如金额的负号、小数点）", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "pad-lacks", listOf("full", "- ."))))
     }
 
     @Test
@@ -63,7 +65,7 @@ class LayoutTextsTest {
         fun report(family: String, ims: List<String> = emptyList(), pads: List<String> = emptyList()) =
             LayoutCheck.Report(emptyList(), emptyList(), family, ims, pads, emptyList(), "0.6.1")
         assertEquals("能用在：拼音、双拼的键盘", LayoutTexts.usedFor(zh(), report("grouped", listOf("pinyin", "shuangpin"))))
-        assertEquals("能用在：数字键盘：123、小数、电话", LayoutTexts.usedFor(zh(), report("number", pads = listOf("full", "decimal", "phone"))))
+        assertEquals("能用在：数字键盘：123、电话", LayoutTexts.usedFor(zh(), report("number", pads = listOf("full", "phone"))))
         assertEquals("能用在：符号面板", LayoutTexts.usedFor(zh(), report("symbols")))
         assertTrue(LayoutTexts.usedFor(appContext, report("letters", listOf("english"))).contains("English"))
     }

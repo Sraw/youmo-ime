@@ -819,7 +819,9 @@
       line('分体时', choice([['', '默认（放在一边）'], ['split', '分成两半'], ['side', '放在一边'], ['none', '不分']], a['on-split'] || '', (v) => setK('on-split', v), { 'aria-label': '分体方式' })),
     ];
     if (a.family === 'number') {
-      const pads = (x) => new Set((keyboardAttrs(x).pads || '').split(' ').filter(Boolean));
+      // an older pad's name is read as the full pad's, as the engine reads it; another unknown one is the engine's error
+      const merged = ['digits', 'signed', 'decimal', 'signed-decimal'];
+      const pads = (x) => new Set((keyboardAttrs(x).pads || '').split(' ').filter(Boolean).map((p) => (merged.includes(p) ? 'full' : p)));
       const on = pads(xml);
       out.push(line('数字键盘', ...FORMAT.pads.map((pad) => h('label', { className: 'inline' }, h('input', { type: 'checkbox', checked: on.has(pad), onchange: (e) => {
         // a box kept over a change does not have the set it was drawn with

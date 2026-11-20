@@ -84,7 +84,9 @@ class CustomPanelTest {
         prefs.numberKeyboardLayout.setValue(mine.id)
         assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_NUMBER))
         assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_PHONE))
-        assertEquals(listOf("1"), shownOnes(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL))
+        // a decimal field has the full pad, so the board for it; a date's is not the board's
+        assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL))
+        assertEquals(listOf("1"), shownOnes(InputType.TYPE_CLASS_DATETIME))
         h.start()
         h.tap(h.key("123"))
         assertTrue(h.texts().toString(), "壹" in h.texts())
@@ -118,6 +120,18 @@ class CustomPanelTest {
         assertEquals(listOf("full"), mine.pads)
         prefs.numberKeyboardLayout.setValue(mine.id)
         assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_NUMBER))
+        assertEquals(listOf("1"), shownOnes(InputType.TYPE_CLASS_PHONE))
+    }
+
+    // their fields have the full pad now
+    @Test
+    fun aBoardImportedForTheMergedPadsIsTheFullOnes() {
+        val mine = numbers(" pads=\"digits decimal\"")!!
+        assertTrue(mine.drawn)
+        assertEquals(listOf("full"), mine.pads)
+        prefs.numberKeyboardLayout.setValue(mine.id)
+        assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD))
+        assertEquals(listOf("壹"), shownOnes(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED))
         assertEquals(listOf("1"), shownOnes(InputType.TYPE_CLASS_PHONE))
     }
 

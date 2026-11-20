@@ -19,25 +19,10 @@ const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
 
 private val EMAIL_VARIATIONS = setOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
 
-// its variation and flags mean this only in their class
-private fun numberKind(type: Int, variation: Int, flags: Int): NumberKind? = when (type) {
-    InputType.TYPE_CLASS_NUMBER -> {
-        val signed = flags and InputType.TYPE_NUMBER_FLAG_SIGNED != 0
-        val decimal = flags and InputType.TYPE_NUMBER_FLAG_DECIMAL != 0
-        when {
-            variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD -> NumberKind.PIN
-            signed && decimal -> NumberKind.SIGNED_DECIMAL
-            signed -> NumberKind.SIGNED
-            decimal -> NumberKind.DECIMAL
-            else -> NumberKind.INTEGER
-        }
-    }
+private fun numberKind(type: Int): NumberKind? = when (type) {
+    InputType.TYPE_CLASS_NUMBER -> NumberKind.NUMBER
     InputType.TYPE_CLASS_PHONE -> NumberKind.PHONE
-    InputType.TYPE_CLASS_DATETIME -> when (variation) {
-        InputType.TYPE_DATETIME_VARIATION_DATE -> NumberKind.DATE
-        InputType.TYPE_DATETIME_VARIATION_TIME -> NumberKind.TIME
-        else -> NumberKind.DATETIME
-    }
+    InputType.TYPE_CLASS_DATETIME -> NumberKind.DATETIME
     else -> null
 }
 
@@ -52,7 +37,7 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
         isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
         isPassword = CapabilityFlags.isPassword(this),
         isNumber = type == InputType.TYPE_CLASS_NUMBER || type == InputType.TYPE_CLASS_PHONE || type == InputType.TYPE_CLASS_DATETIME,
-        number = numberKind(type, variation, inputType and InputType.TYPE_MASK_FLAGS),
+        number = numberKind(type),
         isSearch = action == EditorInfo.IME_ACTION_SEARCH,
         isSensitive = (if (ownPackage != null) CapabilityFlags.forField(this, ownPackage) else CapabilityFlags.fromEditorInfo(this))
             .hasAny(CapabilityFlag.PasswordOrSensitive),

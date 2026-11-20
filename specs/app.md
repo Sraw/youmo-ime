@@ -726,7 +726,7 @@ the finished character's sentence. The recognizer skips a read only for a newer 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
 and 18 keys: k14.xml, k18.xml, their bottom row grouped-bottom.xml), since S4b `NumberKeyboard` (number.xml,
-its seven pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
+its three pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
 no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by keyboard-scene's
 `LookTheme` (`scene/look/`) (a 3.0 single key's name the selector of that key, written by `ThemeWriter` with what selectors read escaped: `zhuyin/,` its comma
@@ -1050,9 +1050,13 @@ character, wherever down the key. A key of one letter a–z (`NineKeyLetters.wei
 layout's own) sends its place too where any group of the layout leans: it weighs nothing of its own, but a slip from it
 onto a key of two has that key's letters weighed by where the tap lies on it (T9Segmenter, 061-neighbour-18key S1).
 
-The number keyboard (S4b) is one layout, `number.xml`, for all seven pads: `NumberKeyboard` gives its
-`NumberPad` as `Input.pad` (`full`, `signed-decimal`…) and the keys beside the digits are chosen by
-`when="pad=…"`; one id, `number`, as the theme names the board (P3 styles `number/<key>`), each pad's
+The number keyboard (S4b) is one layout, `number.xml`, for its three pads: `NumberKeyboard` gives its
+`NumberPad` as `Input.pad` (`full`, `phone`, `datetime`) and the keys beside the digits are chosen by
+`when="pad=…"`. Every number field has the full pad (`NumberPad.of`): what a field declares (decimal, signed, a PIN)
+is often not what it takes, and a field drops what it refuses. A user's board naming the older pads (`digits`,
+`signed`, `decimal`, `signed-decimal`) in `pads=` is read as for `full` (`LayoutReader`, with a reader warning); a key
+`when="pad=…"` of them never holds (a reader warning too); a board whose full pad lacks `-` or `.` is warned of (`pad-lacks`). The board has one
+id, `number`, as the theme names the board (P3 styles `number/<key>`), each pad's
 own `NumberKeyboard` drawing it. Its digits and `+ - * / , = .` are `sym:KP_…`: the `action:` table sends
 every `KP_` keysym with NumLock (`NumLockState`), as `NumPadKey` did (`keypad:`, a typing keyboard's
 corner digit, stays Virtual). The board's `preview="off" popups="off"` are applied to each key

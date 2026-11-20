@@ -46,7 +46,7 @@ class ExampleLayoutsTest {
         val used = mapOf(
             "k17" to (listOf("pinyin") to emptyList()),
             "azerty" to (listOf("pinyin", "shuangpin", "english", "table") to emptyList()),
-            "big-number" to (emptyList<String>() to listOf("full", "digits", "decimal")),
+            "big-number" to (emptyList<String>() to listOf("full")),
         )
         for (id in ids) {
             val r = LayoutCheck.check(example(id), sources, "0.6.1", Fixtures.materialLight)
@@ -66,7 +66,7 @@ class ExampleLayoutsTest {
         // the app's fragments (grouped-bottom): what an include of a layout of the user's reads
         val held = KeyData.of(read.id, read, Forms.fragments, KeyData.Mode.Own)
         val variant = DefaultMarks.variantOf(held.layout)
-        val pads = if (read.family == "number") read.pads.orEmpty().map { it to it } else listOf("" to null)
+        val pads = if (read.family == "number") (read.pads ?: listOf("full")).map { it to it } else listOf("" to null)
         forms.flatMap { (form, env) ->
             pads.map { (padName, pad) ->
                 val told = env.copy(input = env.input.copy(pad = pad))

@@ -37,10 +37,6 @@ class NumberPadsTest {
     private val pads = listOf(
         "full" to "the 123 key's pad, whose / it had there moves below the space",
         "phone" to "a dialler's, whose - moves below the space",
-        "digits" to "a PIN's, blank there before",
-        "signed" to "a signed number's",
-        "decimal" to "a decimal's",
-        "signed-decimal" to "a signed decimal's",
         "datetime" to "a date's or time's",
     ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } }
 
@@ -149,19 +145,12 @@ class NumberPadsTest {
         assertEquals("返回", Forms.block.texts.back, "the test's words are the app's Chinese")
     }
 
-    // nothing drawn at a blank place: each pad's ground (Scene.base) is the full pad's, which has no blank, in each form;
+    // nothing drawn at a blank place: the date pad's ground (Scene.base) is the full pad's, which has no blank, in each form;
     // and a finger there presses nothing
     @Test
     fun aBlankPlaceDrawsNothingAndTakesNoTouch() = assertRows(
-        listOf(
-            // each has other blanks (a PIN's the column left of the digits and three of the bottom row): the place right
-            // of 9, which every one of them leaves blank, is the one probed
-            "digits" to "a PIN's",
-            "signed" to "a signed number's",
-            "decimal" to "a decimal's",
-            "signed-decimal" to "a signed decimal's",
-            "datetime" to "a date's or time's",
-        ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
+        // its other blanks are two of the bottom row: the place right of 9 is the one probed
+        listOf("datetime" to "a date's or time's").flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
         { (pad, form, why) -> "$pad $form: $why" },
     ) { (pad, form, _) ->
         val s = scene(pad, form)
@@ -169,6 +158,20 @@ class NumberPadsTest {
         val nine = key(s, "9").bounds
         val back = key(s, "backspace").bounds
         assertNull(s.keyAt((back.left + back.right) / 2, (nine.top + nine.bottom) / 2), "right of 9, ⌫'s old place, presses nothing")
+    }
+
+    // a board copied from the app's when a PIN's, a decimal's and a signed field's pads were their own: their keys and
+    // blanks (when="pad=digits|…") never shown, each pad it is for laid out as the app's is now
+    @Test
+    fun anOlderCopyWithTheMergedPadsConditionsIsLaidOutAsTheAppsPads() = assertRows(
+        listOf("full" to "123's and every number field's", "phone" to "a dialler's", "datetime" to "a date's, not its but drawn all the same"),
+        { (pad, why) -> "$pad: $why" },
+    ) { (pad, _) ->
+        val old = LayoutReader.layout(testData("../../../../../uat/fixtures/layouts/uat-number-1.0.layout")).ok()
+        val e = Forms.env("number", Forms.block).let { it.copy(input = it.input.copy(pad = pad)) }
+        val mine = SceneBuilder(Fixtures.materialLight, e, FakeMeasurer).build(old, Forms.fragments).ok()
+        val app = Forms.scene("number", e)
+        assertEquals(app.keys.map { it.id to it.bounds }, mine.keys.map { it.id to it.bounds })
     }
 
     // a pack's number.xml of 0.6.0, its blanks written with a look: still read, drawn nothing all the same (one rule for

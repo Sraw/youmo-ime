@@ -11,6 +11,8 @@ import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.ShownKey
 import org.junit.After
@@ -21,8 +23,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -48,35 +48,13 @@ class FieldPadUatTest {
             assertTrue("$variation: $keys", keys.containsAll(digits + listOf("-", "/", ":")) && "q" !in keys)
             assertTrue("$variation: $keys", listOf("+", "*", "=").none { it in keys })
         }
-    }
-
-    @Test
-    @Uat("PAN-17")
-    fun phoneFieldsGetPlusStarAndHash() {
-        val keys = keys(InputType.TYPE_CLASS_PHONE)
-        assertTrue(keys.toString(), keys.containsAll(digits + listOf("+", "*", "#")))
-        assertTrue(keys.toString(), listOf("/", "=").none { it in keys })
-    }
-
-    @Test
-    @Uat("PAN-18")
-    fun pinFieldsGetDigitsOnly() {
-        val keys = keys(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
-        assertTrue(keys.toString(), keys.containsAll(digits))
-        assertTrue(keys.toString(), listOf("+", "-", "*", "/", ".", ",", "=").none { it in keys })
         // the blank places take no press, type nothing, have nothing for TalkBack
         val shown = h.keys()
         assertTrue(shown.toString(), shown.none { !it.enabled && (it.label.isNotEmpty() || it.description != null) })
-        val stretches = blankPlaces(shown)
-        // the bottom row's right two side by side make one stretch: split where the middle one ends
+        val blanks = blankPlaces(shown)
         val width = h.keyboard.width
-        val blanks = stretches.flatMap { r ->
-            if (abs(r.width() - width * (BOTTOM_MIDDLE + BOTTOM_RIGHT)) > 2) return@flatMap listOf(r)
-            val middle = r.left + (width * BOTTOM_MIDDLE).roundToInt()
-            listOf(Rect(r.left, r.top, middle, r.bottom), Rect(middle, r.top, r.right, r.bottom))
-        }
-        assertEquals(stretches.toString(), 7, blanks.size)
-        val wide = listOf(LEFT, LEFT, LEFT, RIGHT, BOTTOM_LEFT, BOTTOM_MIDDLE, BOTTOM_RIGHT)
+        val wide = listOf(RIGHT, BOTTOM_LEFT, BOTTOM_MIDDLE)
+        assertEquals(blanks.toString(), wide.size, blanks.size)
         val shares = blanks.map { it.width().toFloat() / width }.sorted()
         for ((want, got) in wide.sorted().zip(shares)) assertEquals("$blanks", want, got, 2f / width)
         // drawn nothing: each place's middle the keyboard's fill (a key's face is inset from its corner)
@@ -96,6 +74,14 @@ class FieldPadUatTest {
             assertEquals("$at", emptyList<String>(), h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") })
             assertEquals("$at", before, h.field.text.toString())
         }
+    }
+
+    @Test
+    @Uat("PAN-17")
+    fun phoneFieldsGetPlusStarAndHash() {
+        val keys = keys(InputType.TYPE_CLASS_PHONE)
+        assertTrue(keys.toString(), keys.containsAll(digits + listOf("+", "*", "#")))
+        assertTrue(keys.toString(), listOf("/", "=").none { it in keys })
     }
 
     // the stretches along each row's middle no key covers, wider than a key's gap
@@ -121,17 +107,32 @@ class FieldPadUatTest {
         }
     }
 
+    private val full = digits + listOf("+", "-", "*", "/", ",", "=", ".")
+
     @Test
-    @Uat("PAN-19")
-    fun decimalAndSignedFieldsKeepTheDotAndTheMinus() {
-        val number = InputType.TYPE_CLASS_NUMBER
-        fun has(flags: Int) = keys(number or flags).let { ("." in it) to ("-" in it) }
-        // a plain number field (a Compose or Flutter one filters nothing): the whole pad
-        assertTrue(has(0) == (true to true))
-        assertTrue(keys(number).containsAll(listOf("+", "*", "/", "=")))
-        assertTrue(has(InputType.TYPE_NUMBER_FLAG_DECIMAL) == (true to false))
-        assertTrue(has(InputType.TYPE_NUMBER_FLAG_SIGNED) == (false to true))
-        assertTrue(has(InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED) == (true to true))
+    @Uat("PAN-18")
+    fun pinFieldsGetTheFullPad() {
+        val keys = keys(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+        assertTrue(keys.toString(), keys.containsAll(full) && "q" !in keys)
+    }
+
+    // what a field declares is no list of what it takes (an amount declared decimal takes a minus): the field drops the rest
+    @Test
+    @Uat("PAN-19", "PAN-35")
+    fun everyNumberFieldGetsTheFullPadItsMinusSent() = assertRows(
+        listOf(
+            "a number field that says no more" to 0,
+            "a decimal field" to InputType.TYPE_NUMBER_FLAG_DECIMAL,
+            "a signed field" to InputType.TYPE_NUMBER_FLAG_SIGNED,
+            "a signed decimal field" to (InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED),
+        ),
+        { it.first },
+    ) { (_, flags) ->
+        val keys = keys(InputType.TYPE_CLASS_NUMBER or flags)
+        assertTrue(keys.toString(), keys.containsAll(full) && "q" !in keys)
+        h.api.calls.clear()
+        h.tap(h.key("-"))
+        assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "sym=${FcitxKeyMapping.FcitxKey_KP_Subtract}," in it })
     }
 
     @Test
@@ -158,10 +159,8 @@ class FieldPadUatTest {
         const val BLANK_AT_LEAST = 20
 
         // number.xml's widths
-        const val LEFT = 0.16f
         const val RIGHT = 0.18f
         const val BOTTOM_LEFT = 0.08f
         const val BOTTOM_MIDDLE = 0.12f
-        const val BOTTOM_RIGHT = 0.1f
     }
 }

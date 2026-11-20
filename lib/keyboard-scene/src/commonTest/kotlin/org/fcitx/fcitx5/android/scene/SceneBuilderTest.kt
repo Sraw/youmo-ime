@@ -86,14 +86,14 @@ class SceneBuilderTest {
     fun aNumberPadWithNoPadIsTheFullOne() {
         val pads = board(
             "number",
-            "<row><key id=\"=\" label=\"=\" send=\"commit:=\" when=\"pad=full\"/><key id=\"-\" label=\"-\" send=\"commit:-\" when=\"pad=signed\"/></row>",
+            "<row><key id=\"=\" label=\"=\" send=\"commit:=\" when=\"pad=full\"/><key id=\"-\" label=\"-\" send=\"commit:-\" when=\"pad=phone\"/></row>",
         )
         val scene = Fixtures.scene(Fixtures.portrait, pads)
         assertEquals(listOf("="), scene.keys.map { it.id })
         assertTrue(scene.warnings.single().message.contains("no pad="), "${scene.warnings}")
-        val signed = Fixtures.scene(Fixtures.portrait.copy(input = Fixtures.portrait.input.copy(pad = "signed")), pads)
-        assertEquals(listOf("-"), signed.keys.map { it.id })
-        assertTrue(signed.warnings.isEmpty())
+        val phone = Fixtures.scene(Fixtures.portrait.copy(input = Fixtures.portrait.input.copy(pad = "phone")), pads)
+        assertEquals(listOf("-"), phone.keys.map { it.id })
+        assertTrue(phone.warnings.isEmpty())
     }
 
     // split-side is the side a board docks to while the letters split, nothing otherwise

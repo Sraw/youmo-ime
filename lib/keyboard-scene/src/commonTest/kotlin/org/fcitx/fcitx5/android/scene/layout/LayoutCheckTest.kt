@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.scene.TEST_DATA
 import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.readText
 import org.fcitx.fcitx5.android.scene.recording
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.writeText
@@ -226,11 +227,21 @@ class LayoutCheckTest {
         assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("panel-back"))), check(symbols.replace("send=\"panel-back\"", "send=\"layout:Text\"")).errors)
         val number = own("number")
         assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("pad=full: back"))), check(replaceKey(number, "back", "<gap width=\"14\"/>")).errors)
-        val decimal = number.replaceFirst("family=\"number\"", "family=\"number\" pads=\"decimal\"")
-        assertEquals(emptyList(), check(decimal).errors)
-        val noDot = Regex("<key id=\"\\.\"[^>]*/>").replace(decimal, "<gap width=\"10\"/>")
-        assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("pad=decimal: ."))), check(noDot).errors)
-        assertEquals(listOf("decimal"), check(noDot).errors.mapNotNull(LayoutCheck::padLacking))
+        // every number field has the full pad: without - or . an amount's minus or point cannot be typed (told, not refused)
+        val noDot = Regex("<key id=\"\\.\"[^>]*/>").replace(number, "<gap width=\"10\"/>")
+        val noMinus = Regex("<key id=\"-\" kind=\"function\" width=\"(\\d+)\"[^>]*/>").replace(noDot, "<gap width=\"\$1\"/>")
+        assertRows(
+            listOf(
+                Triple("the app's own: both", number, null),
+                Triple("no point: a decimal field cannot take one", noDot, "."),
+                Triple("neither: no minus either", noMinus, "- ."),
+            ),
+            { it.first },
+        ) { (_, board, lacks) ->
+            val r = check(board)
+            assertEquals(emptyList(), r.errors)
+            assertEquals(listOfNotNull(lacks?.let { LayoutCheck.Finding(0, "pad-lacks", listOf("full", it)) }), r.warnings.filter { it.key == "pad-lacks" })
+        }
         assertEquals(listOf("full"), check(replaceKey(number, "back", "<gap width=\"14\"/>")).errors.mapNotNull(LayoutCheck::padLacking))
         assertEquals(null, LayoutCheck.padLacking(LayoutCheck.Finding(0, "lacks", listOf("panel-back"))))
         // digits held by what they type, not by the app's ids

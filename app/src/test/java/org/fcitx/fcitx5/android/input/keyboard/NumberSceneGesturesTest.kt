@@ -30,7 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * On each of the seven pads: every key's gestures, ⌫ held, a tap on each blank place, held to the committed record
+ * On each of the three pads: every key's gestures, ⌫ held, a tap on each blank place, held to the committed record
  * ([GestureSnapshot]); no key pops a bubble, a blank sends nothing; Return's long press offers Emoji.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -166,10 +166,6 @@ class NumberSceneGesturesTest {
 
         val FIELDS = mapOf(
             NumberPad.FULL to InputType.TYPE_CLASS_NUMBER,
-            NumberPad.DIGITS to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD),
-            NumberPad.SIGNED to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED),
-            NumberPad.DECIMAL to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL),
-            NumberPad.SIGNED_DECIMAL to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL),
             NumberPad.PHONE to InputType.TYPE_CLASS_PHONE,
             NumberPad.DATETIME to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
         )

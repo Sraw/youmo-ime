@@ -201,15 +201,14 @@ class PackConvertTest {
         val number = testData("number.xml")
         val all = LayoutReader.layout(done(convert(number, id = "number")).text).ok()
         assertEquals(LayoutReader.PADS, all.pads)
-        val noPoint = number.replace(Regex("<key [^>]*send=\"(sym:KP_Decimal|\\.)\"[^>]*/>"), "<gap/>")
-        assertTrue(noPoint != number)
-        val some = LayoutReader.layout(done(convert(noPoint, id = "number")).text).ok().pads.orEmpty()
-        assertTrue("phone" in some && "datetime" in some && "full" in some, some.toString())
-        assertFalse("decimal" in some || "signed-decimal" in some, some.toString())
-        val declared = noPoint.replaceFirst("family=\"number\"", "family=\"number\" pads=\"full decimal\"")
-        assertTrue(declared != noPoint)
+        // a 5 only where the phone's and the full pad are drawn: no date pad made
+        val noDateFive = number.replace(Regex("<key [^>]*send=\"sym:KP_5\"[^>]*/>")) { it.value.replace("/>", " when=\"pad=full|phone\"/><gap when=\"pad=datetime\"/>") }
+        assertTrue(noDateFive != number)
+        assertEquals(listOf("full", "phone"), LayoutReader.layout(done(convert(noDateFive, id = "number")).text).ok().pads)
+        val declared = noDateFive.replaceFirst("family=\"number\"", "family=\"number\" pads=\"full datetime\"")
+        assertTrue(declared != noDateFive)
         assertIs<PackLayouts.Converted.Not>(convert(declared, id = "number"))
-        done(convert(declared.replace("pads=\"full decimal\"", "pads=\"full\""), id = "number"))
+        done(convert(declared.replace("pads=\"full datetime\"", "pads=\"full\""), id = "number"))
     }
 
     @Test

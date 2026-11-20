@@ -43,7 +43,7 @@
 | `on-split` | 否 | 横屏分体时：`split`（行按 `split="halves"` 分成两半）、`side`（默认，整块放在一边）、`none`（不分） |
 | `preview` | 否 | `off`：按下时不弹气泡 |
 | `popups` | 否 | `off`：键不长按弹出（数字键盘这样的） |
-| `pads` | 只数字键盘 | 管哪几种输入框，空格分开：`full`（点 123 进的那种）、`digits`（只有数字）、`signed`（带正负号）、`decimal`（带小数）、`signed-decimal`、`phone`（电话）、`datetime`（日期时间）。不写就是只管 `full`；没写的那几种照旧用 App 自带的 |
+| `pads` | 只数字键盘 | 管哪几种输入框，空格分开：`full`（点 123 进的那种，各种数字框也用它：纯数字、小数、能填负数、数字密码）、`phone`（电话）、`datetime`（日期时间）。不写就是只管 `full`；没写的那几种照旧用 App 自带的。0.6.3 以前的 `digits`、`signed`、`decimal`、`signed-decimal` 照样读，算作 `full`（这些框现在用完整的数字键盘），网页编辑器提示一句 |
 | `arrange` | 否 | 只能是 `rows`（默认） |
 
 ## 元素
@@ -118,11 +118,11 @@
 
 空格分开的几项都满足才算；逗号加空格（`, `）分开的几组满足一组就算；`!` 取反。带值的写 `名字=值`，几个值用 `|` 分开：
 
-- 带值（只写名字不写值表示「有任何值」）：`ime`（`pinyin`、`shuangpin`、`english`、`table`……）、`scheme`（双拼方案）、`scheme-types`（双拼方案要的键，如 `semicolon`）、`table`、`table-extra`（码表要的额外键：`semicolon`、`star`）、`field`（`url`、`email`……）、`pad`（数字键盘的那几种）、`action`。
+- 带值（只写名字不写值表示「有任何值」）：`ime`（`pinyin`、`shuangpin`、`english`、`table`……）、`scheme`（双拼方案）、`scheme-types`（双拼方案要的键，如 `semicolon`）、`table`、`table-extra`（码表要的额外键：`semicolon`、`star`）、`field`（`url`、`email`……）、`pad`（数字键盘的那几种：`full`、`phone`、`datetime`；以前的 `digits`、`signed`、`decimal`、`signed-decimal` 照样读，但不再有这几种，写着它们的键不显示，网页编辑器提示一句）、`action`。
 - `split-side=`（`left`、`right`）只在分体后的半边用，`on-split="split"` 的键盘里写它是错误。
 - 开关：`roots`、`compact`、`landscape`、`split`、`floating`、`one-handed`、`voice`、`hold-voice`、`lang-key`、`composing`、`looking-up`、`shifted`、`caps-lock`。
 
-例：AZERTY 的 `;` 键 `when="ime=shuangpin scheme-types=semicolon, table-extra=semicolon"`；大按键数字键盘的小数点 `when="pad=full|decimal"`。
+例：AZERTY 的 `;` 键 `when="ime=shuangpin scheme-types=semicolon, table-extra=semicolon"`；App 的数字键盘里只在完整的那种出现的 `=` 键 `when="pad=full"`。
 
 ## 每种键盘必须有的键
 
@@ -131,7 +131,7 @@
 | `letters` | a–z 26 个键（id 就是字母）、空格、Shift |
 | `grouped` | a–z 每个字母至少在一个键上（ü 用 v），每键 1–5 个字母，最多 30 组；空格 |
 | `nine` | 数字 2–9 的键、`nine-side` 的位置 |
-| `number` | 声明的每种输入框都要：0–9、⌫、回车、返回键（`role="back"`）；小数的要 `.`，带正负号的要 `-` |
+| `number` | 声明的每种输入框都要：0–9、⌫、回车、返回键（`role="back"`）。完整的那种缺 `-` 或 `.`、电话缺 `+ * #`、日期缺 `- / :` 是警告：这种框里打不出来 |
 | `symbols` | `symbol-categories`、`symbol-grid` 两个位置、返回键（`send="panel-back"`）、⌫ |
 
 此外每块都要有 ⌫、回车、地球键这些底稿上有的角色（底稿是九键、符号面板时还有它的那几个位置）。
@@ -142,7 +142,7 @@
 
 检查还会在各种屏幕宽度、横竖、紧凑、分体、输入框、这块能用的输入法（双拼排自然码、小鹤、微软三种方案，码表排要 `;`、要 `*` 两种）、数字键盘的每种输入框下各排一遍，横屏还在最矮的键盘高度（144 dp）下排一遍：哪一种排不下（一行太宽、跨行的键和下面的键撞上、同一时刻两个键同 id）或有键什么都不显示，就是错误。
 
-警告（能导入）：没有去数字键盘或符号面板的键；用了 App 自带键的名字又写了长按、角标、滑动（不起作用）；用了 App 自带键的名字、字母分组却和那个键不同（长按按 App 那个键的字母）；底稿是 App 键盘时写的 `popups="off"`（不起作用，照底稿弹出）；键宽不到整行的 1/20（10 列时是半个单位）；有 `commit:`；按当前主题会画成空白的键；没有名字的键；`<gap>` 上写了 `look=`、`class=`；数字键盘、符号面板底排左边两格不是符号键 / 数字键和返回键（和字母键盘的 **符**、**123** 同位）；电话输入框的数字键盘缺 `+ * #`、日期时间的缺 `- / :`（这种输入框里打不出来）；`on-split="split"` 的键盘里 `split="halves"` 的行在某种情况下（比如某个输入法多出的键）不是 9 或 10 个键，分体时只能整行缩小。
+警告（能导入）：没有去数字键盘或符号面板的键；用了 App 自带键的名字又写了长按、角标、滑动（不起作用）；用了 App 自带键的名字、字母分组却和那个键不同（长按按 App 那个键的字母）；底稿是 App 键盘时写的 `popups="off"`（不起作用，照底稿弹出）；键宽不到整行的 1/20（10 列时是半个单位）；有 `commit:`；按当前主题会画成空白的键；没有名字的键；`<gap>` 上写了 `look=`、`class=`；数字键盘、符号面板底排左边两格不是符号键 / 数字键和返回键（和字母键盘的 **符**、**123** 同位）；完整的数字键盘缺 `-` 或 `.`（各种数字框都用它）、电话输入框的数字键盘缺 `+ * #`、日期时间的缺 `- / :`（这种输入框里打不出来）；`on-split="split"` 的键盘里 `split="halves"` 的行在某种情况下（比如某个输入法多出的键）不是 9 或 10 个键，分体时只能整行缩小。
 
 ## 主题怎么画它
 

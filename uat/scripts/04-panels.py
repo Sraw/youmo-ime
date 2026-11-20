@@ -1,7 +1,7 @@
 """uat/04-panels.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import Blocked, case, check
+from uat import Blocked, case, check, script
 
 
 @case("PAN-30")
@@ -83,3 +83,28 @@ def pan23(d):
     check(n is not None, f"颜文字里找不到 {long}")
     d.shot("kb", "颜文字长字")
     return f"框里「{t}」，表情和颜文字格子见图"
+
+
+@case("PAN-35", visual=True)
+def pan35(d):
+    full = {"+", "-", "*", "/", ",", "=", "."}
+    d.step("测试页的小数框：声明小数，什么都收")
+    d.open_page("decimal")
+    d.clear()
+    keys = d.keys(refresh=True)
+    check(full <= set(keys), f"小数框不是完整的数字键盘：{sorted(keys)}")
+    d.shot("ime", "小数框：完整的数字键盘")
+    for k in ("-", "5"):
+        d.tap(keys[k], 0.4)
+    typed = d.field_text() or ""
+    check(typed == "-5", f"小数框点 - 5 打出的是 {typed!r}")
+    d.step("输入测试台的带符号数字框")
+    script("02-keyboard").testbed_field(d, "signed")
+    keys = d.keys(refresh=True)
+    check(full <= set(keys), f"带符号数字框不是完整的数字键盘：{sorted(keys)}")
+    for k in ("-", "3"):
+        d.tap(keys[k], 0.4)
+    time.sleep(0.5)
+    signed = d.testbed_state()["signed"]["text"]
+    check(signed == "-3", f"带符号数字框点 - 3 打出的是 {signed!r}")
+    return f"两个框都是完整的数字键盘；小数框「{typed}」，带符号数字框「{signed}」"

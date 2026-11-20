@@ -110,11 +110,11 @@ class ExpandTest {
     fun twoKeysOfOneIdShownIsAProblem() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
-                "<row><key id=\"minus\" label=\"-\" when=\"pad=signed|signed-decimal\"/>" +
-                "<key id=\"minus\" label=\"-\" when=\"pad=signed|phone\"/></row></keyboard>",
+                "<row><key id=\"minus\" label=\"-\" when=\"pad=full|datetime\"/>" +
+                "<key id=\"minus\" label=\"-\" when=\"pad=full|phone\"/></row></keyboard>",
         ).ok()
         assertEquals(1, Expand.rows(l, emptyMap(), env.copy(input = Input(pad = "phone"))).ok().single().items.size)
-        assertTrue(Expand.rows(l, emptyMap(), env.copy(input = Input(pad = "signed"))).problems().single().message.contains("two keys"))
+        assertTrue(Expand.rows(l, emptyMap(), env.copy(input = Input(pad = "full"))).problems().single().message.contains("two keys"))
     }
 
     @Test

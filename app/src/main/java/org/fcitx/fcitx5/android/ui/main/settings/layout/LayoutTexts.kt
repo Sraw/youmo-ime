@@ -71,7 +71,9 @@ object LayoutTexts {
             // an app key and its board by the name its key page has
             "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
             "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
-            "pad-lacks" -> ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", a.getOrElse(1) { "" })
+            // the full pad is every number field's, not one kind of field
+            "pad-lacks" -> if (a.getOrNull(0) == "full") ctx.getString(R.string.layout_finding_full_lacks, a.getOrElse(1) { "" })
+            else ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", a.getOrElse(1) { "" })
             "bottom-left" -> ctx.getString(R.string.layout_finding_bottom_left, a.getOrElse(0) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(sep) { role(ctx, it) })
             else -> string(f.key)?.let { ctx.getString(it, *Array(ARGS) { i -> a.getOrElse(i) { "" } }) }
                 ?: (f.key + a.joinToString("") { " $it" })
@@ -118,10 +120,6 @@ object LayoutTexts {
 
     fun pad(ctx: Context, p: String): String = when (p) {
         "full" -> ctx.getString(R.string.layout_pad_full)
-        "digits" -> ctx.getString(R.string.layout_pad_digits)
-        "signed" -> ctx.getString(R.string.layout_pad_signed)
-        "decimal" -> ctx.getString(R.string.layout_pad_decimal)
-        "signed-decimal" -> ctx.getString(R.string.layout_pad_signed_decimal)
         "phone" -> ctx.getString(R.string.layout_pad_phone)
         "datetime" -> ctx.getString(R.string.layout_pad_datetime)
         else -> p

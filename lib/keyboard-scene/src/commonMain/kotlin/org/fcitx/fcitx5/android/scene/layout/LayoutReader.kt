@@ -85,10 +85,11 @@ object LayoutReader {
 
     private fun pads(a: Attributes, family: String?): List<String>? {
         val pads = a.matching("pads", PAD_LIST, "number pads apart by a space (${PADS.joinToString(" ")})")?.split(' ') ?: return null
-        pads.filter { it !in PADS }.forEach { a.problem("pads=: \"$it\" is not one of ${PADS.joinToString("|")}") }
+        pads.filter { it !in PADS && it !in MERGED_PADS }.forEach { a.problem("pads=: \"$it\" is not one of ${PADS.joinToString("|")}") }
         if (pads.toSet().size != pads.size) a.problem("pads= names a pad twice")
         if (family != null && family != "number") a.problem("pads= is a number board's")
-        return pads
+        pads.filter { it in MERGED_PADS }.forEach { a.warn("pads=: \"$it\" is the full pad now: such a field has it") }
+        return pads.map { if (it in MERGED_PADS) "full" else it }.distinct()
     }
 
     /**
@@ -320,7 +321,10 @@ object LayoutReader {
     private fun condition(a: Attributes): Condition? {
         val raw = a.string("when") ?: return null
         return when (val c = Condition.parse(raw)) {
-            is Parsed.Ok -> c.value
+            is Parsed.Ok -> c.value.also { cond ->
+                cond.anyOf.flatten().filter { it.name == "pad" }.flatMap { it.values.orEmpty() }.filter { it in MERGED_PADS }.distinct()
+                    .forEach { a.warn("when=: pad=$it is no pad now: its fields have the full one, so pad=$it holds nowhere") }
+            }
             is Parsed.Failed -> null.also { c.problems.forEach { pr -> a.problem(pr.message) } }
         }
     }
@@ -419,7 +423,10 @@ object LayoutReader {
     private const val DEFAULT_COLUMNS = 10.0
     private val IDENT = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
-    val PADS = listOf("full", "digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
+    val PADS = listOf("full", "phone", "datetime")
+
+    /** Older pads whose fields have the full one: a board naming them is for it, a key's `when="pad=…"` of them never holds. */
+    private val MERGED_PADS = setOf("digits", "signed", "decimal", "signed-decimal")
     private val PAD_LIST = Regex("[a-z-]+( [a-z-]+)*")
     private const val MAX_META = 64
     private const val MAX_DESCRIPTION = 200

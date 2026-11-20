@@ -111,9 +111,9 @@ class CustomLayoutFilesTest {
         assertFalse("what its base must be typed on gone", restorable("mine.xml", own("mine").replace("role=\"backspace\" ", "")))
         assertFalse("for a newer app", restorable("mine.xml", own("mine").replaceFirst("<defaults", "<meta min-app=\"9.0.0\"/>\n  <defaults")))
         // a number board whose pad lacks what a field of it types: not drawn, whatever the backup says
-        val numbers = boards.getValue("number").replaceFirst("id=\"number\"", "id=\"my-num\" based-on=\"number\" pads=\"decimal\"")
+        val numbers = boards.getValue("number").replaceFirst("id=\"number\"", "id=\"my-num\" based-on=\"number\" pads=\"phone\"")
         assertTrue("a number board", restorable("my-num.xml", numbers))
-        assertFalse("its decimal pad without 5", restorable("my-num.xml", numbers.replace("send=\"sym:KP_5\"", "send=\"commit:x\"")))
+        assertFalse("its phone pad without 5", restorable("my-num.xml", numbers.replace("send=\"sym:KP_5\"", "send=\"commit:x\"")))
         val names = (1..150).map { "l$it.xml" } + listOf(".converted", "x.xml.saving", "Bad.xml")
         val taken = CustomLayoutFiles.restoredNames(names)
         assertEquals(CustomLayoutFiles.MAX_LAYOUTS, taken.size)

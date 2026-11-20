@@ -33,17 +33,12 @@ data class EditorTraits(
     val isShortMessage: Boolean = false,
 )
 
+/** Not whether a number is signed or decimal, nor a PIN: what a field declares is often not what it takes. */
 enum class NumberKind {
-    /** Neither signed nor decimal. */
-    INTEGER,
-    SIGNED,
-    DECIMAL,
-    SIGNED_DECIMAL,
-
-    PIN,
+    NUMBER,
     PHONE,
-    DATE,
-    TIME,
+
+    /** A date, a time or both. */
     DATETIME,
 }
 

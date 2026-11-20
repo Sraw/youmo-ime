@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  验收测试用（ST-170、ST-171、ST-173）：数字键盘，改自 App 的 number。只管 pads="full phone"（点 123 打开的和电话框的），
-  其余几种（数字框、小数框等）照样用 App 自带的；1 键写「壹」（打出的仍是 1），看得出画的是哪块。其余同 App 的。
+  验收测试用（ST-170、ST-171、ST-173）：数字键盘，改自 App 0.6.2 以前的 number。只管 pads="full phone"（点 123 打开的、各种数字框
+  和电话框的），日期框照样用 App 自带的；1 键写「壹」（打出的仍是 1），看得出画的是哪块。其余同 App 的；还留着当时数字密码、小数、
+  带负号框的 when="pad=digits…" 条件（那些框现在用 full，这些键和空位不再显示），keyboard-scene 的 NumberPadsTest 拿它看旧布局照样排。
 -->
 <keyboard xmlns="https://youmo-ime/layout/1" id="uat-number" based-on="number" name="UAT 数字" family="number" pads="full phone" columns="100" preview="off" popups="off">
   <meta author="UAT" version="1.0" license="CC0" description="验收测试用：数字键盘，1 键上写「壹」（打出的仍是 1），只管完整数字键盘和电话框"/>

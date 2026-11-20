@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   布局编辑器的示例「大按键数字键盘」：改自 App 的数字键盘（number），去掉左边一列运算符，数字键更大。
-  四列一样宽：1 2 3 ⌫ / 4 5 6 . / 7 8 9 ⏎ / 符 返回 0 空格；⏎ 占下面两行（rows="2"）。
-  管三种输入框（pads=）：点 123 打开的、只要数字的、要小数的；只要数字的框里 . 的位置空着。
-  电话、日期、带负号的框照旧用 App 自带的数字键盘。数字键的名字照旧（num/1…），长按和 App 的数字键盘共用。
+  四列一样宽：1 2 3 ⌫ / 4 5 6 . - / 7 8 9 ⏎ / 符 返回 0 空格；⏎ 占下面两行（rows="2"），. 和 - 各占半格。
+  不写 pads=：管点 123 打开的和各种数字框（纯数字、小数、带负号、数字密码），框不收的键由框自己滤掉。
+  电话、日期的框照旧用 App 自带的数字键盘。数字键的名字照旧（num/1…），长按和 App 的数字键盘共用。
 -->
-<keyboard xmlns="https://youmo-ime/layout/1" id="big-number" name="大按键数字键盘" family="number" based-on="number" pads="full digits decimal" columns="100" preview="off" popups="off">
-  <meta author="幽默输入法" version="1.0" license="CC0-1.0" min-app="0.6.1" description="四列大键，⏎ 占两行；管 123、纯数字和小数三种输入框"/>
+<keyboard xmlns="https://youmo-ime/layout/1" id="big-number" name="大按键数字键盘" family="number" based-on="number" columns="100" preview="off" popups="off">
+  <meta author="幽默输入法" version="1.1" license="CC0-1.0" min-app="0.6.1" description="四列大键，⏎ 占两行；管 123 和各种数字框"/>
   <defaults kind="letter" width="25" text-size="34"/>
   <row>
     <key id="1" label="1" send="sym:KP_1" shortcut="num/1"/>
@@ -19,8 +19,8 @@
     <key id="4" label="4" send="sym:KP_4" shortcut="num/4"/>
     <key id="5" label="5" send="sym:KP_5" shortcut="num/5"/>
     <key id="6" label="6" send="sym:KP_6" shortcut="num/6"/>
-    <key id="." kind="function" label="." send="sym:KP_Decimal" when="pad=full|decimal"/>
-    <gap when="pad=digits"/>
+    <key id="." kind="function" width="12.5" label="." send="sym:KP_Decimal"/>
+    <key id="-" kind="function" width="12.5" label="-" send="sym:KP_Subtract"/>
   </row>
   <row>
     <key id="7" label="7" send="sym:KP_7" shortcut="num/7"/>

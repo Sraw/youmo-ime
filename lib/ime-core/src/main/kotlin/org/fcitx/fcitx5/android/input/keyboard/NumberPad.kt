@@ -7,20 +7,13 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.input.editing.NumberKind
 
 /**
- * The number keyboard's keys beside its digits, by field: [FULL] from the 123 key or a plain number field (often a
- * price, a field that filters nothing); the others for fields that say what they take ([of]). "" is a blank key,
- * kept so the digits stay put. [left] top to bottom; [besideNine] right of 9 below the space; [bottom] left of the
- * symbols key, right of 0, left of Return.
+ * The number keyboard's keys beside its digits, by field: [FULL] from the 123 key and for every number field, as what
+ * a field declares often is not what it takes (an amount declared decimal that takes a minus) and a field drops what
+ * it refuses; a phone's and a date's their own ([of]). "" is a blank key, kept so the digits stay put. [left] top to
+ * bottom; [besideNine] right of 9 below the space; [bottom] left of the symbols key, right of 0, left of Return.
  */
 enum class NumberPad(val left: List<String>, val besideNine: String, val bottom: List<String>) {
     FULL(listOf("+", "-", "*"), "/", listOf(",", "=", ".")),
-
-    DIGITS(BLANK3, "", BLANK3),
-
-    // the sign right of 0, the point in the full pad's place
-    SIGNED(BLANK3, "", listOf("", "-", "")),
-    DECIMAL(BLANK3, "", listOf("", "", ".")),
-    SIGNED_DECIMAL(BLANK3, "", listOf("", "-", ".")),
 
     /** `,` is a dialler's pause. */
     PHONE(listOf("+", "*", "#"), "-", listOf("(", ")", ",")),
@@ -41,13 +34,9 @@ enum class NumberPad(val left: List<String>, val besideNine: String, val bottom:
         /** Null for the letters. */
         fun of(kind: NumberKind?): NumberPad? = when (kind) {
             null -> null
-            NumberKind.INTEGER -> FULL
-            NumberKind.PIN -> DIGITS
-            NumberKind.SIGNED -> SIGNED
-            NumberKind.DECIMAL -> DECIMAL
-            NumberKind.SIGNED_DECIMAL -> SIGNED_DECIMAL
+            NumberKind.NUMBER -> FULL
             NumberKind.PHONE -> PHONE
-            NumberKind.DATE, NumberKind.TIME, NumberKind.DATETIME -> DATETIME
+            NumberKind.DATETIME -> DATETIME
         }
 
         val layouts: Set<String> = entries.mapTo(LinkedHashSet()) { it.layout }
@@ -56,8 +45,6 @@ enum class NumberPad(val left: List<String>, val besideNine: String, val bottom:
         fun shownBy(name: String): NumberPad? = KeyboardNames.base(name).let { base -> entries.firstOrNull { it.layout == base } }
     }
 }
-
-private val BLANK3 = listOf("", "", "")
 
 /** The switching knows the number keyboard as [NumberPad.FULL] alone: the field's pad is shown in its place, so a pad is never remembered. */
 class FieldPad {

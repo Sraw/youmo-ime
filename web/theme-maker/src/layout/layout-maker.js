@@ -12,8 +12,7 @@
   const BASE_LABEL = { qwerty: '26 键', k14: '14 键', k18: '18 键', nine: '九键', number: '数字键盘', symbols: '符号面板' };
   const FAMILY_LABEL = { letters: '字母', grouped: '字母分组', nine: '九键', number: '数字', symbols: '符号' };
   const PAD_LABEL = {
-    full: '完整', digits: '只有数字', signed: '数字和正负号', decimal: '数字和小数点', 'signed-decimal': '正负号和小数点',
-    phone: '电话', datetime: '日期时间',
+    full: '完整', phone: '电话', datetime: '日期时间',
   };
   const ROLE_LABEL = { symbols: '符', back: '返回', numbers: '123' };
   const SLOT_LABEL = {
@@ -68,7 +67,10 @@
     'held-letters': ([key, board]) => key + ' 是' + boardName(board) + '的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名',
     'held-popups': ([board]) => '这里写的 popups= 不起作用，跟' + boardName(board) + '一样',
     'gap-look': () => '空位（gap）的 look=、class= 不起作用',
-    'pad-lacks': ([pad, keys]) => '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来',
+    // the full pad is every number field's, not one kind of field
+    'pad-lacks': ([pad, keys]) => (pad === 'full'
+      ? '数字键盘缺 ' + keys + '：数字框里打不出来（比如金额的负号、小数点）'
+      : '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来'),
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',
     'split-scaled': ([n, where]) => '分体时这一行在「' + where + '」有 ' + n + ' 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小',
   };

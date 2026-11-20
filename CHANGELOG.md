@@ -15,12 +15,14 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 0.4 及更早的版本不能再直接升级到这一版：先覆盖安装 0.6.2，弹出键盘打几个字、停一下，再装这一版。直接升级的话，码表里存的词等会丢掉，也没有提示。
 - 0.6.0 测试版里改过的长按和滑动不再带过来：回到从 0.5 带过来的设置，没有的用预设；测试版里清空过的列表也不再是关着的。0.6.0 正式版及以后改的照旧都在。
 - 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
+- 纯数字、小数、能填负数、数字密码这些框都用完整的数字键盘（和点 123 打开的一样），不再按框说的类型去掉 `-`、`.` 等键：框说的常和它收的不一样，比如记账应用的金额框说是小数，却能填负数，原来打不出 `-`。框不收的键点了由框自己滤掉。电话、日期时间框照旧是自己的符号键。导入过的数字键盘布局里写着这几种框的（`pads=` 的 `digits`、`signed`、`decimal`、`signed-decimal`）照样能读、能导入，算作完整的那种；布局编辑器的示例「大按键数字键盘」加了 `-` 键：导入过旧版这个示例的，重新导入新版，能填负数的框才打得出 `-`。导入数字键盘布局时，完整的那种缺 `-` 或 `.` 会提示；写着上面那几种框的键（`when="pad=decimal"` 等）不再显示，网页编辑器里会提示。
 
 ### Smaller changes
 
 - 0.4 and earlier no longer upgrade straight to this release: install 0.6.2 over it first, type a few characters on its keyboard and pause, then install this one. Upgraded directly, the phrases saved in the tables, among others, are lost without a word.
 - Long press and swipe lists edited in the 0.6.0 betas are no longer carried over: they go back to what 0.5 left, or else the presets, and a list emptied in a beta is no longer turned off. Edits from 0.6.0 on stay.
 - The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.
+- Number, decimal, signed and numeric password fields all get the full number pad (the one 123 opens) instead of one trimmed to the field's declared type: what a field declares is often not what it takes (a bookkeeping app's amount, declared decimal, takes a minus, which could not be typed). A key the field refuses is dropped by the field. Phone and date-time fields keep their own signs. Imported number layouts naming those fields (`digits`, `signed`, `decimal`, `signed-decimal` in `pads=`) still read and import, as for the full pad; the layout maker's 大按键数字键盘 example gains a `-` key: whoever imported the old one imports the new one again for a minus in signed fields. Importing a number layout whose full pad lacks `-` or `.` says so; a key written for those fields (`when="pad=decimal"` and the like) no longer shows, and the web maker says so.
 
 ---
 

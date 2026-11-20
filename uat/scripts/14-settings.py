@@ -2248,9 +2248,13 @@ def import_panel_layout(d, name, shown, use):
     d.tap_text("用" if use else "先不用", where="all", scroll=False, after=2.0)
 
 
-def number_ones(d, page="text"):
-    """on the test page [page]: the number keyboard's 1 key as it is labelled (壹: uat-number's), 123 tapped on a text field"""
-    d.open_page(page)
+def number_ones(d, page="text", testbed=False):
+    """on the test page [page] (the testbed's types page's field of that name with [testbed]): the number keyboard's 1 key
+    as it is labelled (壹: uat-number's), 123 tapped on a text field"""
+    if testbed:
+        script("02-keyboard").testbed_field(d, page)
+    else:
+        d.open_page(page)
     keys = d.keys(refresh=True)
     if page == "text":
         d.tap(keys["123"], 1.0)
@@ -2273,7 +2277,7 @@ def st170(d):
     check(layout_card(d, "UAT 数字"), "导入后列表里没有 UAT 数字")
     check(d.wait_text("用在：数字键盘", timeout=5, where="all"), f"卡片下没写「用在：数字键盘」：{d.screen().texts()[:20]}")
     d.shot("app", "导入数字键盘布局后用上：卡片下写「用在：数字键盘」")
-    d.step("123、电话框用它，数字框用自带的")
+    d.step("123、数字框、电话框用它，日期框用自带的")
     check(number_ones(d) == ["壹"], f"123 的数字键盘不是导入的：{number_ones(d)}")
     d.shot("ime", "123 的数字键盘：1 键写「壹」")
     d.tap(d.keys(refresh=True)["壹"], 1.0)
@@ -2281,8 +2285,9 @@ def st170(d):
     d.clear()
     check("1" in typed, f"点「壹」打出的不是 1：{typed!r}")
     check(number_ones(d, "tel") == ["壹"], "电话框的数字键盘不是导入的")
-    check(number_ones(d, "number") == ["1"], "数字框的数字键盘不是自带的")
-    return "确认框写数字键盘：123、电话；问现在就用作数字键盘；卡片写用在：数字键盘；123 和电话框 1 键写壹（打出 1），数字框是自带的"
+    check(number_ones(d, "number") == ["壹"], "数字框的数字键盘不是导入的")
+    check(number_ones(d, "date", testbed=True) == ["1"], "日期框的数字键盘不是自带的")
+    return "确认框写数字键盘：123、电话；问现在就用作数字键盘；卡片写用在：数字键盘；123、数字框和电话框 1 键写壹（打出 1），日期框是自带的"
 
 
 @case("ST-171", base="B0-设置", mutates=True)
@@ -2462,7 +2467,9 @@ def st179(d):
     push_example(d, "big-number")
     import_layout(d, "big-number")
     check(d.wait_text("导入布局 大按键数字键盘？", timeout=8, where="all"), f"没出导入确认：{d.screen().texts('all')[:10]}")
-    check(d.screen().find(contains="数字键盘：123、只有数字、小数", where="all"), f"确认框没写管哪几种：{d.screen().texts('all')[:16]}")
+    s = d.screen()
+    check(s.find(contains="数字键盘：123", where="all") and not s.find(contains="数字键盘：123、", where="all"),
+          f"确认框没写只管 123：{s.texts('all')[:16]}")
     d.tap_text("导入", where="all", scroll=False, after=3.0)
     check(d.wait_text("现在就用作数字键盘吗？", timeout=6, where="all"), f"没问现在就用作数字键盘：{d.screen().texts('all')[:10]}")
     d.tap_text("用", where="all", scroll=False, after=2.0)
@@ -2488,13 +2495,13 @@ def st179(d):
     d.step("小数框用它，电话框用自带的")
     d.open_page("decimal")
     keys = scene_keys(d)
-    check("." in keys and "=" not in keys and "space" in keys, f"小数框的数字键盘不是大按键的：{sorted(keys)}")
+    check("." in keys and "-" in keys and "=" not in keys and "space" in keys, f"小数框的数字键盘不是大按键的：{sorted(keys)}")
     d.open_page("tel")
     keys = scene_keys(d)
     # the app's phone pad: enter one row tall
     check("enter" in keys and "1" in keys and keys["enter"][3] - keys["enter"][1] < 1.5 * (keys["1"][3] - keys["1"][1]),
           f"电话框的数字键盘不是自带的：{sorted(keys)}")
-    return "确认框写 123、只有数字、小数；卡片写用在：数字键盘；123 一行四个、回车跨两行、1 2 ⌫ 5 打出 15；小数框是它，电话框是自带的"
+    return "确认框写数字键盘：123；卡片写用在：数字键盘；123 一行四个、回车跨两行、1 2 ⌫ 5 打出 15；小数框是它（有 . -），电话框是自带的"
 
 
 @case("ST-180", base="B0-设置", mutates=True)

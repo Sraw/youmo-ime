@@ -646,18 +646,17 @@ object LayoutCheck {
         return Shown(errors.values.toList(), padLacks, bottomLeft)
     }
 
-    // a decimal pad needs `.`, a signed one `-` (errors); a phone's `+ * #`, a date's `- / :` (warnings)
+    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it (warnings)
     private fun padLacks(pad: String, keys: List<ExpandedKey>): List<Pair<Boolean, Finding>> {
         val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
         val roles = keys.mapNotNull { it.attrs.role }.toSet()
         val need = ArrayList<String>()
         need += (0..9).map { it.toString() }.filter { it !in types }
         listOf("backspace", "enter", "back").filter { it !in roles }.forEach { need += it }
-        if (pad.endsWith("decimal") && "." !in types) need += "."
-        if (pad.startsWith("signed") && "-" !in types) need += "-"
         val told = when (pad) {
             "phone" -> listOf("+", "*", "#")
             "datetime" -> listOf("-", "/", ":")
+            "full" -> listOf("-", ".")
             else -> emptyList()
         }.filter { it !in types }
         return listOfNotNull(

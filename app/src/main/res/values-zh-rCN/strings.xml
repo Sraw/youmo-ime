@@ -1433,10 +1433,6 @@
     <string name="layout_im_english">英文</string>
     <string name="layout_im_table">五笔等码表</string>
     <string name="layout_pad_full">123</string>
-    <string name="layout_pad_digits">只有数字</string>
-    <string name="layout_pad_signed">带负号</string>
-    <string name="layout_pad_decimal">小数</string>
-    <string name="layout_pad_signed_decimal">带负号的小数</string>
     <string name="layout_pad_phone">电话</string>
     <string name="layout_pad_datetime">日期时间</string>
     <string name="layout_info_description">说明：%1$s</string>
@@ -1510,6 +1506,7 @@
     <string name="layout_board_number_row">数字行</string>
     <string name="layout_finding_gap_look">空位（gap）的 look=、class= 不起作用</string>
     <string name="layout_finding_pad_lacks">数字键盘「%1$s」缺 %2$s：这种输入框里打不出来</string>
+    <string name="layout_finding_full_lacks">数字键盘缺 %1$s：数字框里打不出来（比如金额的负号、小数点）</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 自带的一样）</string>
     <string name="layout_finding_split_scaled">分体时这一行在「%2$s」有 %1$s 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小</string>
 </resources>

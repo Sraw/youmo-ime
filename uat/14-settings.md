@@ -967,9 +967,9 @@
 
 ### ST-170 [P1] 导入数字键盘布局并用上：只管它写的那几种
 - **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-number-1.0.layout`（1 键上写「壹」，打出的仍是 1；`pads="full phone"`）。
-- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框，点 **导入**；问「现在就用作数字键盘吗？」时点 **用**；看卡片；到测试页普通框点 **123**，点「壹」；再到电话框、数字框看数字键盘。
-- **预期**：确认框写「数字键盘：123、电话」。导入后问「现在就用作数字键盘吗？」（不问用在哪些输入法），点 **用** 后提示「数字键盘现在用「UAT 数字」」，「UAT 数字」卡片在数字键盘段，下写「用在：数字键盘」。普通框点 123 出的数字键盘 1 键写「壹」，点了打出 1；电话框的数字键盘也是它；数字框（不是它写的那种）还是 App 自带的，1 键写 1。
-- **JVM**：`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`、`CustomPanelTest.aNumberBoardNamingNoPadsIs123sAlone`、`CustomPanelTest.aNumberBoardForTwoPadsIsMadeOnceForEach`、`KeyboardNamesTest`、`LayoutImportTest.theUatsPanelLayoutsAreTakenWithNoWarning`、`PanelLayoutsTest`。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框，点 **导入**；问「现在就用作数字键盘吗？」时点 **用**；看卡片；到测试页普通框点 **123**，点「壹」；再到电话框、数字框，输入测试台的日期框看数字键盘。
+- **预期**：确认框写「数字键盘：123、电话」。导入后问「现在就用作数字键盘吗？」（不问用在哪些输入法），点 **用** 后提示「数字键盘现在用「UAT 数字」」，「UAT 数字」卡片在数字键盘段，下写「用在：数字键盘」。普通框点 123 出的数字键盘 1 键写「壹」，点了打出 1；电话框、数字框（各种数字框都用 123 那块）的数字键盘也是它；日期框（不是它写的那种）还是 App 自带的，1 键写 1。
+- **JVM**：`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`、`CustomPanelTest.aNumberBoardNamingNoPadsIs123sAlone`、`CustomPanelTest.aNumberBoardForTwoPadsIsMadeOnceForEach`、`CustomPanelTest.aBoardImportedForTheMergedPadsIsTheFullOnes`、keyboard-scene `NumberPadsTest.anOlderCopyWithTheMergedPadsConditionsIsLaidOutAsTheAppsPads`、`KeyboardNamesTest`、`LayoutImportTest.theUatsPanelLayoutsAreTakenWithNoWarning`、`PanelLayoutsTest`。
 
 ### ST-171 [P1] 点卡片「数字键盘用这个」：换回内置的、再换上
 - **前提**：B0-设置；导入了 `uat-number-1.0.layout`，导入后点了 **先不用**。
@@ -1020,9 +1020,9 @@
 - **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`（拼音、双拼、英文、码表都能用，没有警告）、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（分体时第三行分成两半不缩小）；网页：`test/layout-maker.test.mjs`（AZERTY 的行，双拼、码表时出 `;` `*`）。
 
 ### ST-179 [P1] 网页示例「大按键数字键盘」：123 和小数框用它，电话框照旧
-- **前提**：B0-设置，没导入过布局；「下载」里有 `web/theme-maker/examples/layouts/big-number.layout`（`pads="full digits decimal"`）。
+- **前提**：B0-设置，没导入过布局；「下载」里有 `web/theme-maker/examples/layouts/big-number.layout`（不写 `pads=`：123 和各种数字框）。
 - **操作**：导入它，看确认框，问「现在就用作数字键盘吗？」时点 **用**；到测试页普通框点 **123**，看键盘，点 1、2、⌫、5；再到小数框（`#decimal`）、电话框看数字键盘。
-- **预期**：确认框写「数字键盘：123、只有数字、小数」。卡片下写「用在：数字键盘」。123 打开的是它：一行四个键（1 2 3 ⌫），回车竖着占两行，左下是 **符**、**返回**，没有 `=`、`,`；点 1、2、⌫、5 打出 15。小数框也是它，6 右边是 `.`；电话框还是 App 自带的数字键盘。
+- **预期**：确认框写「数字键盘：123」。卡片下写「用在：数字键盘」。123 打开的是它：一行四个键（1 2 3 ⌫），回车竖着占两行，左下是 **符**、**返回**，没有 `=`、`,`；点 1、2、⌫、5 打出 15。小数框也是它，6 右边是 `.` 和 `-`；电话框还是 App 自带的数字键盘。
 - **JVM**：`ExampleLayoutsTest.eachChecksCleanWhereItSaysItIsUsed`、`ExampleLayoutsTest.eachDrawnInEveryFormAsHeld`（每种输入框各画一次）、`CustomPanelTest.aNumberBoardIsDrawnForThePadsItIsForTheAppsForTheRest`；网页：`test/layout-maker.test.mjs`（大按键数字键盘的几何和 pads）。
 
 ### ST-180 [P2] 导入分体时分不成两半的布局：确认框警告这一行会整行缩小
