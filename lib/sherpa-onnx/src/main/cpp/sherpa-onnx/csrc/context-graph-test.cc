@@ -232,4 +232,70 @@ TEST(ContextGraph, FinalizedLogProbGivesBackAnUnfinishedPrefix) {
   }
 }
 
+// youmo: as the beam search takes hotwords (ForwardOnce, then Finalize at the
+// end): a reduplicated phrase "AA" written twice in a row is worth it once, so
+// voice does not write 方方方方 for 方方; written apart it counts each time
+static float WalkOnce(const ContextGraph &graph, const std::string &s) {
+  auto state = graph.Root();
+  const ContextState *last = nullptr;
+  int32_t since = 0;
+  float sum = 0;
+  for (auto c : s) {
+    auto res = graph.ForwardOnce(state, c, &last, &since);
+    sum += res.first;
+    state = res.second;
+  }
+  return sum + graph.Finalize(state).first;
+}
+
+TEST(ContextGraph, APhraseAgainRightAfterItselfGainsNothing) {
+  ContextGraph graph({{'A', 'A'}, {'B', 'C'}}, 1.0f, {5.0f, 5.0f});
+  auto walk = [&](const std::string &s) { return WalkOnce(graph, s); };
+  EXPECT_FLOAT_EQ(walk("AA"), 10);
+  EXPECT_FLOAT_EQ(walk("AAAA"), 10);
+  EXPECT_FLOAT_EQ(walk("AAA"), 10);
+  EXPECT_FLOAT_EQ(walk("AAAAAA"), 10);
+  EXPECT_FLOAT_EQ(walk("AAXAA"), 20);
+  EXPECT_FLOAT_EQ(walk("AABCAA"), 30);
+  EXPECT_FLOAT_EQ(walk("BCBC"), 10);
+  // another phrase right after counts: the graph has tokens, not readings, so
+  // it cannot tell 方方芳芳 heard for 芳芳 from two names said in a row
+  EXPECT_FLOAT_EQ(walk("AABC"), 20);
+  // ForwardOneStep alone, not strict: each pair paid again
+  auto state = graph.Root();
+  float plain = 0;
+  for (auto c : std::string("AAAA")) {
+    auto res = graph.ForwardOneStep(state, c, false);
+    plain += std::get<0>(res);
+    state = std::get<1>(res);
+  }
+  EXPECT_FLOAT_EQ(plain + graph.Finalize(state).first, 20);
+}
+
+// the bonus given back is all of the second time's on other graphs too
+TEST(ContextGraph, APhraseAgainGivesBackItsWholeBonusWhateverTheGraph) {
+  // finished by an output link, inside XABY's path
+  ContextGraph output({{'A', 'B'}, {'X', 'A', 'B', 'Y'}}, 1.0f, {5.0f, 5.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(output, "XABAB"), 10);
+  EXPECT_FLOAT_EQ(WalkOnce(output, "ABAB"), 10);
+  // a prefix of another: ABC, not strict, is never reached past AB's end
+  ContextGraph prefix({{'A', 'B'}, {'A', 'B', 'C'}}, 1.0f, {5.0f, 5.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(prefix, "ABAB"), 10);
+  EXPECT_FLOAT_EQ(WalkOnce(prefix, "ABCABC"), 20);
+  // three tokens
+  ContextGraph three({{'A', 'B', 'C'}}, 1.0f, std::vector<float>{5.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(three, "ABCABC"), 15);
+  // a shared prefix, scored otherwise
+  ContextGraph shared({{'A', 'A'}, {'A', 'B'}}, 1.0f, {5.0f, 2.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(shared, "ABAB"), 7);
+  // overlapping, the other one after counts
+  ContextGraph overlap({{'A', 'B'}, {'B', 'A'}}, 1.0f, {5.0f, 5.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(overlap, "ABAB"), 10);
+  EXPECT_FLOAT_EQ(WalkOnce(overlap, "ABBA"), 20);
+  // a suffix of another
+  ContextGraph suffix({{'A', 'A'}, {'B', 'A', 'A'}}, 1.0f, {5.0f, 5.0f});
+  EXPECT_FLOAT_EQ(WalkOnce(suffix, "BAAAA"), 25);
+  EXPECT_FLOAT_EQ(WalkOnce(suffix, "BAABAA"), 15);
+}
+
 }  // namespace sherpa_onnx

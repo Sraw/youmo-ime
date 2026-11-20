@@ -250,10 +250,10 @@
 
 ### VO-38 [P1] 同音的字换成你的词
 <!-- learning: 060-voice-userdict.md；用户 2026-11-10 定「同意你语音的方案」 -->
-- **前提**：B0-设置（导入了语音包），在 **词库与短语 → 用户词库** 里手动加「徐婧」（拼音 xu jing）和「攻势」（拼音 gong shi）。
-- **操作**：回测试页，按住空格说"麻烦你去找一下徐婧"，松开；删光，再说"许静来了"；删光，再说"这个公式"。
-- **预期**：第一次框里是「麻烦你去找一下徐婧」（没加时是「徐静」；说的时候显示的也已是「徐婧」）；第二次仍是「许静来了」（声调不同不换）；第三次是「这个公式」（常用词不换成你的「攻势」）。
-- **JVM**：`VoiceHomophonesTest`（读音带声调逐字相同、学到的词打过 3 次以上、自己的词和常用词不换、更长的词里不换（`lib/ime-core` 的确定链））；模拟器上（导入了语音包）也跑一遍。
+- **前提**：B0-设置（导入了语音包），在 **词库与短语 → 用户词库** 里手动加「徐婧」（拼音 xu jing）、「攻势」（拼音 gong shi）和「方方」（拼音 fang fang）。
+- **操作**：回测试页，按住空格说"麻烦你去找一下徐婧"，松开；删光，再说"许静来了"；删光，再说"这个公式"；删光，再说"我想芳芳"。
+- **预期**：第一次框里是「麻烦你去找一下徐婧」（没加时是「徐静」；说的时候显示的也已是「徐婧」）；第二次仍是「许静来了」（声调不同不换）；第三次是「这个攻势」（常用词也换成你的「攻势」，手动加的、打字学到的都一样）；第四次是「我想方方」，不多写成「方方方方」。
+- **JVM**：`VoiceHomophonesTest`（读音带声调逐字相同、学到的词打过 3 次以上、自己的词不换、常用词也换、更长的词里不换（`lib/ime-core` 的确定链））；叠字热词不多写：`lib/sherpa-onnx/host-test.sh` 的 `ContextGraph.APhraseAgainRightAfterItselfGainsNothing`（紧接着又一遍的热词不再加分）；模拟器上（导入了语音包）也跑一遍。
 
 ### VO-39 [P1] 语音出错时的提示
 <!-- R25 voice-3/voice-5：识别出错不再报成模型或麦克风的问题 -->
@@ -274,7 +274,7 @@
 - **前提**：B0-语音；用户词库里没有「徐婧」。
 - **操作**：在「普通文本」框按住空格说"麻烦你去找一下徐婧"，松开（框里是「…徐静」，见 VO-38）。按 ⌫ 删掉句末标点和「徐静」，用拼音打 x u j i n g，选「徐婧」（一个字一个字选也行）。看键盘上方；点 **记住**；再点 **撤销**。再点一次 **记住** 后打开 **用户词库 → 手动添加的词**。
 - **预期**：重打以后键盘上方问「让语音记住『徐婧』？」，带 **记住** 按钮；点了提示变成「语音记住了『徐婧』」带 **撤销**，候选栏清空（不留重打前的联想），手动添加的词里有「徐婧」（拼音 xu jing）；点 **撤销** 又拿掉（学到的不动，不算删过）；再记住后再说"麻烦你去找一下徐婧"直接是「徐婧」。
-- **JVM**：`VoiceAskFieldTest.aFieldLeftBeforeTheEngineAnswersIsNotReadNorAskedOver`（提交后、问之前离开输入框：不读新框、不问）、`VoiceAskFieldTest.theCodeInTheFieldIsNotReadAsItsText`（引擎回答前又打了一个键、编码写在框里（编码行：输入框里）：交给引擎的是「我找徐婧」，不带框里的编码，照样问）、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示。
+- **JVM**：`VoiceAskFieldTest.aFieldLeftBeforeTheEngineAnswersIsNotReadNorAskedOver`（提交后、问之前离开输入框：不读新框、不问）、`VoiceAskFieldTest.theCodeInTheFieldIsNotReadAsItsText`（引擎回答前又打了一个键、编码写在框里（编码行：输入框里）：交给引擎的是「我找徐婧」，不带框里的编码，照样问）、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示；ime-eval uatTest `VoiceRememberUatTest.aNameTypedAgainIsAskedAboutCommonOrNot`（app 的真数据，全拼、连句号删、九键、手写四种改法：「丹丹」改「单单」问；「莉莉」是词库里的常见词，改「丽丽」也问，加了「丽丽」（手动加的、学到的都一样）语音把「莉莉」换成它；「徐静蕾」里的「徐静」、「和瑞典」里的「和瑞」不换）。
 
 ### VO-42 [P1] 不点就什么都不记，下次再这样改还问
 - **前提**：B0-语音。
@@ -284,9 +284,9 @@
 
 ### VO-43 [P1] 这些改法不问
 - **前提**：B0-语音。
-- **操作**：语音打出「徐静」后分别：重打成「许静」（声调不同）、「徐婧婧」（字数不同）、词库里的常见词（「公式」改「攻势」）；用码表（五笔）、联想、粘贴打进去；打进标点或数字；只删不打。
-- **预期**：都不问。只问点了以后语音真会换的词：读音（连声调）逐字一样、两个字以上、加了以后语音真会把听到的那段换成它（常见词不换，见 VO-38）。打进来的不是汉字（标点、数字）就不再跟着看。
-- **JVM**：ime-core `VoiceEditsTest.what is not asked about`（声调不同、字数不同、听到的就是你的词、只删不打、打的不是汉字……一张表）、`VoiceEditsTest.the word to ask about`（问的词和拼音按每个字共有的带调读音）、`VoiceEditsTest.typed by what is no word typed, the window ends (Q5)`（码表、联想、粘贴打的不算，窗口结束）、`EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（真数据的声调不同不问）；设备上不跑。
+- **操作**：语音打出「徐静」后分别：重打成「许静」（声调不同）、「徐婧婧」（字数不同）；语音打出「徐静蕾」「和瑞典」后把「徐静」改「徐婧」、「和瑞」改「何芮」；用码表（五笔）、联想、粘贴打进去；打进标点或数字；只删不打。
+- **预期**：都不问。只问点了以后语音真会换的词：读音（连声调）逐字一样、两个字以上、加了以后语音真会把听到的那段换成它（词库里的常见词也换，见 VO-38：「公式」改「攻势」要问；在更长的词里、跟前面或后面的字连成常见词的不换，所以不问）。打进来的不是汉字（标点、数字）就不再跟着看。
+- **JVM**：ime-core `VoiceEditsTest.what is not asked about`（声调不同、字数不同、听到的就是你的词、只删不打、打的不是汉字……一张表）、`VoiceEditsTest.the word to ask about`（问的词和拼音按每个字共有的带调读音）、`VoiceEditsTest.typed by what is no word typed, the window ends (Q5)`（码表、联想、粘贴打的不算，窗口结束）、`EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（真数据的声调不同不问）、ime-eval uatTest `VoiceRememberUatTest.aNameTypedAgainIsAskedAboutCommonOrNot`（app 的真数据，全拼、连句号删、九键、手写四种改法：「丹丹」改「单单」问；「莉莉」是词库里的常见词，改「丽丽」也问，加了「丽丽」（手动加的、学到的都一样）语音把「莉莉」换成它；「徐静蕾」里的「徐静」、「和瑞典」里的「和瑞」不换）；设备上不跑。
 
 ### VO-44 [P2] 同一处改两次：点了记住换掉上一次加的
 - **前提**：B0-语音。
@@ -298,7 +298,7 @@
 - **前提**：B0-语音。
 - **操作**：照 VO-41 说话，删掉「徐静」，点工具栏的 **手写**，在字母区写「徐」「婧」上屏。
 - **预期**：照样问「让语音记住『徐婧』？」；拼音按两个字和语音听到的共有的读音（xu jing）。
-- **JVM**：ime-core `EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are`（真的 Engines、拼音键盘上手写）；设备上不跑。
+- **JVM**：ime-core `EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are`（真的 Engines、拼音键盘上手写）、ime-eval uatTest `VoiceRememberUatTest.aNameTypedAgainIsAskedAboutCommonOrNot`（app 的真数据，全拼、连句号删、九键、手写四种改法：「丹丹」改「单单」问；「莉莉」是词库里的常见词，改「丽丽」也问，加了「丽丽」（手动加的、学到的都一样）语音把「莉莉」换成它；「徐静蕾」里的「徐静」、「和瑞典」里的「和瑞」不换）；设备上不跑。
 
 ### VO-46 [P1] 不记录的框里、不用我的输入习惯时不问
 - **前提**：B0-语音。

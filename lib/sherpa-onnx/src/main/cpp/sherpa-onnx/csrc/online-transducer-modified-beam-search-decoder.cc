@@ -252,10 +252,12 @@ void OnlineTransducerModifiedBeamSearchDecoder::Decode(
           new_hyp.timestamps.push_back(t + frame_offset);
           new_hyp.num_trailing_blanks = 0;
           if (ss != nullptr && ss[b]->GetContextGraph() != nullptr) {
-            auto context_res = ss[b]->GetContextGraph()->ForwardOneStep(
-                context_state, new_token, false /*strict mode*/);
-            context_score = std::get<0>(context_res);
-            new_hyp.context_state = std::get<1>(context_res);
+            // youmo: a hotword again right after itself gains nothing
+            auto context_res = ss[b]->GetContextGraph()->ForwardOnce(
+                context_state, new_token, &new_hyp.last_hotword,
+                &new_hyp.since_hotword);
+            context_score = context_res.first;
+            new_hyp.context_state = context_res.second;
           }
           if (ss != nullptr && ss[b]->GetBlockGraph() != nullptr) {
             new_hyp.block_state = std::get<1>(ss[b]->GetBlockGraph()->ForwardOneStep(

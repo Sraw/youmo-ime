@@ -254,8 +254,14 @@ internal class EngineAssets(
     /** By the dictionary's words and the model's counts. */
     fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray {
         val data = pinyinData
-        // readings of those that are words, one dictionary walk for all
-        val wordTexts = spans.mapNotNullTo(HashSet()) { span -> span.text.takeIf { textWords.id(it) != NgramModel.NO_WORD } }
+        // readings of the words in them (VoiceHomophones.allowed reads each), one dictionary walk for all
+        val wordTexts = HashSet<String>()
+        for (span in spans) {
+            val text = span.text
+            for (from in 0 until text.length - 1) {
+                for (to in from + 2..text.length) text.substring(from, to).takeIf { textWords.id(it) != NgramModel.NO_WORD }?.let(wordTexts::add)
+            }
+        }
         val readings by lazy(LazyThreadSafetyMode.NONE) { WordText.readings(data.dictionary, data.vocabulary, wordTexts) }
         val dictionary = object : VoiceHomophones.Dictionary {
             override fun isWord(text: String) = textWords.id(text) != NgramModel.NO_WORD
@@ -391,7 +397,7 @@ internal class EngineAssets(
     }
 
     private companion object {
-        // log10 unigram at or above which a dictionary word is too common for a user word read alike to replace it
+        // log10 unigram at or above which a dictionary word is too common to cut: a stretch across its edge is not replaced
         const val COMMON_WORD = -5.5f
 
         // longer is a sentence: and the dictionary is walked as deep

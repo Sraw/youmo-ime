@@ -25,7 +25,7 @@ class VoiceEditsTest {
         var blocked = emptySet<String>()
         val dictionary = HashMap<String, String>()
 
-        // what voice would not put in: VoiceHomophones' rules (a common word left, say), faked
+        // what voice would not put in: VoiceHomophones' rules (inside a longer dictionary word, say), faked
         var refused = emptySet<String>()
         val taken = ArrayList<String>()
 
@@ -138,7 +138,7 @@ class VoiceEditsTest {
         "a word blocked in it" to {
             assertNull(edits(words { blocked = setOf("婧") }).retype("我找徐静", 2, "徐婧"))
         },
-        "a word voice would not put in (a common word it leaves)" to {
+        "a word voice would not put in (inside a longer dictionary word, as 徐静 of 徐静雨)" to {
             assertNull(edits(words { refused = setOf("徐婧") }).retype("我找徐静", 2, "徐婧"))
         },
         "a polyphone kept beside the changed one, the dictionary not settling it: its reading not known" to { assertNull(edits().retype("长长", 2, "掌长")) },

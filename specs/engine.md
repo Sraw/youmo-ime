@@ -70,8 +70,9 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   `VoiceRerank`).
 - **Homophones**: after the polish, a stretch reading exactly as a user's word (toned, char by char,
   `CharReadings`/`ToneTable`) becomes it (徐静→徐婧; `VoiceHomophones`): added words at once, learned
-  ones typed more than 3 times; never the user's own word, a common word (unigram log10 P ≥ -5.5) or
-  one with a common word in it or across its edge, nor inside a longer dictionary word. Built with the
+  ones typed more than 3 times; never the user's own word, one across a common word's edge (unigram
+  log10 P ≥ -5.5: 和瑞 of 和瑞典), nor inside a longer dictionary word (徐静 of 徐静蕾), nor holding a dictionary word read
+  otherwise (那个 of 是那个, not the user's 是哪个); a common word read alike is replaced (公式→攻势: the user made the word theirs). Built with the
   hotwords (`Engines.voiceHomophones`), each candidate checked once a hold
   (`Engines.voiceHomophonesAllowed`); shown as it streams too, same length, so settled text holds.
 - **Asked, then remembered** (0.6.1, dev/design/061-voice-learn-from-edits.md): `VoiceEdits` (ime-core
@@ -89,7 +90,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   typed again, the same length, each character sharing a toned reading with the one heard
   (`EngineAssets.voiceReadings`; Q2), is asked about once a window (Q6) only if voice's own homophones, the
   word added as the settings add it (one this window added at the place left out, review M4), would put
-  it in (`Words.takes`; so a common word, a word already added or blocked is not); a sentence's mark
+  it in (`Words.takes`; so a word already added or blocked, inside a longer word or across a common one's edge is not; a common word is); a sentence's mark
   deleted with it, the stretch is judged once its Chinese is typed again (review S5). A word asked about
   is not asked again that window: one typed at the place after it is, but the first typed back again is
   not (Q6). A syllable typed that none of the character's readings in the tables has asks nothing (voice

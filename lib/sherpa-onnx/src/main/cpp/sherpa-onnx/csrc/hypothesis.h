@@ -71,6 +71,11 @@ struct Hypothesis {
   // youmo: its state in the stream's graph of blocked phrases, if any
   const ContextState *block_state = nullptr;
 
+  // youmo: the hotword it finished last and the tokens since
+  // (ContextGraph::ForwardOnce)
+  const ContextState *last_hotword = nullptr;
+  int32_t since_hotword = 0;
+
   // TODO(fangjun): Make it configurable
   // the minimum of tokens in a chunk for streaming RNN LM
   int32_t lm_rescore_min_chunk = 2;  // a const

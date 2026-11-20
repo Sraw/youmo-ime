@@ -41,10 +41,12 @@ PHRASES = {   # name: (what Kokoro is given, what X-ASR alone should hear, None:
     "lanjing": ("我住在澜境花园", None),
     # VO-56: 九键 not heard as 酒店 where a user word begins with 酒店 (20bbb03e0)
     "jiujian": ("九键输入法", "九键输入法"),
-    # VO-38: a name the recognizer hears as 徐静, its homophone put in; 许静 and 公式 never
+    # VO-38: a name the recognizer hears as 徐静, its homophone put in; 许静 never; 公式 by the added 攻势
     "xujing": ("麻烦你去找一下徐婧", None),
     "xujing3": ("许静来了", None),
     "gongshi": ("这个公式", None),
+    # VO-38: a reduplicated name, the user's homophone 方方 its hotword: written once, not 方方方方
+    "fangfang": ("我想芳芳", None),
     # VO-19..21: a name the recognizer alone hears as 王小明 or the like
     "wangxiaoming": ("汪小明", None),
     "wangmingtian": ("汪小明明天来", None),

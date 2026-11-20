@@ -70,6 +70,16 @@ class ContextGraph {
       const ContextState *state, int32_t token_id,
       bool strict_mode = true) const;
 
+  // youmo: ForwardOneStep as the beam search takes it (not strict), but a
+  // phrase finished again right after itself gains nothing the second time:
+  // a reduplicated hotword (方方) was paid again for each extra pair, so
+  // voice wrote 方方方方. `last` is the phrase a hypothesis finished last and
+  // `since` the tokens decoded after it, both brought up to date
+  std::pair<float, const ContextState *> ForwardOnce(const ContextState *state,
+                                                     int32_t token_id,
+                                                     const ContextState **last,
+                                                     int32_t *since) const;
+
   std::pair<bool, const ContextState *> IsMatched(
       const ContextState *state) const;
 

@@ -16,6 +16,11 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 0.6.0 测试版里改过的长按和滑动不再带过来：回到从 0.5 带过来的设置，没有的用预设；测试版里清空过的列表也不再是关着的。0.6.0 正式版及以后改的照旧都在。
 - 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
 - 纯数字、小数、能填负数、数字密码这些框都用完整的数字键盘（和点 123 打开的一样），不再按框说的类型去掉 `-`、`.` 等键：框说的常和它收的不一样，比如记账应用的金额框说是小数，却能填负数，原来打不出 `-`。框不收的键点了由框自己滤掉。电话、日期时间框照旧是自己的符号键。导入过的数字键盘布局里写着这几种框的（`pads=` 的 `digits`、`signed`、`decimal`、`signed-decimal`）照样能读、能导入，算作完整的那种；布局编辑器的示例「大按键数字键盘」加了 `-` 键：导入过旧版这个示例的，重新导入新版，能填负数的框才打得出 `-`。导入数字键盘布局时，完整的那种缺 `-` 或 `.` 会提示；写着上面那几种框的键（`when="pad=decimal"` 等）不再显示，网页编辑器里会提示。
+- 语音打出词库里的常见词（「莉莉」），你删掉重打成同音的「丽丽」，现在也问「让语音记住『丽丽』？」；你的词（手动加的、点了 **记住** 的、打字学成的）也换掉同音的常见词，加了「攻势」，说「这个公式」打出「这个攻势」。
+
+### 修复
+
+- 手动加了叠字的词（「方方」），语音会把「芳芳」听成「方方方方」：叠字的热词接着自己又算了一次。现在只打一遍。
 
 ### Smaller changes
 
@@ -23,6 +28,11 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Long press and swipe lists edited in the 0.6.0 betas are no longer carried over: they go back to what 0.5 left, or else the presets, and a list emptied in a beta is no longer turned off. Edits from 0.6.0 on stay.
 - The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.
 - Number, decimal, signed and numeric password fields all get the full number pad (the one 123 opens) instead of one trimmed to the field's declared type: what a field declares is often not what it takes (a bookkeeping app's amount, declared decimal, takes a minus, which could not be typed). A key the field refuses is dropped by the field. Phone and date-time fields keep their own signs. Imported number layouts naming those fields (`digits`, `signed`, `decimal`, `signed-decimal` in `pads=`) still read and import, as for the full pad; the layout maker's 大按键数字键盘 example gains a `-` key: whoever imported the old one imports the new one again for a minus in signed fields. Importing a number layout whose full pad lacks `-` or `.` says so; a key written for those fields (`when="pad=decimal"` and the like) no longer shows, and the web maker says so.
+- A common dictionary word voice wrote (莉莉), deleted and typed again as a homophone (丽丽), is now asked about too (「让语音记住『丽丽』？」), and the user's words (added by hand or **记住**, or learned from typing) now replace a common homophone in voice: with 攻势 added, 「这个公式」 is written 「这个攻势」.
+
+### Fixes
+
+- With a reduplicated word added (方方), voice wrote 芳芳 as 方方方方: the hotword counted again right after itself. It is written once now.
 
 ---
 

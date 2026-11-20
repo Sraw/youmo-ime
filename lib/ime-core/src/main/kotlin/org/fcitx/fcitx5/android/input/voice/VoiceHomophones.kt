@@ -8,8 +8,8 @@ import org.fcitx.fcitx5.android.engine.runtime.UserWord
 
 /**
  * Puts the user's words in for what voice heard read the same, tones and all (婧 is never in the beam). Not
- * where it is a word of theirs, holds or is a common word, is the dictionary's word read otherwise, or is
- * covered by or crosses a longer dictionary word. BMP words of two characters or more; the text keeps its
+ * where it is a word of theirs, holds a dictionary word read otherwise, or is covered by a longer dictionary
+ * word or crosses a common one; a common word read alike is replaced. BMP words of two characters or more; the text keeps its
  * length. Made once a hold on the engine's thread; the dictionary is asked only of stretches that read as a word.
  */
 class VoiceHomophones internal constructor(
@@ -219,19 +219,19 @@ class VoiceHomophones internal constructor(
             return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings, taking.count { it.text in added })
         }
 
-        /** No common word in it, not the dictionary's word read otherwise, no longer word covering it. */
+        /** No dictionary word in it read otherwise, no longer word covering it, no common word cut by its edge. */
         fun allowed(span: Span, dictionary: Dictionary): Boolean {
             val text = span.text
-            // a common word in it too: 是那个 is not made the user's 是哪个
+            // by the words in it, not each char's readings alone: 那 and 哪 share one, the word 那个 reads otherwise than 哪个
             for (from in 0 until text.length - 1) {
-                for (to in from + 2..text.length) if (dictionary.isCommon(text.substring(from, to))) return false
-            }
-            dictionary.wordReading(text)?.let { read ->
-                if (read.size != text.length) return false
-                for (k in read.indices) {
-                    val tone = read[k] % 8
-                    val ok = span.word.readings[k].any { if (tone == 0) it / 8 == read[k] / 8 else it == read[k] }
-                    if (!ok) return false
+                for (to in from + 2..text.length) {
+                    val read = dictionary.wordReading(text.substring(from, to)) ?: continue
+                    if (read.size != to - from) return false
+                    for (k in read.indices) {
+                        val tone = read[k] % 8
+                        val ok = span.word.readings[from + k].any { if (tone == 0) it / 8 == read[k] / 8 else it == read[k] }
+                        if (!ok) return false
+                    }
                 }
             }
             // any word covering it (徐静 in 徐静雨), or a common one cut by its edge (和瑞 of 和瑞典)

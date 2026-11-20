@@ -106,6 +106,26 @@ ContextGraph::ForwardOneStep(const ContextState *state, int32_t token,
   return std::make_tuple(score + node->output_score, node, matched_node);
 }
 
+std::pair<float, const ContextState *> ContextGraph::ForwardOnce(
+    const ContextState *state, int32_t token_id, const ContextState **last,
+    int32_t *since) const {
+  auto res = ForwardOneStep(state, token_id, false);
+  float score = std::get<0>(res);
+  const ContextState *next = std::get<1>(res);
+  const ContextState *matched = std::get<2>(res);
+  ++*since;
+  // not strict, a finished phrase takes the walk back to the root
+  if (matched != nullptr && next == root_.get()) {
+    // all it gained since the last one given back, as Finalize() would: with
+    // nothing finished in between, `since == level` means the walk took its own
+    // arcs from the root, so `state` is its parent and holds all of it
+    if (matched == *last && *since == matched->level) score = -state->node_score;
+    *last = matched;
+    *since = 0;
+  }
+  return std::make_pair(score, next);
+}
+
 std::pair<float, const ContextState *> ContextGraph::Finalize(
     const ContextState *state) const {
   float score = -state->node_score;

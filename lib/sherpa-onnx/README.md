@@ -45,6 +45,13 @@ need only be made to the streaming recognizer; the changes below that predate 0.
   helping the hotword on while it is spoken, and on purpose an endpoint and its trailing blanks still
   follow the beam's own best, not finalized. 酒店 begins seven of the pack's hotwords (酒店管理…) and
   was 3.0 up on 九键 when the segment ended there.
+- **Reduplicated hotwords:** a hotword finished again right after itself gains nothing the second
+  time (`ContextGraph::ForwardOnce`, the streaming modified beam search's step): not strict, a
+  finished hotword takes the walk back to the root, so 方方 was paid again for each extra pair and an
+  added 方方 made 我想芳芳 我想方方方方 (n-best 1.58 over 我想方方 1.37). Apart, it counts each time.
+  Another hotword right after still counts: the graph has tokens, not readings, so it cannot tell
+  方方芳芳 heard for 芳芳 from two names said in a row (with both added, 我想芳芳 stays, 方方芳芳
+  third at 1.27 against 1.59).
 - **Hotwords graph:** `CreateStream(hotwords)` keeps the graph of the last hotwords it was given and
   returns it again for the same ones, rather than building the pack's hotwords into a new graph for
   each stream. The user's words are not written to the log, where upstream's streaming recognizer
