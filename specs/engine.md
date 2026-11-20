@@ -230,7 +230,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    and backspace deletes there, and the input is read again whole, as if typed so (the decoder
    searches again from the first syllable that changed). A piece picked whose keys that changes is
    dropped; `PreeditPlaces` says where each place of the preedit is in the input, syllables
-   spaced or spelt out (双拼). On the nine keys a syllable taken puts the cursor past it if it was in
+   spaced or spelt out (双拼); a step passes the input places no preedit place is (a trailing `'`). On the nine keys a syllable taken puts the cursor past it if it was in
    or after its digits, and backspace gives the last one back at the end alone.
 5. **Learn.** Each commit is a record in the learning record (`learn/LearnLog`, `learn.log`; the
    reducer `LearnState`): rows by code (the keys typed, per input method) and the word before
@@ -684,6 +684,19 @@ setting either: it reads the codes.
   微软 nine keys after `;` moved to 1 (2026-11-09, `shuangpin ms --keys nine` then `pinyin --scheme ms-nine`, both
   models, the app's pinyin.data, all samples typed rather than `--same`'s): chat held-out 31.5 → 33.0%, pinyin.tsv
   73.7 → 75.3%; against the old run 4 won, 1 lost of 827 shared.
+- **The code as keys** (issue #5; setting `ShuangpinKeysShown`, off: the pinyin spelt, as before).
+  `PinyinSession(keysShown = true)` (`SessionFactory`, every 双拼 session, the hardware one too) shows
+  each syllable as its edge's keys (`Shows.keysOf`): a slipped key as the key meant (`Slips.meant`, as
+  the pinyin shows the syllable meant); on a grouped keyboard `KeyedSegmenter.keysShown` gives the
+  scheme's letters each key was read as, of the syllable's codes (fuzzy partners' too) the one whose
+  letters the keys pressed hold, never the group nor its first letter; a syllable or initial taken
+  off the bar its scheme keys (zhong `vs`, zh `v`). A typo read (ü typed with its own key, `TYPO`) is no slip:
+  its key shows as pressed. `PreeditPlaces` maps the text to the keys as it does the spelt pinyin,
+  so `'`, a pick's rest and 编码行 in the field follow; a taken piece shown shorter than its keys has its letters all at its start
+  (`Builder.add(whole)`; not while an edit left the cursor inside it, nor once what is left of it
+  shows letter for letter; Backspace right of it takes its last letter, as with the switch off), and `Action.Step` passes the places no preedit place is (`PreeditPlaces.shows`),
+  so the cursor never stops inside the keys of what shows shorter than them; Enter on a grouped keyboard (`CommitRaw`, `restShown`) commits the letters shown. Chaizi
+  and the misreading hints stay off as `spell` keeps them; the bar and the nine keys' column list pinyin.
 - **Learning.** Kind `spk:<scheme>:<tag>` (`Kinds.shuangpinKeys`, the scheme as
   `EngineSettings.SCHEMES` names it, no colon in any), apart from `sp:<scheme>` and from each
   scheme's: the same keys read other syllables under another. `Kinds.isShuangpin` is true for

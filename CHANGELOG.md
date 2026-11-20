@@ -13,6 +13,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 主要变化
 
 - 语音输入时暂停别的应用在放的音乐、视频，免得被当成说的话听进去：麦克风一开就暂停，说完交还，它们通常自己接着放。说着时来电话、响闹钟就当作说完，已经说的照常上屏。**按键 → 语音输入时暂停播放** 可以关掉。
+- 双拼可以让编码行显示按下的双拼字母，不显示完整拼音：双拼设置里打开 **编码行显示双拼按键**（默认关），小鹤打 `nihc` 编码行就是 `ni hc`。全键盘、18 键、14 键、九键和每个方案都能用；18 键、14 键、九键显示每个键读出的那个字母（九键 6 4 4 5 显示 `ni hk`），按回车上屏的也是这些字母。
 
 ### 小改动
 
@@ -29,6 +30,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - Voice input pauses music and videos playing in other apps, so they are not heard as speech: paused as the microphone opens and handed back once you finish, the apps usually going on by themselves. A call or an alarm while you speak ends the talk as if you had finished, what you said typed. **按键 → 语音输入时暂停播放** turns it off.
+
+### Main changes
+
+- 双拼 can show the keys pressed in the code row instead of the full pinyin: turn on **编码行显示双拼按键** in 双拼's settings (off by default) and 小鹤's `nihc` shows `ni hc`. On the full, 18, 14 and nine keys and with every scheme; on the 18, 14 and nine keys each key shows the letter it was read as (the nine keys' 6 4 4 5 shows `ni hk`), and Enter puts in those letters.
 
 ### Smaller changes
 

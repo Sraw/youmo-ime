@@ -329,6 +329,11 @@ object InputMethodSettings {
                 },
             )
         ),
+        Section(
+            R.string.im_section_typing, listOf(
+                Toggle(EngineSettings.SHUANGPIN_KEYS_SHOWN, text(R.string.im_shuangpin_keys_shown), R.string.im_shuangpin_keys_shown_summary),
+            )
+        ),
     )
 
     private fun table(keys: List<Item> = emptyList()) = listOf(

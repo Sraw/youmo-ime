@@ -15,6 +15,8 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 /** The user's input-method settings from the androidengine addon's config; keys are libime pinyin's so old settings carried over. */
 data class EngineSettings(
     val shuangpin: String = ZIRANMA,
+    /** 双拼's code shows the keys pressed, not the pinyin they read. */
+    val shuangpinKeysShown: Boolean = false,
     val fuzzy: Set<Fuzzy> = emptySet(),
     /** Whether neighbour slips and common misspellings are read as meant. */
     val typos: Boolean = true,
@@ -49,6 +51,7 @@ data class EngineSettings(
 
     companion object {
         const val SHUANGPIN_PROFILE = "ShuangpinProfile"
+        const val SHUANGPIN_KEYS_SHOWN = "ShuangpinKeysShown"
         const val PAGE_SIZE = "PageSize"
         const val PREDICTION = "Prediction"
         const val EMOJI = "Emoji"

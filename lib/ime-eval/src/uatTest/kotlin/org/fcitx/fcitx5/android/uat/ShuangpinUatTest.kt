@@ -64,6 +64,28 @@ class ShuangpinUatTest {
         expectPreedit("zheng")
     }
 
+    // 编码行显示双拼按键: the keys on 26 keys, the scheme's letters read on the grouped ones; off, the pinyin
+    @Test
+    @Uat("SP-60", "SP-61")
+    fun theCodeShowsTheKeysPressedOnEveryKeyboardWhenSet() {
+        for (letters in listOf<NineKeyLetters?>(null) + GROUPED) {
+            with(EngineReplay(settings(EngineSettings(shuangpinKeysShown = true)), im = InputMethodCatalog.SHUANGPIN)) {
+                if (letters == null) type("nihk") else typeOn(letters, "nihk")
+                val shown = preedit.filter { it != ' ' }
+                // 14 keys and nine read another pair first (不好 bu hk): its letters, each on the key pressed
+                if (letters == null || letters == NineKeyLetters.G18) assertEquals("$letters", "ni hk", preedit)
+                assertEquals(preedit, 4, shown.length)
+                if (letters != null) assertTrue(preedit, shown.indices.all { shown[it] in letters.letters(letters.key("nihk"[it])) })
+            }
+            if (letters == null || letters == NineKeyLetters.G18) {
+                with(EngineReplay(im = InputMethodCatalog.SHUANGPIN)) {
+                    if (letters == null) type("nihk") else typeOn(letters, "nihk")
+                    assertEquals("$letters off", "ni hao", preedit)
+                }
+            }
+        }
+    }
+
     @Test
     @Uat("SP-07")
     fun aWordMadeInFullPinyinTypesInShuangpinItsOrderItsOwn() = with(EngineReplay()) {

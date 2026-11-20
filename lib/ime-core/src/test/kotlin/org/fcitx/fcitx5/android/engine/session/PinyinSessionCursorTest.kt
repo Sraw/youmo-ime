@@ -50,6 +50,14 @@ class PinyinSessionCursorTest {
         assertEquals(2, fixed.cursor)
     }
 
+    // a trailing ' shows nowhere (xi): a step back from the end is not lost on the place before it
+    @Test
+    fun aStepPassesAPlaceThePreeditCannotShow() {
+        val session = session()
+        assertEquals("xi", session.type("xi'").preedit)
+        assertEquals(1, session.apply(Step(-1)).cursor)
+    }
+
     @Test
     fun backspaceDeletesBeforeTheCursor() {
         val session = session()

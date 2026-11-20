@@ -96,3 +96,78 @@ def sp51(d):
     gear(d, "双拼")
     check(d.wait_text("UAT 换位 18 键（自定义）", timeout=5, contains=True), f"双拼的「键盘」没写 UAT 换位 18 键（自定义）：{d.screen().texts()[:16]}")
     return f"拼音、双拼都能用；WE 在 Q 左边；候选 {c[:3]}；点「你好」上屏；键盘写 UAT 换位 18 键（自定义）"
+
+
+def keys_shown_on(d):
+    # 编码行显示双拼按键 on, back on the test page in 双拼
+    gear(d, "双拼")
+    d.switch("编码行显示双拼按键", True)
+    d.open_page("text")
+    d.switch_im("双拼")
+
+
+@case("SP-60", base="B0-18键", mutates=True)
+def sp60(d):
+    # off first: the pinyin, as before
+    grouped_keys(d, "bn io h jk")
+    off = d.preedit()
+    d.clear()
+    keys_shown_on(d)
+    grouped_keys(d, "bn io h jk")
+    row, c = d.preedit(), d.cands()
+    d.shot("kb", "18 键自然码 BN IO H JK，开了编码行显示双拼按键：编码行 ni hk")
+    d.enter()
+    entered = d.field_text()
+    d.clear()
+    grouped_keys(d, "bn io h jk")
+    d.pick("你")
+    rest = d.preedit()
+    d.clear()
+    # zhong taken shows as vs: a tap between v and s goes before it, so a key there leaves zhong whole
+    grouped_keys(d, "v sd fg io")
+    d.syllable_tap("zhong")
+    taken = d.preedit()
+    spans, y = d.preedit_glyphs()
+    d.tap(((spans[0][1] + spans[1][0]) // 2, y), 0.6)
+    grouped_keys(d, "bn")
+    tapped = d.preedit()
+    d.shot("kb", "点定 zhong 后点 v、s 中间再按 BN：编码行末尾仍是 vs'go")
+    d.clear()
+    gear(d, "双拼")
+    choose(d, "键盘", "全键盘")
+    d.open_page("text")
+    d.switch_im("双拼")
+    d.type("nihk")
+    full = d.preedit()
+    d.clear()
+    d.type("vsg")
+    abbrev = d.preedit()
+    d.clear()
+    check(off == "ni hao", f"关着时编码行是「{off}」")
+    check(row == "ni hk", f"18 键 BN IO H JK 的编码行是「{row}」")
+    check("你好" in c[:5], f"BN IO H JK 的候选 {c[:8]}")
+    check(entered == "nihk", f"回车后框里是「{entered}」")
+    check(rest == "你hk", f"点「你」后编码行是「{rest}」")
+    check(taken == "vs'go", f"点定 zhong 后编码行是「{taken}」")
+    check(tapped.endswith("vs'go"), f"点 v、s 中间再按 BN，编码行是「{tapped}」")
+    check(full == "ni hk", f"全键盘 nihk 的编码行是「{full}」")
+    check(abbrev == "vs g", f"全键盘 vsg 的编码行是「{abbrev}」")
+    return f"关「{off}」；18 键「{row}」，回车「{entered}」，点你「{rest}」，点定 zhong「{taken}」→「{tapped}」；全键盘「{full}」「{abbrev}」"
+
+
+@case("SP-61", base="B0-18键", mutates=True)
+def sp61(d):
+    gear(d, "双拼")
+    d.switch("编码行显示双拼按键", True)
+    script("18-lifecycle").in_field(d)
+    d.switch_im("双拼")
+    grouped_keys(d, "bn io h jk")
+    d.cands()
+    shown = d.field_text()
+    d.shot("full", "编码行在输入框里，18 键 BN IO H JK：框里 ni hk")
+    d.pick("你好")
+    t = d.field_text()
+    d.clear()
+    check(shown == "ni hk", f"框里是「{shown}」")
+    check(t == "你好", f"点「你好」后框里是「{t}」")
+    return f"框里「{shown}」，点「你好」后「{t}」"

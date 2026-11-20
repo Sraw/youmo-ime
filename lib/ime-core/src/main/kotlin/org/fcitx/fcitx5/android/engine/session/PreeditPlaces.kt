@@ -11,6 +11,9 @@ internal class PreeditPlaces private constructor(
 ) {
     fun inputAt(at: Int, readFrom: Int) = if (at <= restAt) readFrom else inInput[minOf(at - restAt, inInput.size - 1)]
 
+    /** Whether some place of the preedit is input place [place]: one inside a piece shown whole is none. */
+    fun shows(place: Int) = place in inInput
+
     /** Where in the preedit input place [place] is: before a space between syllables, not after. */
     fun preeditAt(place: Int): Int {
         val first = inInput.indexOfFirst { it >= place }
@@ -24,10 +27,13 @@ internal class PreeditPlaces private constructor(
 
         val rest get() = text.toString()
 
-        /** [shown] for keys [from]..[to]: a character a key, spread evenly (rounded down) where spelt out; a shown space is a zero-width place. */
-        fun add(shown: String, from: Int, to: Int): Builder {
+        /**
+         * [shown] for keys [from]..[to]: a character a key, spread evenly (rounded down) where spelt out; a shown space is a
+         * zero-width place. [whole]: every character at [from], so the cursor goes before or after the keys, never among them.
+         */
+        fun add(shown: String, from: Int, to: Int, whole: Boolean = false): Builder {
             text.append(shown)
-            for (j in shown.indices) put(from + (to - from) * j / shown.length)
+            for (j in shown.indices) put(if (whole) from else from + (to - from) * j / shown.length)
             return this
         }
 

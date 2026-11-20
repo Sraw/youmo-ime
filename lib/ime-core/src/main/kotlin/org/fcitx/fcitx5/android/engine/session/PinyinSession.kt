@@ -59,6 +59,7 @@ import java.util.Calendar
  * while the user pauses ([Action.Refine]).
  *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
+ * @param keysShown show 双拼's syllables as the scheme's keys pressed instead (a slipped key as meant)
  *
  * On the nine keys the input is digits, shown as the best reading's pinyin; a syllable taken ([Action.Syllable])
  * goes in as its letters and a separator, and Backspace right after gives its digits back, as 搜狗 does.
@@ -68,6 +69,7 @@ class PinyinSession(
     private val segmenter: Segmenter,
     penalties: Penalties = Penalties(),
     private val spell: Boolean = false,
+    private val keysShown: Boolean = false,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
     private val user: UserModel? = null,
     private val prediction: Boolean = true,
@@ -210,7 +212,15 @@ class PinyinSession(
             takeContext(action.before, action.cleared).also { action.learnFlags?.let { recorder.learnFlags = it } }
         }
         is Action.Cursor -> moved { lastRead.places.inputAt(action.at, readFrom()) }
-        is Action.Step -> moved { action.applyTo(cursor, input.length) }
+        is Action.Step -> moved { stepped(action) }
+    }
+
+    // past the places the preedit cannot show (a taken syllable's keys shown as fewer letters), or a step looks lost
+    private fun stepped(step: Action.Step): Int {
+        var at = step.applyTo(cursor, input.length)
+        val by = if (step.by < 0) -1 else 1
+        while (at > readFrom() && at < input.length && !lastRead.places.shows(at)) at += by
+        return at
     }
 
     /** Takes [text], committed by a session over this one (a stroke lookup), as what the input to come follows. */
@@ -881,16 +891,30 @@ class PinyinSession(
                 }
                 from = to
             }
-            return joined(graph, parts, ends, readFrom())
+            // a taken syllable or initial (its letters in the input) shown as its keys is fewer letters than it has: one piece,
+            // unless an edit left the cursor inside it, which must show where it is
+            val at = cursor - readFrom()
+            return joined(graph, parts, ends, readFrom()) { start, end, shown ->
+                keysShown && keyed != null && graph.input[start] in 'a'..'z' && shown.length < end - start && at !in start + 1 until end
+            }
         }
 
         private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
+            keysShown -> keysOf(graph, edge, syllable)
             // digits say nothing: the syllable read (fuzzy too), and of one still being typed as many letters as were typed
             keyed != null -> if (graph.kind(edge) == Kind.SYLLABLE) keyed.spelt(syllable) else keyed.started(syllable, graph.text(edge).length)
             spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)
             // a slipped key shows as meant: `nihap` as ni hao
             graph.isSlip(edge) -> Syllables.spelling(syllable)
             else -> graph.text(edge)
+        }
+
+        private fun keysOf(graph: SyllableGraph, edge: Int, syllable: Int): String {
+            val text = graph.text(edge)
+            val slip = graph.slips(edge)
+            val i = if (slip == null) -1 else graph.matches(edge).indexOf(syllable)
+            val meant = if (slip == null || i < 0) text else text.replaceRange(slip.at(i), slip.at(i) + 1, slip.meant(i).toString())
+            return keyed?.keysShown(meant, syllable) ?: keyed.typedOrSelf(meant)
         }
 
         fun reading(graph: SyllableGraph, from: Int, to: Int, word: Int): Reading? =
@@ -970,7 +994,7 @@ private fun first(sentences: List<Candidate>, picked: Int) =
     if (picked == 0) sentences else listOf(sentences[picked]) + sentences.filterIndexed { i, _ -> i != picked }
 
 /** [parts] of [graph]'s input joined for the preedit; [base] where the graph's input starts in the session's. */
-private fun joined(graph: SyllableGraph, parts: List<String>, ends: List<Int>, base: Int): PreeditPlaces.Builder {
+private fun joined(graph: SyllableGraph, parts: List<String>, ends: List<Int>, base: Int, whole: (start: Int, end: Int, shown: String) -> Boolean = { _, _, _ -> false }): PreeditPlaces.Builder {
     val out = PreeditPlaces.Builder().add(graph.input.substring(0, graph.start), base, base + graph.start)
     for (k in parts.indices) {
         val start = if (k == 0) graph.start else ends[k - 1]
@@ -983,7 +1007,7 @@ private fun joined(graph: SyllableGraph, parts: List<String>, ends: List<Int>, b
         val last = graph.input[ends[k] - 1]
         val end = if (last == SyllableGraph.SEPARATOR) ends[k] - 1 else ends[k]
         val tone = ZhuyinKeys.toneOf(last)
-        out.add(if (tone > 0) parts[k] + ZhuyinKeys.MARKS[tone - 1] else parts[k], base + start, base + end)
+        out.add(if (tone > 0) parts[k] + ZhuyinKeys.MARKS[tone - 1] else parts[k], base + start, base + end, whole(start, end, parts[k]))
     }
     return out
 }

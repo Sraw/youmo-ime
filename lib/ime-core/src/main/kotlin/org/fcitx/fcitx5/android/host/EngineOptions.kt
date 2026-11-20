@@ -65,6 +65,7 @@ class EngineOptions {
     private val englishSuggest = Option(EngineSettings.ENGLISH_SUGGEST, Flag, TRUE)
     private val candidateReading = Option(EngineSettings.CANDIDATE_READING, Names(ReadingStyle.entries.map { it.key }), ReadingStyle.OFF.key)
     private val strokeSingles = Option(EngineSettings.STROKE_SINGLES, Number(StrokeFilter.SINGLES_RANGE), StrokeFilter.SINGLES.toString())
+    private val shuangpinKeysShown = Option(EngineSettings.SHUANGPIN_KEYS_SHOWN, Flag, FALSE)
     private val fuzzy = Group(
         EngineSettings.FUZZY,
         listOf(Option(EngineSettings.TYPOS, Flag, TRUE)) + FUZZY_KEYS.map { Option(it, Flag, FALSE) },
@@ -88,7 +89,7 @@ class EngineOptions {
     /** In order; the two `ExternalOption`s are never saved. */
     private val entries: List<Any> = listOf(
         shuangpin, pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest, candidateReading,
-        strokeSingles,
+        strokeSingles, shuangpinKeysShown,
     ) + tables.values
 
     private val values = HashMap<String, String>()
@@ -184,6 +185,7 @@ class EngineOptions {
         fun flag(path: String) = values.getValue(path) == TRUE
         return EngineSettings(
             shuangpin = values.getValue(shuangpin.key),
+            shuangpinKeysShown = flag(shuangpinKeysShown.key),
             fuzzy = Fuzzy.entries.filterTo(HashSet()) { values["${fuzzy.key}/${it.name}"] == TRUE },
             typos = flag("${fuzzy.key}/${EngineSettings.TYPOS}"),
             prediction = flag(prediction.key),
@@ -251,7 +253,7 @@ class EngineOptions {
     // EnginePinyinPage and the others
     private fun pageOf(im: String): List<Any>? = when (im) {
         InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, strokeSingles, fuzzy)
-        InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
+        InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, shuangpinKeysShown, fuzzy)
         InputMethodCatalog.ENGLISH -> listOf(englishSuggest)
         in tables -> listOf(pageSize, prediction, emoji, modelLevel)
         else -> null

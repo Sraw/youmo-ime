@@ -129,7 +129,7 @@ class InputMethodSettingsTest {
     fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
         val own = mapOf(
             InputMethodCatalog.PINYIN to listOf(EngineSettings.CHAIZI, EngineSettings.LATIN_WORDS, AppPrefs.PINYIN_KEYBOARD) + nineKeys,
-            InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD),
+            InputMethodCatalog.SHUANGPIN to listOf(EngineSettings.SHUANGPIN_PROFILE, AppPrefs.SHUANGPIN_KEYBOARD, EngineSettings.SHUANGPIN_KEYS_SHOWN),
             InputMethodCatalog.ENGLISH to listOf(
                 AppPrefs.ENGLISH_KEYBOARD, AppPrefs.T9_ENGLISH_TYPING, *nineKeys.toTypedArray(),
                 EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS,

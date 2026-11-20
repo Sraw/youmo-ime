@@ -37,6 +37,9 @@ interface KeyedSegmenter : Segmenter {
     /** The separator, or a tone on zhuyin keyboards. */
     fun separates(c: Char): Boolean = c == SyllableGraph.SEPARATOR
 
+    /** How [syllable] read off [text] (its keys, a slipped one as meant) shows as the keys pressed; null: as [asTyped]. Only grouped 双拼 says. */
+    fun keysShown(text: String, syllable: Int): String? = null
+
     /** Only grouped 双拼 says. */
     fun endsSyllable(lead: String, final: Char): Boolean = false
 

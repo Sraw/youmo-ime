@@ -47,6 +47,9 @@ class GroupedShuangpinSegmenter(
     // an initial taken, then its final's key: that initial's syllables the group may end
     private val withFinal = HashMap<String, SyllableMatches>()
 
+    // each syllable's codes in letters, fuzzy ones too: what [keysShown] picks from
+    private val codesOf = HashMap<Int, ArrayList<String>>()
+
     init {
         val table = HashMap<String, TreeMap<Int, Int>>()
         val spelt = ArrayList<Triple<String, Int, Int>>()
@@ -58,6 +61,7 @@ class GroupedShuangpinSegmenter(
         fun keep(code: String, id: Int, flags: Int, init: String) {
             val keys = grouped(code) ?: return
             keepBest(table.getOrPut(keys) { TreeMap() }, id, flags)
+            codesOf.getOrPut(id) { ArrayList() }.let { if (code !in it) it += code }
             if (init.isNotEmpty()) keepBest(finalIds.getOrPut(init + keys[1]) { TreeMap() }, id, flags)
         }
         for (id in 0 until Syllables.count) {
@@ -76,7 +80,10 @@ class GroupedShuangpinSegmenter(
         val taken = table.filterValues { it.containsValue(0) }.keys
         for ((code, id, flags) in spelt) {
             val keys = grouped(code) ?: continue
-            if (scheme.leadVowel || keys !in taken) keepBest(table.getOrPut(keys) { TreeMap() }, id, flags)
+            if (scheme.leadVowel || keys !in taken) {
+                keepBest(table.getOrPut(keys) { TreeMap() }, id, flags)
+                codesOf.getOrPut(id) { ArrayList() }.let { if (code !in it) it += code }
+            }
         }
         val byLead = HashMap<Char, TreeMap<Int, Int>>()
         for ((code, syllables) in table) {
@@ -100,6 +107,22 @@ class GroupedShuangpinSegmenter(
     /** Whether [final] ends a syllable after [lead] (a key code, or a bar-taken initial's letters). */
     override fun endsSyllable(lead: String, final: Char): Boolean =
         if (lead.length == 1 && letters.isCode(lead[0])) "$lead$final" in pairs else withFinal["$lead$final"] != null
+
+    /**
+     * The scheme's letters that read [syllable] off [text] (codes, after a bar-taken initial or syllable): of the
+     * syllable's codes, the one most on the keys pressed, as many letters as were pressed; a taken syllable its code.
+     */
+    override fun keysShown(text: String, syllable: Int): String? {
+        val codes = codesOf[syllable] ?: return null
+        var taken = 0
+        while (taken < text.length && text[taken] in 'a'..'z') taken++
+        val initial = text.substring(0, taken)
+        if (taken > 0 && initial !in byInitial) return scheme.encode(syllable) ?: codes.first()
+        // what each place may be: a taken initial's keys, then each key's letters
+        val places = listOfNotNull(initial.takeIf { it.isNotEmpty() }?.let(scheme::initialKeys)) + text.filter(letters::isCode).map(letters::letters)
+        val best = codes.maxBy { code -> places.indices.count { j -> j < code.length && code[j] in places[j] } }
+        return best.take(places.size)
+    }
 
     override fun reads(c: Char) = letters.isCode(c)
 

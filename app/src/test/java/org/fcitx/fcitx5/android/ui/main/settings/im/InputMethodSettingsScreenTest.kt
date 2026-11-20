@@ -371,6 +371,11 @@ class InputMethodSettingsScreenTest {
         val shuangpin = mutableMapOf<String, String>()
         screen(InputMethodCatalog.SHUANGPIN, shuangpin).findPreference<ListPreference>(EngineSettings.SHUANGPIN_PROFILE)!!.callChangeListener("Xiaohe")
         assertEquals("Xiaohe", engineReads(InputMethodCatalog.SHUANGPIN, shuangpin).shuangpin)
+        // off by default; on, it reaches the engine
+        val keys = screen(InputMethodCatalog.SHUANGPIN, shuangpin).titled(R.string.im_shuangpin_keys_shown)
+        assertFalse((keys as SwitchPreferenceCompat).isChecked)
+        keys.callChangeListener(true)
+        assertTrue(engineReads(InputMethodCatalog.SHUANGPIN, shuangpin).shuangpinKeysShown)
         val wubi = mutableMapOf<String, String>()
         val page = screen("engine-wubi", wubi)
         page.titled(R.string.im_auto_select).callChangeListener(false)

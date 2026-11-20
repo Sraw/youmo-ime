@@ -741,6 +741,8 @@
     <string name="im_typos_summary">按在键的边上、靠着旁边哪个键，也按那个键读（点在键中间不改）；全拼还认 gn 当成 ng 这类错拼，双拼全键盘还认 j、q、x、y 后的 u 按成了 ü 的键</string>
     <string name="im_latin_words">中英混输</string>
     <string name="im_latin_words_summary">拼音里直接打英文单词，比如 iphone 出 iPhone</string>
+    <string name="im_shuangpin_keys_shown">编码行显示双拼按键</string>
+    <string name="im_shuangpin_keys_shown_summary">编码行显示按下的双拼字母（小鹤 ni hc），不显示完整拼音（ni hao）；18 键、14 键、九键显示每个键读出的那个字母</string>
     <string name="engine_data_libime">拼音词典和语言模型：libime</string>
     <string name="engine_data_fineweb">语言模型、英文词表、手写的字频统计和语音整理的合成口语用的网页文本：FineWeb-2</string>
     <string name="engine_data_handwriting">手写识别模型：本项目用 Make Me a Hanzi 的笔画（来自文鼎字体）和开源手写字体训练</string>

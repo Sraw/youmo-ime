@@ -288,6 +288,10 @@ class SettingsIndexTest {
         }
         assertTrue(found("上滑").toString(), found("上滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_UP })
         assertTrue(found("下滑").toString(), found("下滑").any { it.route == SettingsRoute.Keys && it.key == AppPrefs.SWIPE_DOWN })
+        // 编码行显示双拼按键 by the words people say for it
+        for (term in listOf("拼音行", "按键显示")) {
+            assertTrue("$term: ${found(term)}", found(term).any { it.key == EngineSettings.SHUANGPIN_KEYS_SHOWN })
+        }
     }
 
     @Test

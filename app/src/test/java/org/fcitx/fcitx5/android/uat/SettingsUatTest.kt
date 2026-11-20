@@ -325,6 +325,8 @@ class SettingsUatTest {
         assertTrue(s(R.string.handwriting_pause) in st.titles())
         im(c.SHUANGPIN)
         assertTrue(s(R.string.im_shuangpin_scheme) in st.titles())
+        assertTrue(s(R.string.im_shuangpin_keys_shown) in st.titles())
+        assertFalse(checked(R.string.im_shuangpin_keys_shown))
         assertTrue(s(R.string.im_latin_words) !in st.titles())
         for (table in listOf(c.WUBI, c.ERBI, c.CANGJIE, c.ZIRANMA, c.WUBI_PINYIN)) {
             im(table)

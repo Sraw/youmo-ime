@@ -143,4 +143,16 @@ class EngineOptionsTest {
         }
     }
 
+    // an older config has no key: the code stays pinyin
+    @Test
+    fun shuangpinKeysShownIsOffTillSetAndOnTheShuangpinPage() {
+        assertEquals(false, EngineOptions().toSettings().shuangpinKeysShown)
+        assertEquals(true, EngineOptions().apply { load("ShuangpinKeysShown=True\n") }.toSettings().shuangpinKeysShown)
+        assertEquals(false, EngineOptions().apply { load("ShuangpinKeysShown=x\n") }.toSettings().shuangpinKeysShown)
+        val options = EngineOptions()
+        assertTrue(options.setPage(InputMethodCatalog.SHUANGPIN, ConfigTree.of(mapOf(EngineSettings.SHUANGPIN_KEYS_SHOWN to "True"))))
+        assertEquals(true, options.toSettings().shuangpinKeysShown)
+        assertEquals("True", options.page(InputMethodCatalog.SHUANGPIN)!!.leaves()[EngineSettings.SHUANGPIN_KEYS_SHOWN])
+    }
+
 }

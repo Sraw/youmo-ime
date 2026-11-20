@@ -346,3 +346,17 @@
 - **操作**：（没打过「小米」）点 x w m m 选「下面」，再做一次；删光，点 x ' m，翻看候选。
 - **预期**：第一个是「下面」；「小米」等没打过的词照旧在候选里（分隔键后的单个声母不限打过的词）。
 - **JVM**：`ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell`（:lib:ime-core:test）；设备上不跑。
+
+## 编码行显示双拼按键
+
+### SP-60 [P1] 编码行显示按下的双拼键（每种键盘）
+- **前提**：B0-18键（自然码）。
+- **操作**：到 **输入法 → 双拼** 打开 **编码行显示双拼按键**；回测试页点 BN IO H JK（自然码 ni hk），看编码行和候选；按回车，看框里；删光，点 BN IO H JK，点「你」，看编码行；删光，点 V SD FG IO，在音节条上点 zhong，在编码行 v 和 s 之间点一下，再点 BN，看编码行；删光，**键盘** 改回「全键盘」，打 n i h k 看编码行，再点 v s g 看编码行。
+- **预期**：18 键上编码行是 `ni hk`（每个键读出的字母，不是 `bn io h jk` 也不是拼音 `ni hao`），候选里有「你好」；回车后框里是 `nihk`；点「你」后编码行是 `你hk`。点定 zhong 后编码行是 `vs'go`，点在 v、s 之间再点 BN，编码行末尾仍是 `vs'go`（光标算在 zhong 前面，不会拆开它）。全键盘上 n i h k 是 `ni hk`，v s g 是 `vs g`。关着（默认）时编码行是拼音 `ni hao`。14 键、九键（6 4 4 5 显示 `ni hk`，不是 `mg gj`）、小鹤（`nihc` 显示 `ni hc`）、微软（`x;`）、`'`、光标（左右移一下跳过点定的音节）、退格、按偏的键（显示认出来的键）、ü 按成自己的键的错拼（显示按下的键）、音节条上点定的音节（自然码 zhong 显示 `vs`）由 JVM 覆盖。
+- **JVM**：ime-core `PinyinSessionKeysShownTest`（每种键盘、三个方案、简拼、选了一部分、`'`、光标、按偏的键、点定的音节和声母、模糊音、回车）、`EngineOptionsTest.shuangpinKeysShownIsOffTillSetAndOnTheShuangpinPage`；ime-eval `ShuangpinUatTest.theCodeShowsTheKeysPressedOnEveryKeyboardWhenSet`（真数据，四种键盘）；app `InputMethodSettingsScreenTest.aSchemeAndATablesOptionsAreSavedWhereTheEngineReadsThem`（开关默认关，打开后引擎读到）；设备上跑（冒烟）。
+
+### SP-61 [P1] 编码行在输入框里时也显示双拼键
+- **前提**：B0-18键（自然码）；**编码行显示双拼按键** 打开；B-IF（编码行选成「输入框里（实验性）」）。
+- **操作**：回测试页换到双拼，点 BN IO H JK，看框里；点「你好」。
+- **预期**：框里带下划线的是 `ni hk`（不是 `ni hao`）；点「你好」后框里是「你好」。
+- **JVM**：ime-eval `ShuangpinUatTest.theCodeShowsTheKeysPressedOnEveryKeyboardWhenSet`（输入框里写的就是编码行的文字，`CodeInFieldUatTest` 管它怎样放进框里）；设备上跑（冒烟）。

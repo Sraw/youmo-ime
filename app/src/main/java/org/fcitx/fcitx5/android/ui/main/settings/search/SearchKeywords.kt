@@ -15,6 +15,7 @@ object SearchKeywords {
         listOf("value:key_drawing=StrokeFilter") to R.array.kw_stroke_filter,
         listOf("cmd:stroke") to R.array.kw_stroke_commands,
         listOf("pref:StrokeSingles") to R.array.kw_stroke_singles,
+        listOf("pref:ShuangpinKeysShown") to R.array.kw_shuangpin_keys_shown,
         listOf("value:key_drawing=Glide") to R.array.kw_glide,
         listOf("page:RareChars") to R.array.kw_rare_chars,
         listOf("pref:Fuzzy") to R.array.kw_fuzzy,

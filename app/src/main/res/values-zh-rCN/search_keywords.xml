@@ -16,6 +16,11 @@
     <string-array name="kw_stroke_singles">
         <item>笔画筛选</item>
     </string-array>
+    <string-array name="kw_shuangpin_keys_shown">
+        <item>拼音行</item>
+        <item>按键显示</item>
+        <item>双拼字母</item>
+    </string-array>
     <string-array name="kw_glide">
         <item>滑动输入</item>
         <item>划词</item>

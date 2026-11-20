@@ -206,10 +206,10 @@ internal class SessionFactory(
             // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; slips read by tap, no other typo;
             // learned under spk: (CommitRecorder)
             SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE ->
-                ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
+                ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, keysShown = s.shuangpinKeysShown, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
-                val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin))
+                val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos, neighbours = s.typos), spell = true, keysShown = s.shuangpinKeysShown, kind = Kinds.shuangpin(s.shuangpin))
                 GlideSession(
                     ForgetsInTables(pinyin),
                     syllableBoundary,
@@ -348,13 +348,14 @@ internal class SessionFactory(
     private fun pinyinSession(
         segmenter: Segmenter,
         spell: Boolean,
+        keysShown: Boolean = false,
         chaizi: PartsLookup = PartsLookup { emptyList() },
         kind: String = Kinds.FULL,
     ): PinyinSession {
         val s = settings()
         val user = sessionUser()
         return PinyinSession(
-            assets.pinyinData, segmenter, spell = spell,
+            assets.pinyinData, segmenter, spell = spell, keysShown = keysShown,
             pageSize = s.pageSize, user = user, prediction = s.prediction, prior = lexicon.prior(), phraseBook = phraseBook(),
             builtInPhrases = s.builtInPhrases, commonWords = commonWords(kind),
             reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
