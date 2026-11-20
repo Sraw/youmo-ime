@@ -490,7 +490,7 @@ class EngineBridge {
         is LearningOp.NoPredict, is LearningOp.RemoveItems, is LearningOp.RemoveWords -> true
         is LearningOp.Menu, is LearningOp.Delete, is LearningOp.Block, is LearningOp.Pin, is LearningOp.Unpin,
         is LearningOp.Report, LearningOp.Overview, LearningOp.Saving, is LearningOp.ListItems, is LearningOp.RestoreCorrection,
-        is LearningOp.ResetTableOrder -> false
+        is LearningOp.ResetTableOrder, is LearningOp.VoiceAlways -> false
         is BackupOp.Restore, is BackupOp.RestoreKept, BackupOp.Revert -> true
         BackupOp.Kept, is BackupOp.Delete, is BackupOp.Peek, BackupOp.Copy, is BackupOp.SetAuto -> false
     }

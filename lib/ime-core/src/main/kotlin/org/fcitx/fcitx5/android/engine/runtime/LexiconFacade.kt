@@ -56,7 +56,7 @@ internal class LexiconFacade(
 
     fun voiceHomophones(words: List<UserWord>) = assets.voiceHomophones(words)
 
-    fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = assets.voiceHomophonesAllowed(spans)
+    fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>) = assets.voicePick(homophones, text, before, blocked)
 
     /** Which of [texts] have a character 生僻字屏蔽 holds back now ([UserLexicon.gate]). */
     fun rareHeld(texts: Collection<String>): Set<String> {

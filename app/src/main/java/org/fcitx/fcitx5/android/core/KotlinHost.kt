@@ -237,7 +237,9 @@ class KotlinHost(
     }
     override suspend fun logProbs(texts: List<String>) = withContext(dispatcher) { bridge.engines.logProbs(texts) }
     override suspend fun voiceHomophones(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.voiceHomophones(words) }
-    override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = withContext(dispatcher) { bridge.engines.voiceHomophonesAllowed(spans) }
+    override suspend fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>) =
+        withContext(dispatcher) { bridge.engines.voicePick(homophones, text, before, blocked) }
+    override suspend fun voiceStretches(texts: List<String>) = withContext(dispatcher) { bridge.engines.voiceStretches(texts) }
     override suspend fun rareHeld(texts: Collection<String>) = withContext(dispatcher) { bridge.engines.rareHeld(texts) }
     override suspend fun rareGrid() = withContext(dispatcher) { bridge.engines.rareGrid() }
     override suspend fun addUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.addWord(text, pinyin) }
@@ -246,7 +248,7 @@ class KotlinHost(
     override suspend fun voiceConfirm(before: String?, after: String?) = withContext(dispatcher) { bridge.engines.voiceConfirm(before, after) }
     override suspend fun voiceEditsEnd() = withContext(dispatcher) { bridge.engines.voiceEditsEnd() }
     override suspend fun voiceRemember(ask: VoiceEdits.Ask) = withContext(dispatcher) { bridge.engines.voiceRemember(ask) }
-    override suspend fun voiceForget(word: String) = withContext(dispatcher) { bridge.engines.voiceForget(word) }
+    override suspend fun voiceForget(ask: VoiceEdits.Ask) = withContext(dispatcher) { bridge.engines.voiceForget(ask) }
     override suspend fun blockUserWord(text: String, pinyin: String) = withContext(dispatcher) { bridge.engines.blockWord(text, pinyin) }
     override suspend fun removeUserWords(words: List<UserWord>) = withContext(dispatcher) { bridge.engines.removeWords(words) }
     override suspend fun englishWords() = withContext(dispatcher) { bridge.engines.englishWords() }

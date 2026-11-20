@@ -141,6 +141,12 @@ class VoiceListener(
     @Volatile
     private var capturedAt = 0L
 
+    // the user's words of the closed stretches, on the decoder: summed and the longest; of what showed, asked on the side
+    private var pickMs = 0L
+    private var pickMaxMs = 0L
+    private var livePickMs = 0L
+    private var livePicks = 0
+
     private fun tell(event: Events.() -> Unit) {
         main.post { if (!closed) events.event() }
     }
@@ -210,8 +216,10 @@ class VoiceListener(
         override suspend fun logProbs(texts: List<String>): FloatArray? =
             orFallback("voice log probs", null) { language.logProbs(texts) }
 
-        override suspend fun homophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray? =
-            orFallback("voice homophones", null) { language.homophonesAllowed(spans) }
+        override suspend fun pick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String? =
+            orFallback("voice user words", null) { language.pick(homophones, text, before, blocked) }
+
+        override suspend fun stretches(texts: List<String>) = orFallback("voice stretches", Unit) { language.stretches(texts) }
     }
 
     private suspend fun <T> caught(block: suspend () -> T): Result<T> = try {
@@ -290,25 +298,54 @@ class VoiceListener(
         var stream: OnlineStream? = null
         try {
             val recognizer = models.recognizer
-            val live = VoiceLive(models.polisher?.stream())
+            // read by the polish as the talk puts them in, both on the decoder
+            val putIn = LinkedHashSet<String>()
+            val live = VoiceLive(models.polisher?.stream(putIn))
             if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
-            // the user's words put in after the polish, for what shows and what is typed alike: no word changes at the end
-            val homophones = words.homophones.hold()
-            val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
             suspend fun polished(step: () -> VoiceLive.Heard) {
                 restartIn(live)
                 val heard = orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
                     ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
-                show(homophones.replace(heard, homophoneLexicon))
+                show(heard)
             }
+            // the user's words go in before the polish, each stretch read after the one before it; what shows meanwhile
+            // asked beside the decoding, never waited for
+            val timedLanguage = object : VoiceChoice.Language by safeLanguage {
+                override suspend fun pick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String? {
+                    val t = SystemClock.uptimeMillis()
+                    return safeLanguage.pick(homophones, text, before, blocked).also {
+                        livePickMs += SystemClock.uptimeMillis() - t
+                        livePicks++
+                    }
+                }
+            }
+            val talk = VoiceChoice.Talk(
+                words.homophones, words.blockedWords, safeLanguage,
+                // a failed ask only leaves what shows as heard, not the talk failed
+                launch = { block -> scope.launch(decoder) { orFallback("voice live pick", Unit) { block() } } },
+                show = { said -> polished { live.heard(said) } },
+                liveLanguage = timedLanguage,
+                putIn = putIn,
+            )
             val made = VoiceEngine.stream(recognizer, words)
             stream = made
             val segment = VoiceSegments(
                 Recognition(recognizer, made),
                 VoiceEngine.SAMPLE_RATE,
-                choose = { result -> orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) } },
-                live = { heard -> polished { live.heard(heard) } },
-                closed = { text -> polished { live.closed(text) } },
+                choose = { result ->
+                    val chosen = orFallback("voice choice", result.text) { VoiceEngine.choose(result, words, safeLanguage) }
+                    val t = SystemClock.uptimeMillis()
+                    orFallback("voice user words", chosen) { talk.chosen(chosen) }.also {
+                        val ms = SystemClock.uptimeMillis() - t
+                        pickMs += ms
+                        pickMaxMs = maxOf(pickMaxMs, ms)
+                    }
+                },
+                live = { heard -> polished { live.heard(talk.shows(heard)) } },
+                closed = { text ->
+                    talk.kept(text)
+                    polished { live.closed(text) }
+                },
                 quiet,
             )
             var acceptMax = 0L
@@ -319,6 +356,7 @@ class VoiceListener(
                 if (BuildConfig.DEBUG) acceptMax = maxOf(acceptMax, SystemClock.uptimeMillis() - t)
             }
             if (closed) return
+            talk.stop()
             val drained = SystemClock.uptimeMillis()
             segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
             val tailDecoded = SystemClock.uptimeMillis()
@@ -334,8 +372,9 @@ class VoiceListener(
                 polishFailure = null
             }
             val polishedAt = SystemClock.uptimeMillis()
-            val result = if (polished != null) homophones.replace(polished, homophoneLexicon) to false else homophones.replace(live.raw, homophoneLexicon) to true
+            val result = if (polished != null) polished to false else live.raw to true
             if (BuildConfig.DEBUG) logTiming(drained, tailDecoded, polishedAt, acceptMax)
+            if (talk.stretches.isNotEmpty()) safeLanguage.stretches(talk.stretches.toList())
             said.complete(result)
         } catch (e: CancellationException) {
             throw e
@@ -353,9 +392,9 @@ class VoiceListener(
         val stop = liftAt
         val captured = capturedAt.takeIf { it > 0 }
         Timber.d(
-            "voice timing: firstShownFromReadyMs=%d stopToClosedMs=%d closedToDrainedMs=%d tailDecodeMs=%d polishMs=%d homophonesMs=%d stopToSaidMs=%d acceptMaxMs=%d",
+            "voice timing: firstShownFromReadyMs=%d stopToClosedMs=%d closedToDrainedMs=%d tailDecodeMs=%d polishMs=%d pickMs=%d pickMaxMs=%d livePickMs=%d livePicks=%d stopToSaidMs=%d acceptMaxMs=%d",
             if (shownAt > 0 && readyAt > 0) shownAt - readyAt else -1, if (stop != null && captured != null) captured - stop else -1,
-            captured?.let { drained - it } ?: -1, tailDecoded - drained, polishedAt - tailDecoded, end - polishedAt,
+            captured?.let { drained - it } ?: -1, tailDecoded - drained, polishedAt - tailDecoded, pickMs, pickMaxMs, livePickMs, livePicks,
             stop?.let { end - it } ?: -1, acceptMax,
         )
     }

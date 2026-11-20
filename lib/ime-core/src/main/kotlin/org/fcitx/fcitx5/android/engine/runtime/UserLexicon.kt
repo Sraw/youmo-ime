@@ -139,7 +139,7 @@ internal class UserLexicon(
     fun userWords(): List<UserWord> = UserWord.Kind.entries.flatMap { userWords(it) }
 
     fun userWords(kind: UserWord.Kind): List<UserWord> = when (kind) {
-        UserWord.Kind.ADDED -> lists.addedWords.map { it.word(kind) }
+        UserWord.Kind.ADDED -> lists.voiceAlways.let { always -> lists.addedWords.map { it.word(kind).copy(voiceAlways = it.text in always) } }
         UserWord.Kind.LEARNED -> user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(kind, count) }
         UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) } + englishBlocks.blocked.map { UserWord(it, "", kind) }
     }
@@ -241,6 +241,15 @@ internal class UserLexicon(
         }
         if (listedThem) dropUser()
     }
+
+    /** 「以后总是换」 on or off for an added word; whether it changed. */
+    fun setVoiceAlways(text: String, on: Boolean): Boolean = lists.setVoiceAlways(text, on)
+
+    /** The added words voice always puts in. */
+    val voiceAlways: Set<String> get() = lists.voiceAlways
+
+    /** [WordLists.putVoiceAlways]. */
+    fun putVoiceAlways(texts: Collection<String>, merge: Boolean) = lists.putVoiceAlways(texts, merge)
 
     /** Takes [text] off the added words as a long press deletes it: out of the model at once ([UserModel.unlist]), sessions kept. */
     fun unAdd(text: String) {

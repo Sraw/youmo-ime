@@ -16,7 +16,7 @@ class VoicePolisher private constructor(
     private val tags: VoicePolishTags,
 ) : VoicePolishStream.Tagger, AutoCloseable {
 
-    fun stream() = VoicePolishStream(tags, this)
+    fun stream(words: Collection<String> = emptyList()) = VoicePolishStream(tags, this, words = words)
 
     override fun labels(text: IntArray): VoicePolishStream.Labels {
         if (text.isEmpty()) return VoicePolishStream.Labels(IntArray(0), IntArray(0))

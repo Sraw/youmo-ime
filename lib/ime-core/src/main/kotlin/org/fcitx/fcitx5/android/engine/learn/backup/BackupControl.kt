@@ -37,6 +37,9 @@ class BackupControl(
     private val addresses: () -> AddressData? = { null },
     /** Merge (true) or replace (false, 退回恢复前) the app's address book. */
     private val putAddresses: (AddressData, merge: Boolean) -> Unit = { _, _ -> },
+    /** The added words voice always puts in; marked on top (true) or as the only ones (false, 退回恢复前). */
+    private val voiceAlways: () -> Set<String> = { emptySet() },
+    private val putVoiceAlways: (Collection<String>, merge: Boolean) -> Unit = { _, _ -> },
 ) : LearningOps.Backups {
     fun run(op: BackupOp): BackupResult = try {
         when (op) {
@@ -76,12 +79,12 @@ class BackupControl(
 
     fun bytes(kind: Int): ByteArray {
         val (added, blocked) = lists()
-        return bytes(kind, state(), added, blocked, clock.now(), addresses())
+        return bytes(kind, state(), added, blocked, clock.now(), addresses(), voiceAlways())
     }
 
     // timed no earlier than its last commit, so after a clock set back a clear's cut still finds it
-    private fun bytes(kind: Int, s: LearnState, added: List<ListedWord>, blocked: List<ListedWord>, time: Long, book: AddressData?) =
-        LearnBackup.bytes(BackupHead(maxOf(time, s.lastMinute * LearnClock.MINUTE), s.day, backups.installId, kind, version), s, added, blocked, book)
+    private fun bytes(kind: Int, s: LearnState, added: List<ListedWord>, blocked: List<ListedWord>, time: Long, book: AddressData?, always: Set<String>) =
+        LearnBackup.bytes(BackupHead(maxOf(time, s.lastMinute * LearnClock.MINUTE), s.day, backups.installId, kind, version), s, added, blocked, book, always)
 
     /** Merges in a backup, a bare log or the user dictionary's export; returns its head. */
     @Throws(IOException::class)
@@ -138,6 +141,7 @@ class BackupControl(
         }
         if (!written) throw IOException("the learning was not written")
         if (add.isNotEmpty() || block.isNotEmpty()) addLists(add, block)
+        if (backup.voiceAlways.isNotEmpty()) putVoiceAlways(backup.voiceAlways, true)
         // a backup without addresses: keep the phone's
         backup.addresses?.let { putAddresses(it, true) }
         return backup.head
@@ -186,6 +190,7 @@ class BackupControl(
         val add = copy.added.filter { it !in nowAdded }
         val block = copy.blocked.filter { it !in nowBlocked }
         if (add.isNotEmpty() || block.isNotEmpty()) addLists(add, block)
+        putVoiceAlways(copy.voiceAlways, false)
         // a copy without addresses: keep the phone's
         copy.addresses?.let { putAddresses(it, false) }
         backups.dropBeforeRestore()
@@ -198,13 +203,14 @@ class BackupControl(
         if (!backups.due(s.day)) return
         val (added, blocked) = lists()
         val book = addresses()
+        val always = voiceAlways()
         val read = logBytes
         if (read == null) {
-            val bytes = bytes(BackupHead.AUTO, s, added, blocked, clock.now(), book)
+            val bytes = bytes(BackupHead.AUTO, s, added, blocked, clock.now(), book, always)
             backups.saveAuto(s.day) { bytes }
         } else {
             // timed after the read, so a clear's cut between the two finds it
-            backups.saveAuto(s.day) { read()?.let { log -> LearnBackup.replay(log).first.let { bytes(BackupHead.AUTO, it, added, blocked, clock.now(), book) } } }
+            backups.saveAuto(s.day) { read()?.let { log -> LearnBackup.replay(log).first.let { bytes(BackupHead.AUTO, it, added, blocked, clock.now(), book, always) } } }
         }
     }
 
@@ -215,7 +221,7 @@ class BackupControl(
         val s = state()
         if (!backups.auto || backups.installId == 0L || s.day < 1) return
         val (added, blocked) = lists()
-        val bytes = bytes(BackupHead.AUTO, s, added, blocked, clock.now(), addresses())
+        val bytes = bytes(BackupHead.AUTO, s, added, blocked, clock.now(), addresses(), voiceAlways())
         backups.saveAuto(s.day) { bytes }
     }
 

@@ -9,7 +9,7 @@ object VoicePost {
 
     class Stretch(val raw: String)
 
-    /** Not all the app does (VoiceHomophones, VoiceEnd's last mark are not run), so not letter for letter what the user sees. */
+    /** Not all the app does (VoiceEnd's last mark is not run, the user's words only as `--words` puts them in), so not letter for letter what the user sees. */
     fun text(stretches: List<Stretch>, polish: VoicePolishStream? = null): String {
         val live = VoiceLive(polish)
         for (stretch in stretches) live.closed(stretch.raw)

@@ -28,6 +28,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.pack.AppData
@@ -213,7 +214,7 @@ object VoiceEngine {
     // a failed read is the awaiting listener's to log (its Deferred), not this scope's
     private val reading = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** Each answer in time or none: no boundaries (VoiceBlocking takes a text as having the word), no scores. */
+    /** Each answer in time or none: no boundaries (VoiceBlocking takes a text as having the word), no scores, none of the user's words put in. */
     fun language(fcitx: HostConnection) = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
@@ -221,8 +222,21 @@ object VoiceEngine {
         override suspend fun logProbs(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { logProbs(texts) } }
 
-        override suspend fun homophonesAllowed(spans: List<VoiceHomophones.Span>) =
-            withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voiceHomophonesAllowed(spans) } }
+        override suspend fun pick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>) =
+            withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voicePick(homophones, text, before, blocked) } }
+
+        // handed over, not waited for: the talk's own scope is cancelled as soon as its text is typed
+        override suspend fun stretches(texts: List<String>) {
+            reading.launch {
+                try {
+                    withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voiceStretches(texts) } }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    Timber.w(e, "voice stretches")
+                }
+            }
+        }
     }
 
     // the engine busy or starting: the text as heard, not a wait

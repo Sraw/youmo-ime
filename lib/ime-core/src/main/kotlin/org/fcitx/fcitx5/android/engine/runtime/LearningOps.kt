@@ -82,7 +82,14 @@ internal class LearningOps(
             LearningResult.Done()
         }
         is LearningOp.RemoveWords -> removeWords(op.words)
-        is LearningOp.RestoreCorrection -> LearningResult.Done().also { restoreCorrection(op.texts) }
+        is LearningOp.RestoreCorrection -> {
+            restoreCorrection(op.texts)
+            LearningResult.Done()
+        }
+        is LearningOp.VoiceAlways -> {
+            lexicon.setVoiceAlways(op.text, op.on)
+            LearningResult.Done()
+        }
     }
 
     // whether learning is written now, and whether the record takes rewrites at all till restart
@@ -121,6 +128,8 @@ internal class LearningOps(
     private fun removeWords(words: List<UserWord>): LearningResult {
         fun entries(kind: UserWord.Kind) = words.filter { it.kind == kind }.mapNotNull(lexicon::entryOf)
         val added = lexicon.addedPlaces(entries(UserWord.Kind.ADDED))
+        // voice's 总是换 goes with a deleted word and comes back with it
+        val always = lexicon.voiceAlways.filter { t -> words.any { it.kind == UserWord.Kind.ADDED && it.text == t } }
         val blocked = entries(UserWord.Kind.BLOCKED)
         // English's have no reading: those blocked now are blocked again on undo
         val english = lexicon.englishBlocks
@@ -130,6 +139,7 @@ internal class LearningOps(
         val forgets = tableForgets()
         val token = control.undoable(inverse = {
             lexicon.reAdd(added)
+            lexicon.putVoiceAlways(always, true)
             lexicon.reBlock(blocked)
             english.block(englishBlocked)
             dropSessions()
@@ -236,9 +246,13 @@ internal class LearningOps(
         // a deleted added word leaves its list (Engines.changed) and returns on undo, deleted ones only; a whole phrase
         // takes no word with it. Look-alikes are words even when the pressed one is a phrase's rest
         val added = lexicon.addedPlaces((if (whole.isEmpty()) texts else texts.drop(1)).flatMap { lexicon.addedOf(it) })
+        val always = lexicon.voiceAlways.filter { it in texts }
         val forgets = tableForgets()
         var done = emptyList<String>()
-        val token = acted(inverse = { lexicon.reAdd(added.filter { it.value.text in done }) }, wrote = { done.isNotEmpty() }) {
+        val token = acted(inverse = {
+            lexicon.reAdd(added.filter { it.value.text in done })
+            lexicon.putVoiceAlways(always, true)
+        }, wrote = { done.isNotEmpty() }) {
             done = act()
             texts.first() in done
         } ?: return LearningResult.Unavailable

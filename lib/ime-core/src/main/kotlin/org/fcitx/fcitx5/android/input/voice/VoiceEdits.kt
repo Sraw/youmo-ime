@@ -25,13 +25,28 @@ class VoiceEdits(
 
         fun pinyinOf(text: String): String?
 
-        /** Whether voice, with [word] added and [replacing] removed, would put it in for [heard] (VoiceHomophones' rules). */
-        fun takes(text: String, at: Int, heard: String, word: String, pinyin: String, replacing: String?): Boolean
+        /** Whether voice, with [word] added and [replacing] removed, would put it in for [heard] at [at] of [text] (VoiceHomophones.pick). */
+        fun takes(text: String, at: Int, heard: String, word: String, pinyin: String, replacing: String?): Takes
     }
 
-    class Mine(val added: Set<String>, val learned: Set<String>, val blocked: Set<String>)
+    enum class Takes {
+        /** Not even always put in: read otherwise, inside a longer word and so on. */
+        NO,
 
-    /** [replaces]: this window's earlier prompt at the same place, removed as this one goes in. [hint]: the once-only 「把整个词删掉重打，语音才能记住」. */
+        /** Only always put in: the word model does not take it here. */
+        IF_ALWAYS,
+
+        YES,
+    }
+
+    /** [always]: the added words voice always puts in. */
+    class Mine(val added: Set<String>, val learned: Set<String>, val blocked: Set<String>, val always: Set<String> = emptySet())
+
+    /**
+     * [replaces]: this window's earlier prompt at the same place, removed as this one goes in. [hint]: the once-only
+     * 「把整个词删掉重打，语音才能记住」. [always]: 「以后总是换」, where the word model would not put it in; [added]: the word was
+     * added already, so taking it back leaves it so.
+     */
     class Ask(
         val word: String,
         val pinyin: String,
@@ -39,6 +54,8 @@ class VoiceEdits(
         val replaces: String?,
         val hint: Boolean,
         internal val cells: Set<Int> = emptySet(),
+        val always: Boolean = false,
+        val added: Boolean = false,
     )
 
     /** Whether a window is still open, and what to ask once [confirm]ed. */
@@ -413,14 +430,20 @@ class VoiceEdits(
         val w = now.substring(span.first, span.last + 1)
         val xw = heard.substring(span.first, span.last + 1)
         if (w.length < 2 || w == xw || !w.all(::han)) return null
-        if (w in mine.added || w in asked) return null
+        if (w in mine.always || w in asked) return null
         if (mine.blocked.any { it.isNotEmpty() && it in w }) return null
         val pinyin = pinyinOf(span, heard, now, w) ?: return null
         val ids = span.mapTo(HashSet()) { cells!![it].id }
         // voice is judged without the earlier one at the same place, which goes as this goes in
         val replaces = remembered.firstOrNull { (over, word) -> word != w && over.any(ids::contains) }?.second
-        if (!words.takes(heard, span.first, xw, w, pinyin, replaces)) return null
-        return Ask(w, pinyin, xw, replaces, hint = false, cells = ids)
+        val added = w in mine.added
+        // one added already and corrected again where voice left it: only 「总是换」 would help
+        val always = when (words.takes(heard, span.first, xw, w, pinyin, replaces)) {
+            Takes.NO -> return null
+            Takes.IF_ALWAYS -> true
+            Takes.YES -> added
+        }
+        return Ask(w, pinyin, xw, replaces, hint = false, cells = ids, always = always, added = added)
     }
 
     // the typed syllable where the char may read so, else its reading, else the dictionary's for the word. A typed

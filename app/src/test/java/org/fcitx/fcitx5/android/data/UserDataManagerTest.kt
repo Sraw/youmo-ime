@@ -276,6 +276,7 @@ class UserDataManagerTest {
         File(phone.engine, LearnLog.FILE).writeText("the phone's")
         File(phone.engine, OLD_MARKER).writeText("the phone's")
         File(phone.engine, WordLists.ADDED).writeText("the phone's")
+        File(phone.engine, WordLists.ALWAYS).writeText("the phone's")
         File(phone.engine, EnglishBlocks.FILE).writeText("the phone's")
         File(phone.engine, "${Backups.DIR}/auto-1.fxlb").writeText("the phone's")
         File(phone.engine, "wubi.user").writeText("the phone's")
@@ -287,17 +288,20 @@ class UserDataManagerTest {
             "engine/${LearnLog.FILE}.unreadable.1" to "the backup's",
             "engine/${OLD_MARKER}" to "the backup's",
             "engine/${WordLists.ADDED}" to "the backup's",
+            // voice's 总是换 of the backup's words is merged as they are, not laid over the phone's
+            "engine/${WordLists.ALWAYS}" to "the backup's always",
             "engine/${EnglishBlocks.FILE}" to "the backup's English",
             "engine/wubi.user" to "the backup's table",
         )
         UserDataManager.import(backup, phone).getOrThrow()
         // every old log the phone's: a changed one would read as words removed
-        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, EnglishBlocks.FILE, "${Backups.DIR}/auto-1.fxlb", "wubi.user", "${LearnLog.FILE}.unreadable.1")) {
+        for (name in listOf(LearnLog.FILE, OLD_MARKER, WordLists.ADDED, WordLists.ALWAYS, EnglishBlocks.FILE, "${Backups.DIR}/auto-1.fxlb", "wubi.user", "${LearnLog.FILE}.unreadable.1")) {
             assertEquals(name, "the phone's", File(phone.engine, name).readText())
         }
         val stash = stashes(phone).single()
         assertEquals("the backup's learning", File(stash, RestoreStash.BACKUP).readText())
         assertEquals("the backup's", File(stash, WordLists.ADDED).readText())
+        assertEquals("the backup's always", File(stash, WordLists.ALWAYS).readText())
         // English's blocked words merged as pinyin's
         assertEquals("the backup's English", File(stash, EnglishBlocks.FILE).readText())
         assertEquals("the backup's table", File(stash, "wubi.user").readText())

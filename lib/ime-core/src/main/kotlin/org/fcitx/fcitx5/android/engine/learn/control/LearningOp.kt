@@ -90,6 +90,9 @@ sealed class LearningOp {
     /** 恢复 English correction of [texts], uses kept. */
     data class RestoreCorrection(val texts: List<String>) : LearningOp()
 
+    /** 「以后总是换」 of an added word on or off. */
+    data class VoiceAlways(val text: String, val on: Boolean) : LearningOp()
+
     /** Removes [items] from their [ListItems] list. */
     data class RemoveItems(val items: List<ListedItem>) : LearningOp()
 

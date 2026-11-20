@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
+import org.fcitx.fcitx5.android.input.voice.VoiceRerank
 import java.io.IOException
 
 /**
@@ -251,6 +252,17 @@ internal class EngineAssets(
         return if (of.isEmpty()) null else IntArray(of.size) { VoiceHomophones.reading(of[it].syllable, of[it].tone) }
     }
 
+    /** The user's words put in [text] as [VoiceHomophones.pick] judges, scored as heard: marks and spaces left out. */
+    fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String {
+        val spans = homophones.candidates(text)
+        if (spans.isEmpty()) return text
+        val ok = voiceHomophonesAllowed(spans)
+        val allowed = spans.filterIndexed { i, _ -> ok[i] }
+        if (allowed.isEmpty()) return text
+        val after = VoiceRerank.bare(before).takeLast(VOICE_BEFORE)
+        return homophones.pick(text, allowed, blocked) { texts -> FloatArray(texts.size) { textWords.logProb(VoiceRerank.bare(texts[it]), after) } }
+    }
+
     /** By the dictionary's words and the model's counts. */
     fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray {
         val data = pinyinData
@@ -399,6 +411,9 @@ internal class EngineAssets(
     private companion object {
         // log10 unigram at or above which a dictionary word is too common to cut: a stretch across its edge is not replaced
         const val COMMON_WORD = -5.5f
+
+        // the model reads two words back: a few characters are enough
+        const val VOICE_BEFORE = 8
 
         // longer is a sentence: and the dictionary is walked as deep
         const val MAX_WORD_CHARS = 8

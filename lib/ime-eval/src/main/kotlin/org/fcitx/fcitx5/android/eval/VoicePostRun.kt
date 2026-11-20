@@ -5,12 +5,17 @@
 package org.fcitx.fcitx5.android.eval
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
+import org.fcitx.fcitx5.android.input.voice.VoiceChoice
+import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoicePolishTags
 import org.fcitx.fcitx5.android.input.voice.VoicePost
@@ -169,8 +174,11 @@ internal object VoicePostRun {
     /** The polish tagger's labels for a clip, run by voice-eval, for `--source tagged`. */
     class Tagged(val text: IntArray, val labels: VoicePolishStream.Labels)
 
-    /** [tagged]'s labels for each window the stream asks about; one not found is all kept and counted in [misses]. */
-    class Replay(private val tagged: Tagged) : VoicePolishStream.Tagger {
+    /**
+     * [tagged]'s labels for each window the stream asks about; one not found is all kept and counted in [misses]. A
+     * character [swaps] has for the one tagged (a user's word put in for what was heard) is taken for it, its labels the heard one's.
+     */
+    class Replay(private val tagged: Tagged, private val swaps: Set<Long> = emptySet()) : VoicePolishStream.Tagger {
         var misses = 0
             private set
         private var from = 0
@@ -187,7 +195,88 @@ internal object VoicePostRun {
         }
 
         private fun find(text: IntArray, start: Int): Int? = (start..tagged.text.size - text.size).firstOrNull { i ->
-            text.indices.all { tagged.text[i + it] == text[it] }
+            text.indices.all { tagged.text[i + it] == text[it] || swap(text[it], tagged.text[i + it]) in swaps }
+        }
+    }
+
+    private fun swap(put: Int, heard: Int) = put.toLong() shl Int.SIZE_BITS or heard.toLong()
+
+    /**
+     * The user's words of `--words` put in each stretch before the polish, as the app does ([VoiceChoice.pick]): the
+     * engine's word model over [homophones], each stretch after the one kept before it.
+     */
+    class Words(private val engines: Engines, private val homophones: VoiceHomophones) {
+        var put = 0
+            private set
+
+        // each stretch's pick, as the app's pickMs
+        var picks = 0
+            private set
+        var pickNanos = 0L
+            private set
+        var pickMaxNanos = 0L
+            private set
+
+        /** The words [picked] put in, of its last call. */
+        val putIn = LinkedHashSet<String>()
+
+        fun picked(stretches: List<VoicePost.Stretch>): List<VoicePost.Stretch> {
+            var before = ""
+            putIn.clear()
+            return stretches.map { s ->
+                val t = System.nanoTime()
+                val text = engines.voicePick(homophones, s.raw, before, emptyList())
+                (System.nanoTime() - t).let { n ->
+                    picks++
+                    pickNanos += n
+                    pickMaxNanos = maxOf(pickMaxNanos, n)
+                }
+                VoiceChoice.putIn(homophones, s.raw, text, putIn)
+                if (text != s.raw) put++
+                if (text.isNotBlank()) before = text
+                VoicePost.Stretch(text)
+            }
+        }
+
+        fun summary(): String {
+            val mean = if (picks == 0) 0.0 else pickNanos / 1e6 / picks
+            return String.format(Locale.ROOT, "words: stretches changed=%d picks=%d pickMs mean=%.3f max=%.1f", put, picks, mean, pickMaxNanos / 1e6)
+        }
+
+        companion object {
+            /** A TSV of `text, pinyin (spaced or with '), added|learned`; [bonus] the added and the learned bonus, null for the app's. */
+            fun read(engines: Engines, file: File, bonus: Pair<Float, Float>?): Words = parsing(file.name) {
+                val words = file.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
+                    val (text, pinyin, kind) = line.split('\t').also { if (it.size < 3) throw BadInput("${file.name}: not text, pinyin, kind: $line") }
+                    val learned = when (kind) {
+                        "added" -> false
+                        "learned" -> true
+                        else -> throw BadInput("${file.name}: added or learned, not $kind")
+                    }
+                    // a learned word counts once typed more than VoiceHomophones.LEARNED_MIN times
+                    UserWord(text, pinyin.replace('\'', ' '), if (learned) UserWord.Kind.LEARNED else UserWord.Kind.ADDED, count = if (learned) VoiceHomophones.LEARNED_MIN + 1 else 0f)
+                }
+                val homophones = engines.voiceHomophones(words)
+                Words(engines, bonus?.let { (a, l) -> homophones.withBonus(a, l) } ?: homophones)
+            }
+        }
+    }
+
+    /**
+     * [path] again in [outDir], each stretch's `app` text with the user's words of [words] put in: for voice-eval's
+     * tag_segs.py to tag what the polish now sees, the polish's marks then measured on it (`--source tagged`).
+     */
+    fun writePicked(path: String, words: Words, outDir: File) = parsing(File(path).name) {
+        outDir.mkdirs()
+        File(outDir, File(path).name).bufferedWriter().use { out ->
+            for (line in File(path).readLines()) {
+                if (line.isBlank()) continue
+                val o = Json.parseToJsonElement(line).jsonObject
+                val stretches = o.getValue("stretches").jsonArray.map { it.jsonObject }
+                val picked = words.picked(stretches.map { VoicePost.Stretch(text(it, "app")) })
+                val edited = stretches.zip(picked).map { (st, p) -> JsonObject(st + ("app" to JsonPrimitive(p.raw))) }
+                out.appendLine(JsonObject(o + ("stretches" to JsonArray(edited))).toString())
+            }
         }
     }
 
@@ -260,16 +349,17 @@ internal object VoicePostRun {
         out: Appendable,
         texts: String? = null,
         polish: Polish? = null,
+        words: Words? = null,
     ): Int {
         misses?.let { File(it).bufferedWriter() }.use { m ->
-            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out, polish) }
+            texts?.let { File(it).bufferedWriter() }.use { t -> run(paths, source, m, t, out, polish, words) }
         }
         return 0
     }
 
     class Polish(val tags: VoicePolishTags, val guard: Boolean = true)
 
-    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable, polish: Polish?) {
+    private fun run(paths: List<String>, source: String, missed: Appendable?, texts: Appendable?, out: Appendable, polish: Polish?, words: Words?) {
         val all = Score()
         missed?.appendLine("set\twav\tref\thyp")
         texts?.appendLine("set\twav\tref\thyp")
@@ -282,13 +372,16 @@ internal object VoicePostRun {
             val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
             score.unwritten = clips.size - scored.size
             for (clip in scored) {
-                val replay = polish?.let { p -> clip.tagged?.let(::Replay)?.let { it to VoicePolishStream(p.tags, it, guard = p.guard) } }
+                val stretches = words?.picked(clip.stretches) ?: clip.stretches
+                val swaps = swaps(clip.stretches, stretches)
+                val putIn = words?.putIn?.toList().orEmpty()
+                val replay = polish?.let { p -> clip.tagged?.let { Replay(it, swaps) }?.let { it to VoicePolishStream(p.tags, it, guard = p.guard, words = putIn) } }
                 // a clip voice-eval did not tag: as the app's with the tagger failing, and counted
                 if (polish != null && replay == null) score.untagged++
                 if (polish != null && (clip.tagged?.text?.size ?: 0) > VoicePolishStream.WINDOW) score.long++
-                val hyp = VoicePost.text(clip.stretches, replay?.second)
+                val hyp = VoicePost.text(stretches, replay?.second)
                 replay?.first?.let { score.unfound += it.misses }
-                score.stretches += clip.stretches.size
+                score.stretches += stretches.size
                 val before = score.writtenErrors
                 score(clip.ref, hyp, score)
                 val line = listOf(name, clip.wav, clip.ref, hyp).joinToString("\t") { it.replace(WHITE, " ") }
@@ -301,7 +394,14 @@ internal object VoicePostRun {
         if (paths.size > 1) out.appendLine(row("all", all))
         // after the table: its columns are what voice-eval reads
         if (polish != null) out.appendLine("tagged: guard=${polish.guard} untagged=${all.untagged} unfound=${all.unfound} long=${all.long}")
+        words?.let { out.appendLine(it.summary()) }
     }
+
+    // each character a word put in for the one heard there, whose labels it takes
+    private fun swaps(heard: List<VoicePost.Stretch>, put: List<VoicePost.Stretch>): Set<Long> = heard.zip(put)
+        .filter { (h, p) -> h.raw.length == p.raw.length }
+        .flatMap { (h, p) -> h.raw.indices.filter { h.raw[it] != p.raw[it] }.map { swap(p.raw[it].code, h.raw[it].code) } }
+        .toSet()
 
     private val WHITE = Regex("[\t\r\n]")
 

@@ -121,6 +121,8 @@ internal class LearningFacade(
         logBytes = userDir?.let { dir -> { dir.file(LearnLog.FILE).takeIf { it.exists() }?.read() } },
         addresses = addresses,
         putAddresses = putAddresses,
+        voiceAlways = { lexicon.voiceAlways },
+        putVoiceAlways = lexicon::putVoiceAlways,
     )
 
     private fun listed(kind: UserWord.Kind) = lexicon.userWords(kind).map { ListedWord(it.text, Syllables.apostrophed(it.pinyin)) }

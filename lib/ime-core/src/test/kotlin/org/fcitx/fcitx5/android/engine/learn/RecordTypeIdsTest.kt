@@ -50,7 +50,8 @@ class RecordTypeIdsTest {
             "WORD_USE_ROW" to 48, "PHRASE_ROW" to 49, "TABLE_BLOCK_ROW" to 65, "DATE_ROW" to 80,
             "backup.HEAD" to 70, "backup.ADDED" to 71, "backup.BLOCKED" to 72, "backup.ORIGIN" to 73,
             // LAST: not a type, the bound of a backup's range, kept as fixed as one
-            "backup.END" to 74, "backup.ADDRESS_COUNTS" to 75, "backup.ADDRESSES" to 76, "backup.LAST" to 79,
+            "backup.END" to 74, "backup.ADDRESS_COUNTS" to 75, "backup.ADDRESSES" to 76, "backup.VOICE_ALWAYS" to 77,
+            "backup.LAST" to 79,
         )
 
         val RETIRED = emptyMap<String, Int>()

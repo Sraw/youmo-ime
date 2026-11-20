@@ -46,7 +46,7 @@ data class ListedWord(val text: String, val code: String) {
 /** The address bar's learned data, carried opaquely. */
 data class AddressData(val counts: String, val addresses: String)
 
-/** [origin]: the install its days belong to (the head's, else derived from the bytes); [addresses] null in older backups. */
+/** [origin]: the install its days belong to (the head's, else derived from the bytes); [addresses] null in older backups; [voiceAlways]: added words voice always puts in. */
 class Backup(
     val head: BackupHead?,
     val state: LearnState,
@@ -54,11 +54,12 @@ class Backup(
     val blocked: List<ListedWord>,
     val origin: Long = head?.installId ?: 0L,
     val addresses: AddressData? = null,
+    val voiceAlways: List<String> = emptyList(),
 )
 
 /**
  * A learning backup: `learn.log` records under their own header ([FORMAT], `FXLB` 1): [HEAD], the
- * learning snapshot, the [ADDED] and [BLOCKED] word lists, the address bar's data, and last exactly one
+ * learning snapshot, the [ADDED] and [BLOCKED] word lists, [VOICE_ALWAYS], the address bar's data, and last exactly one
  * [END] holding the file's length, so a truncated or spliced file does not read. Evolves like the log.
  */
 object LearnBackup {
@@ -72,6 +73,9 @@ object LearnBackup {
     const val ADDRESS_COUNTS: Byte = 75
 
     const val ADDRESSES: Byte = 76
+
+    /** An added word voice always puts in: its text. An older build drops it as a later build's type. */
+    const val VOICE_ALWAYS: Byte = 77
 
     /** The last record: the file's length in bytes (an Int), this record included. */
     const val END: Byte = 74
@@ -87,6 +91,7 @@ object LearnBackup {
         added: List<ListedWord>,
         blocked: List<ListedWord>,
         addresses: AddressData? = null,
+        voiceAlways: Collection<String> = emptyList(),
     ): ByteArray {
         val out = ByteArrayOutputStream()
         out.write(FORMAT.header())
@@ -105,6 +110,7 @@ object LearnBackup {
         }, keeps = if (head.kind == BackupHead.BEFORE_RESTORE) { _ -> true } else ::backedUp)
         for (w in added) out.write(word(ADDED, w))
         for (w in blocked) out.write(word(BLOCKED, w))
+        for (t in voiceAlways) out.write(FORMAT.record(VOICE_ALWAYS) { writeUTF(t) })
         if (addresses != null) {
             // the address book's caps keep them under writeUTF's 64 KB; past it they are left out, not the whole backup
             try {
@@ -143,6 +149,8 @@ object LearnBackup {
         var head: BackupHead? = null
         val added = ArrayList<ListedWord>()
         val blocked = ArrayList<ListedWord>()
+        val always = ArrayList<String>()
+        val listed = mapOf(ADDED to added, BLOCKED to blocked)
         var counts: String? = null
         var addresses: String? = null
         val state = LearnState()
@@ -154,8 +162,8 @@ object LearnBackup {
             lastType = type
             when (type) {
                 HEAD -> head = head(input)
-                ADDED -> added += ListedWord(input.readUTF(), input.readUTF())
-                BLOCKED -> blocked += ListedWord(input.readUTF(), input.readUTF())
+                ADDED, BLOCKED -> listed.getValue(type) += ListedWord(input.readUTF(), input.readUTF())
+                VOICE_ALWAYS -> always += input.readUTF()
                 ADDRESS_COUNTS -> counts = input.readUTF()
                 ADDRESSES -> addresses = input.readUTF()
                 END -> ended = input.readInt()
@@ -169,7 +177,7 @@ object LearnBackup {
             throw IOException("a learning backup not whole: ${bytes.size} bytes, whole to $whole, end $ended, head ${head != null}")
         }
         val book = if (counts == null && addresses == null) null else AddressData(counts.orEmpty(), addresses.orEmpty())
-        return Backup(head, state, added, blocked, addresses = book)
+        return Backup(head, state, added, blocked, addresses = book, voiceAlways = always)
     }
 
     private fun head(input: DataInputStream) = BackupHead(input.readLong(), input.readInt(), input.readLong(), input.readUnsignedByte(), input.readUTF())

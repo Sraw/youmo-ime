@@ -392,6 +392,13 @@ class UserWordListFragment : Fragment() {
         }
     }
 
+    private fun voiceAlwaysOff(word: UserWord) {
+        lifecycleScope.launch {
+            onFcitx(SAVING_FAILED) { learning(LearningOp.VoiceAlways(word.text, on = false)) }.getOrElse { return@launch }
+            load()
+        }
+    }
+
     /** Logged and shown where uncaught it would close the app; a [Result] as [block] may itself give null. */
     private suspend fun <T> onFcitx(failed: String, block: suspend HostApi.() -> T): Result<T> {
         val ctx = requireContext()
@@ -412,6 +419,7 @@ class UserWordListFragment : Fragment() {
             if (held.isNotEmpty()) add(if (held.size == 1) R.string.rare_allow_one else R.string.rare_allow_these)
             if (source.editable) add(R.string.edit)
             if (source == EnglishWords && word.neverCorrected) add(R.string.english_restore_correction)
+            if (word.voiceAlways) add(R.string.voice_always_cancel)
             add(source.removeLabel)
         }
         AlertDialog.Builder(requireContext())
@@ -424,6 +432,7 @@ class UserWordListFragment : Fragment() {
                         addUserWord(text, pinyin).also { if (it) removeUserWords(listOf(word)) }
                     }
                     R.string.english_restore_correction -> restoreCorrection(word)
+                    R.string.voice_always_cancel -> voiceAlwaysOff(word)
                     else -> remove(listOf(word))
                 }
             }
@@ -677,6 +686,8 @@ internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
         } else if (word.kind == UserWord.Kind.BLOCKED && word.pinyin.isEmpty()) {
             // all-lower-case matches any case, any other (iPhone) as written
             res.getString(if (word.text == word.text.lowercase()) R.string.english_block_detail else R.string.english_block_detail_exact)
+        } else if (word.voiceAlways) {
+            res.getString(R.string.voice_always_detail, word.pinyin)
         } else {
             word.pinyin
         }

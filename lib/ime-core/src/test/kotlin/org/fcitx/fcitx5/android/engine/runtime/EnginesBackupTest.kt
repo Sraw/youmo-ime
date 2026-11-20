@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -108,6 +109,23 @@ class EnginesBackupTest {
             newPhone.backup(BackupOp.Restore(bytes))
             assertEquals(listOf("巴波"), newPhone.userWords(UserWord.Kind.ADDED).map { it.text })
             assertEquals(listOf(char(0, 1) + char(1, 1)), newPhone.userWords(UserWord.Kind.BLOCKED).map { it.text })
+        }
+    }
+
+    // a zip restored while the engine was stopped (UserDataManager's stash): voice's 总是换 of both kept, a mark of a
+    // word on neither list dropped
+    @Test
+    fun aStashedZipsVoiceAlwaysIsMergedWithThePhones() {
+        val dir = MemoryFiles()
+        engines(dir).use { it.addWord("巴波", "ba bo") }
+        dir.file(WordLists.ALWAYS).write("巴波\n".toByteArray())
+        val stash = stash(dir)
+        stash.file(WordLists.ADDED).write("${char(2, 1)}${char(3, 1)} ca'ce\n".toByteArray())
+        stash.file(WordLists.ALWAYS).write("${char(2, 1)}${char(3, 1)}\n不在\n".toByteArray())
+        engines(dir).use { e ->
+            assertFalse(dir.dir(RestoreStash.DIR).exists())
+            val marked = e.userWords(UserWord.Kind.ADDED).filter { it.voiceAlways }.map { it.text }
+            assertEquals(setOf("巴波", char(2, 1) + char(3, 1)), marked.toSet())
         }
     }
 

@@ -75,6 +75,76 @@ class WordListsTest {
     }
 
     @Test
+    @Uat("VO-59")
+    fun voiceAlwaysIsKeptBesideTheAddedList() {
+        val dir = MemoryFiles()
+        val lists = WordLists(dir)
+        val gongshi = entry("攻势", "gong", "shi")
+        lists.add(gongshi)
+        val addedLine = "攻势 gong'shi\n"
+        assertRows(
+            "only an added word is marked" to { assertFalse(lists.setVoiceAlways("徐婧", true)) },
+            "marked, and read back so" to {
+                assertTrue(lists.setVoiceAlways("攻势", true))
+                assertEquals(setOf("攻势"), WordLists(dir).voiceAlways)
+            },
+            "the added list's own file as an older build reads it" to {
+                assertEquals(addedLine, String(dir.file(WordLists.ADDED).input().readBytes()))
+            },
+            "unmarked" to {
+                assertTrue(lists.setVoiceAlways("攻势", false))
+                assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
+            },
+            "deleted with the word: added again it is not marked" to {
+                lists.setVoiceAlways("攻势", true)
+                lists.remove(gongshi)
+                lists.add(gongshi)
+                assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
+            },
+            "全部清空 clears it" to {
+                lists.setVoiceAlways("攻势", true)
+                lists.clear()
+                lists.add(gongshi)
+                assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
+            },
+            "deleted by an older build, which keeps the mark's file: dropped at the next start, not back when added again" to {
+                lists.setVoiceAlways("攻势", true)
+                dir.file(WordLists.ADDED).write(ByteArray(0))
+                WordLists(dir).add(gongshi)
+                assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
+            },
+            "put beside those marked (a restore), only added ones" to {
+                val other = WordLists(MemoryFiles()).apply {
+                    add(gongshi)
+                    add(entry("徐婧", "xu", "jing"))
+                    setVoiceAlways("攻势", true)
+                    putVoiceAlways(listOf("徐婧", "不在"), merge = true)
+                }
+                assertEquals(setOf("攻势", "徐婧"), other.voiceAlways)
+                other.putVoiceAlways(listOf("徐婧"), merge = false)
+                assertEquals(setOf("徐婧"), other.voiceAlways)
+            },
+            "the added list not read at a start: the marks left as they are for the next" to {
+                val files = MemoryFiles()
+                WordLists(files).apply {
+                    add(gongshi)
+                    setVoiceAlways("攻势", true)
+                }
+                val failing = object : UserFiles by files {
+                    override fun file(name: String): LogFile = files.file(name).let { f ->
+                        if (name != WordLists.ADDED) f else object : LogFile by f {
+                            override fun input(): InputStream = throw IOException("EIO")
+                        }
+                    }
+                }
+                WordLists(failing) {}
+                assertEquals(setOf("攻势"), WordLists(files).voiceAlways)
+            },
+            "no file (older data): none marked" to { assertEquals(emptySet<String>(), WordLists(MemoryFiles()).voiceAlways) },
+        )
+    }
+
+    @Test
     fun theListsAreKeptInTheirFiles() {
         val dir = MemoryFiles()
         val lists = WordLists(dir)

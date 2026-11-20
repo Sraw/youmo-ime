@@ -46,6 +46,9 @@ class BackupControlTest {
     private var book = AddressData("", "")
     private val puts = ArrayList<Pair<AddressData, Boolean>>()
 
+    // voice's 总是换, as WordLists keeps it: only an added word's
+    private val always = LinkedHashSet<String>()
+
     @After
     fun close() = log.close()
 
@@ -86,6 +89,11 @@ class BackupControlTest {
         putAddresses = { d, merge ->
             puts += d to merge
             book = if (merge) AddressData(lines(book.counts, d.counts), lines(book.addresses, d.addresses)) else d
+        },
+        voiceAlways = { always.toSet() },
+        putVoiceAlways = { texts, merge ->
+            if (!merge) always.clear()
+            texts.filterTo(always) { t -> added.any { it.text == t } }
         },
     )
 
@@ -141,6 +149,22 @@ class BackupControlTest {
         assertFalse(control.run(BackupOp.Revert).ok)
         learn("拟")
         assertEquals(2, log.state.stats.size)
+    }
+
+    @Test
+    fun voicesAlwaysIsMergedOnRestoreCarriedInBackupsAndTakenBackWithTheRestore() {
+        val control = control()
+        added += ListedWord("幽默", "you'mo")
+        always += "幽默"
+        assertEquals(listOf("幽默"), LearnBackup.read(control.run(BackupOp.Copy).bytes!!).voiceAlways)
+        val bytes = LearnBackup.bytes(
+            BackupHead(0, 0, 2L, BackupHead.SAVED), LearnState(), listOf(ListedWord("攻势", "gong'shi")), emptyList(),
+            voiceAlways = listOf("攻势"),
+        )
+        control.run(BackupOp.Restore(bytes))
+        assertEquals(setOf("幽默", "攻势"), always)
+        assertTrue(control.run(BackupOp.Revert).ok)
+        assertEquals(setOf("幽默"), always)
     }
 
     // the same backup restored again on a later typing day changes nothing

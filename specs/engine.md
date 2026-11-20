@@ -68,13 +68,25 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   neither a hotword nor a homophone's target (`Engines.rareHeld`).
 - **Reranking**: the recognizer's hypotheses are rescored by the word model (`Engines.logProbs`,
   `VoiceRerank`).
-- **Homophones**: after the polish, a stretch reading exactly as a user's word (toned, char by char,
-  `CharReadings`/`ToneTable`) becomes it (徐静→徐婧; `VoiceHomophones`): added words at once, learned
-  ones typed more than 3 times; never the user's own word, one across a common word's edge (unigram
-  log10 P ≥ -5.5: 和瑞 of 和瑞典), nor inside a longer dictionary word (徐静 of 徐静蕾), nor holding a dictionary word read
-  otherwise (那个 of 是那个, not the user's 是哪个); a common word read alike is replaced (公式→攻势: the user made the word theirs). Built with the
-  hotwords (`Engines.voiceHomophones`), each candidate checked once a hold
-  (`Engines.voiceHomophonesAllowed`); shown as it streams too, same length, so settled text holds.
+- **Homophones** (dev/design/063-voice-model-replace): on the stretch reranking chose, before the polish, a
+  stretch reading exactly as a user's word (toned, char by char, `CharReadings`/`ToneTable`) may become it
+  (徐静→徐婧; `VoiceHomophones`): added words, learned ones typed more than 3 times. Never the user's own
+  word, one across a common word's edge (unigram log10 P ≥ -5.5: 和瑞 of 和瑞典), nor inside a longer
+  dictionary word (徐静 of 徐静蕾), nor holding a dictionary word read otherwise (那个 of 是那个, not the
+  user's 是哪个). Where they allow, the word model decides (`VoiceHomophones.pick`): each way of writing it
+  (each stretch alone, then those not overlapping together, 16 at most) is scored log10 P after the stretch
+  before it plus a bonus per word put in, added 1.5 and learned 1, and the best wins over the stretch as
+  heard only if higher (公式→攻势 after 敌人的, not after 推导这个). Added words marked 「总是换」
+  (`UserWord.voiceAlways`, the file `words.voice-always` beside `words.added`, a text a line) go in unasked.
+  None that makes a blocked word. One engine call a stretch (`Engines.voicePick`: the gates and the scores),
+  none where nothing reads alike; null or late (1 s), the stretch as chosen. What shows while a stretch is
+  said is picked the same way but never waited for (`VoiceChoice.Live`): each place is answered once for
+  the same four characters each side and the word, a text with a place not answered shows those known
+  (the place's last answer this stretch meanwhile), one ask runs beside the decoding at a time, for the
+  latest text only, and is shown only if that text still shows; none asked after a failure in the talk.
+  The stretch, closed, is picked anew (`VoiceChoice.Talk`). The polish sees the user's words. Marks go
+  with a deleted word and come back with its undo; one left by an older build's delete is dropped at
+  start, so the word added again is not marked.
 - **Asked, then remembered** (0.6.1, dev/design/061-voice-learn-from-edits.md): `VoiceEdits` (ime-core
   `input/voice/`, pure; `engine/runtime/VoiceEditsGlue` binds it to `Engines`) follows the text of one talk,
   told whole by `Engines.voiceSaid(text, before, hinted)` once it is in, with the field's text before the
@@ -90,7 +102,14 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   typed again, the same length, each character sharing a toned reading with the one heard
   (`EngineAssets.voiceReadings`; Q2), is asked about once a window (Q6) only if voice's own homophones, the
   word added as the settings add it (one this window added at the place left out, review M4), would put
-  it in (`Words.takes`; so a word already added or blocked, inside a longer word or across a common one's edge is not; a common word is); a sentence's mark
+  it in at that place, judged by `voicePick` on the stretch voice judged after the one kept before it (the talk's stretches as
+  kept, told by `Engines.voiceStretches` at its end; the clause after what is before it where none is found,
+  as the polish wrote it otherwise) (`Words.takes`; so a
+  word blocked, inside a longer word or across a common one's edge is not; a common word is). Where only
+  「总是换」 would (the word model does not take it there; `Takes.IF_ALWAYS`), or a word added already is
+  corrected again where voice left it (whatever the model would say now), it asks 「以后总是把『公式』写成『攻势』？」 (`Ask.always`):
+  taken, the word is added if not yet and marked (`UserLexicon.setVoiceAlways`), its 撤销 unmarks it and
+  takes it off only if the ask added it (`Ask.added`); a word marked already is not asked about. A sentence's mark
   deleted with it, the stretch is judged once its Chinese is typed again (review S5). A word asked about
   is not asked again that window: one typed at the place after it is, but the first typed back again is
   not (Q6). A syllable typed that none of the character's readings in the tables has asks nothing (voice
@@ -1249,8 +1268,11 @@ place. Rules that keep old files and old users working:
   boundary, a record lost or added, a draft build's file), is refused. 73 is the record's (below);
   75 and 76 (0.5.0) the app's address bar's book (`AddressData`: its suffix counts, its remembered
   addresses, a string each, opaque here), before the END, which v0.4.0 skips; one without them
-  (v0.4.0's) restores none and leaves the app's as they are (`Backup.addresses` null). 77–79 a later
-  build's of the file and dropped on read and never written (a kept row of 70–79 but
+  (v0.4.0's) restores none and leaves the app's as they are (`Backup.addresses` null). 77 (0.6.3) an
+  added word voice always puts in (`VOICE_ALWAYS`, its text), after the lists: 0.6.2 and before skip it
+  and restore the words unmarked, a backup without it marks none; a restore marks them beside the
+  phone's, 退回恢复前 puts the copy's back as they were. The version stays 1, as a bumped one an older
+  build refuses whole. 78–79 a later build's of the file and dropped on read and never written (a kept row of 70–79 but
   73 is left out of `bytes`), any other type the record's and kept as it is (review-int-records M1).
   `ORIGIN` (73) rows say by how many typing days an install's backups were moved, so the same one
   restored again lands where it did; every install that opens the record writes one of offset 0

@@ -68,6 +68,18 @@ class LearnBackupTest {
     }
 
     @Test
+    fun voicesAlwaysReadsBackAndAnOlderBackupHasNone() {
+        val added = listOf(ListedWord("攻势", "gong'shi"), ListedWord("徐婧", "xu'jing"))
+        val read = LearnBackup.read(LearnBackup.bytes(head, learned(), added, emptyList(), voiceAlways = listOf("攻势")))
+        assertEquals(listOf("攻势"), read.voiceAlways)
+        assertEquals(added, read.added)
+        assertEquals(emptyList<String>(), LearnBackup.read(LearnBackup.bytes(head, learned(), added, emptyList())).voiceAlways)
+        // contract: of this file's range, which older builds skip as a later build's, so a newer backup restores on
+        // them with its words, unmarked; mutation cannot see it
+        assertTrue(LearnBackup.VOICE_ALWAYS in 70..79 && LearnBackup.VOICE_ALWAYS != BackupMerge.ORIGIN && LearnBackup.VOICE_ALWAYS != LearnBackup.END)
+    }
+
+    @Test
     fun itsHeadReadsAloneForTheList() {
         val bytes = LearnBackup.bytes(head, learned(), emptyList(), emptyList())
         assertEquals(head, LearnBackup.head(ByteArrayInputStream(bytes)))

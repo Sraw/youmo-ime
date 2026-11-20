@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -120,6 +122,190 @@ class VoiceChoiceTest {
             "searched again: its best with it passed over for its next" to {
                 val again = VoiceChoice.Heard(listOf("开放𤝰", "开放啦"), FloatArray(0), "开放𤝰")
                 assertEquals("开放啦", now { VoiceChoice.choose(heard("开饭了"), blocked, FakeLanguage(words), held) { again } })
+            },
+        )
+    }
+
+    // 徐婧 added, read xu2 jing4 as 徐静 is
+    private val xuJing: VoiceHomophones = run {
+        val chars = mapOf('徐' to intArrayOf(VoiceHomophones.reading(1, 2)), '静' to intArrayOf(VoiceHomophones.reading(2, 4)), '婧' to intArrayOf(VoiceHomophones.reading(2, 4)))
+        VoiceHomophones.of(listOf(UserWord("徐婧", "", UserWord.Kind.ADDED)), { w -> w.text.map { chars.getValue(it) } }) { chars[it] }
+    }
+
+    // the engine's pick: what [answer] says, each ask kept
+    private class Picking(private val answer: (String) -> String?) : VoiceChoice.Language {
+        val asked = mutableListOf<String>()
+        override suspend fun boundaries(texts: List<String>) = emptyMap<String, IntArray>()
+        override suspend fun logProbs(texts: List<String>): FloatArray? = null
+        override suspend fun pick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String? {
+            asked += "$before|$text|${blocked.joinToString()}"
+            return answer(text)
+        }
+    }
+
+    @Test
+    @Uat("VO-38")
+    fun `the user's words go in as the engine picks, never unasked`() {
+        assertRows(
+            "the engine's pick, with what came before and the blocked words" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                assertEquals("找徐婧", now { VoiceChoice.pick("找徐静", "你好", xuJing, listOf("坏"), l) })
+                assertEquals(listOf("你好|找徐静|坏"), l.asked)
+            },
+            "the engine not answering in time: as chosen, not put in by hand" to {
+                assertEquals("找徐静", now { VoiceChoice.pick("找徐静", "", xuJing, emptyList(), Picking { null }) })
+            },
+            "nothing read alike: the engine not asked" to {
+                val l = Picking { error("asked") }
+                assertEquals("你好", now { VoiceChoice.pick("你好", "", xuJing, emptyList(), l) })
+            },
+        )
+    }
+
+    // asks launched on the side, run when a row says
+    private inner class Side {
+        val queued = ArrayList<suspend () -> Unit>()
+        val shown = ArrayList<String>()
+        fun live(l: VoiceChoice.Language) = VoiceChoice.Live(xuJing, emptyList(), l, { queued += it }, show = { shown += it })
+        fun talk(l: VoiceChoice.Language) = VoiceChoice.Talk(xuJing, emptyList(), l, { queued += it }, show = { shown += it })
+        fun run() {
+            while (queued.isNotEmpty()) queued.removeAt(0).let { now { it() } }
+        }
+    }
+
+    @Test
+    @Uat("VO-38")
+    fun `what shows while said is never waited for, asked once a place, shown if still shown`() {
+        assertRows(
+            "a place not answered: shown as heard, asked on the side, its answer shown" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                assertEquals("徐静", live.pick("徐静", ""))
+                assertEquals(emptyList<String>(), l.asked)
+                side.run()
+                assertEquals(listOf("|徐静|"), l.asked)
+                assertEquals(listOf("徐婧"), side.shown)
+            },
+            "answered, the same place again, more said past the few characters around it: not asked" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静来了没有", "我找")
+                side.run()
+                assertEquals("徐婧来了没有", live.pick("徐静来了没有", "我找"))
+                assertEquals("徐婧来了没有啊", live.pick("徐静来了没有啊", "我找"))
+                side.run()
+                assertEquals(1, l.asked.size)
+            },
+            "more said about the place: asked again, its last answer shown meanwhile" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静", "")
+                side.run()
+                assertEquals("徐婧来", live.pick("徐静来", ""))
+                side.run()
+                assertEquals(2, l.asked.size)
+            },
+            "the text moved on before the answer: not shown" to {
+                val side = Side()
+                val live = side.live(Picking { it.replace("徐静", "徐婧") })
+                live.pick("徐静", "")
+                live.pick("你好", "")
+                side.run()
+                assertEquals(emptyList<String>(), side.shown)
+            },
+            "texts while one is asked: only the latest asked after it" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静", "")
+                live.pick("徐静来", "")
+                live.pick("徐静来了", "")
+                assertEquals(1, side.queued.size)
+                side.run()
+                assertEquals(listOf("|徐静来了|"), l.asked)
+                assertEquals(listOf("徐婧来了"), side.shown)
+            },
+            "the stretch closed before the ask ran: nothing asked nor shown" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静", "")
+                live.closed()
+                side.run()
+                assertEquals(emptyList<String>(), l.asked)
+                assertEquals(emptyList<String>(), side.shown)
+            },
+            "after one failure, this talk's later texts unasked" to {
+                val l = Picking { null }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静", "")
+                side.run()
+                assertEquals("徐静来", live.pick("徐静来", ""))
+                assertEquals(0, side.queued.size)
+                assertEquals(1, l.asked.size)
+            },
+        )
+    }
+
+    @Test
+    @Uat("VO-38")
+    fun `a word put in while said stays once nothing is asked`() {
+        assertRows(
+            "stopped (the finger lifted): an answered place still put in, a new one as heard and unasked, an answer on its way not shown" to {
+                val l = Picking { it.replace("徐静", "徐婧") }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静来了没有", "我找")
+                side.run()
+                live.pick("徐静来了没有啊", "我找")
+                live.pick("徐静", "")
+                live.stop()
+                side.run()
+                assertEquals(listOf("徐婧来了没有"), side.shown)
+                assertEquals("徐婧来了没有啊，徐静", live.pick("徐静来了没有啊，徐静", "我找"))
+                assertEquals(0, side.queued.size)
+                assertEquals(1, l.asked.size)
+            },
+            "after one failure, the places answered before still put in" to {
+                var answers = 0
+                val l = Picking { t -> if (answers++ == 0) t.replace("徐静", "徐婧") else null }
+                val side = Side()
+                val live = side.live(l)
+                live.pick("徐静来了没有", "我找")
+                side.run()
+                live.pick("徐静来了没有啊，徐静", "我找")
+                side.run()
+                assertEquals("徐婧来了没有啊，徐静呢", live.pick("徐静来了没有啊，徐静呢", "我找"))
+                assertEquals(0, side.queued.size)
+                assertEquals(2, l.asked.size)
+            },
+        )
+    }
+
+    @Test
+    @Uat("VO-38")
+    fun `a talk reads each stretch after the one kept before it`() {
+        val l = Picking { it.replace("徐静", "徐婧") }
+        val talk = Side().talk(l)
+        assertEquals("找徐婧", now { talk.chosen("找徐静") })
+        talk.kept("找徐婧")
+        talk.kept("")
+        assertEquals("徐婧来了", now { talk.chosen("徐静来了") })
+        talk.kept("徐婧来了")
+        assertRows(
+            "each after the last one kept, an empty one passed over" to { assertEquals(listOf("|找徐静|", "找徐婧|徐静来了|"), l.asked) },
+            "those kept, for 记住's judging" to { assertEquals(listOf("找徐婧", "徐婧来了"), talk.stretches) },
+            "the words put in, for the polish to keep" to {
+                val putIn = LinkedHashSet<String>()
+                val t = VoiceChoice.Talk(xuJing, emptyList(), l, {}, {}, putIn = putIn)
+                now { t.chosen("说了你好") }
+                assertEquals(emptySet<String>(), putIn)
+                now { t.chosen("找徐静") }
+                assertEquals(setOf("徐婧"), putIn)
             },
         )
     }

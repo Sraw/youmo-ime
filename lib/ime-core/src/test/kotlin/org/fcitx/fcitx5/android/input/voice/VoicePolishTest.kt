@@ -250,6 +250,32 @@ class VoicePolishTest {
     }
 
     @Test
+    @Uat("VO-38")
+    fun theUsersWordsVoicePutInAreNoNumber() {
+        // the model's worst: every number character but 点 a number
+        val tagger = VoicePolishStream.Tagger { w ->
+            VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] in VoicePolishTags.NUMBER_CHARS && w[it] != '点'.code) 1 else 0 })
+        }
+        assertRows(
+            "none put in: numbers, as the model says" to { assertEquals("11郎有3个", VoicePolishStream(numTags, tagger).finish("十一郎有三个")) },
+            "十一郎 put in: as it is, the number after it still one" to {
+                assertEquals("十一郎有3个", VoicePolishStream(numTags, tagger, words = setOf("十一郎")).finish("十一郎有三个"))
+            },
+            "一帆 put in" to { assertEquals("一帆说了3遍", VoicePolishStream(numTags, tagger, words = setOf("一帆")).finish("一帆说了三遍")) },
+            "a word put in once the stream began: read as the talk puts them in" to {
+                val words = HashSet<String>()
+                val stream = VoicePolishStream(numTags, tagger, words = words)
+                words += "十一郎"
+                assertEquals("十一郎来了", stream.finish("十一郎来了"))
+            },
+            "a word put in that is cut by a window's start: still kept" to {
+                val before = "好".repeat(28)
+                assertEquals(before + "十一郎" + "好".repeat(70), VoicePolishStream(numTags, tagger, words = setOf("十一郎")).finish(before + "十一郎" + "好".repeat(70)))
+            },
+        )
+    }
+
+    @Test
     fun aHotwordsDigitsAreNeverDeleted() {
         // the vocabulary has ASCII digits 1–8 alone (0 and 9 are <unk>): digits the recognizer wrote are kept
         fun deletesDigits() = VoicePolishStream(tags, { t ->

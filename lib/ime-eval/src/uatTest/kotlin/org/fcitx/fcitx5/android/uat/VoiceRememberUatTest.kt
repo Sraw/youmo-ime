@@ -15,9 +15,6 @@ import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
 
 /** uat/12-voice.md's 语音先问再记 on the app's data: a name voice wrote, deleted and typed again by each way of typing, a common word or not. */
 class VoiceRememberUatTest {
@@ -58,21 +55,14 @@ class VoiceRememberUatTest {
     }
 
     // whether voice, with [typed] the user's as [kind], would put it in for [heard] (the rule the question is asked by)
-    private fun voiceTakes(heard: String, typed: String, kind: UserWord.Kind = UserWord.Kind.ADDED): Boolean {
-        val e = UatEngines.fresh()
-        val word = UserWord(typed, checkNotNull(e.pinyinOf(typed)), kind, count = LEARNED_TAKES)
-        val spans = e.voiceHomophones(listOf(word)).candidates("我想$heard")
-        return spans.isNotEmpty() && e.voiceHomophonesAllowed(spans).all { it }
-    }
+    private fun voiceTakes(heard: String, typed: String, kind: UserWord.Kind = UserWord.Kind.ADDED): Boolean =
+        voiceWrites("我想$heard", typed, kind) == "我想$typed"
 
-    // what voice's homophones write for [heard] with [typed] the user's as [kind]: after recognition, each stretch replaced in place
+    // what voice writes for [heard], a stretch chosen, with [typed] the user's as [kind]: the word model judging
     private fun voiceWrites(heard: String, typed: String, kind: UserWord.Kind = UserWord.Kind.ADDED): String {
         val e = UatEngines.fresh()
         val word = UserWord(typed, checkNotNull(e.pinyinOf(typed)), kind, count = LEARNED_TAKES)
-        val hold = e.voiceHomophones(listOf(word)).hold()
-        var out: Result<String>? = null
-        suspend { hold.replace(heard) { e.voiceHomophonesAllowed(it) } }.startCoroutine(Continuation(EmptyCoroutineContext) { out = it })
-        return checkNotNull(out).getOrThrow()
+        return e.voicePick(e.voiceHomophones(listOf(word)), heard, "", emptyList())
     }
 
     @Test
@@ -100,7 +90,31 @@ class VoiceRememberUatTest {
         "何芮 added leaves 和瑞 of 和瑞典, a common word across its edge" to { assertEquals("我想和瑞典人聊天", voiceWrites("我想和瑞典人聊天", "何芮")) },
         // char by char 是那个 reads as 是哪个 (那 and 哪 share a reading); the word 那个 inside it does not
         "是哪个 learned leaves 是那个, a word inside it read otherwise" to { assertEquals("我想是那个", voiceWrites("我想是那个", "是哪个", UserWord.Kind.LEARNED)) },
+        "婷婷 added leaves 亭亭 of 亭亭玉立, a longer word" to { assertEquals("她长得亭亭玉立", voiceWrites("她长得亭亭玉立", "婷婷")) },
     )
+
+    @Test
+    @Uat("VO-38", "VO-59")
+    fun aWordTheModelDoesNotTakeThereIsAskedAboutAlwaysAndPutInAfter() {
+        val e = UatEngines.fresh()
+        assertTrue(e.addWord("攻势", checkNotNull(e.pinyinOf("攻势"))))
+        fun writes(text: String) = e.voicePick(e.voiceHomophones(e.userWords()), text, "", emptyList())
+        assertRows(
+            "added, 攻势 goes in where the sentence takes it" to { assertEquals("敌人的攻势很猛", writes("敌人的公式很猛")) },
+            "not after 推导这个: a formula is derived" to { assertEquals("推导这个公式", writes("推导这个公式")) },
+        )
+        e.context(PINYIN, "", said = true)
+        e.voiceSaid("推导这个公式", "推导这个公式", hinted = false)
+        repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
+        val commit = e.typed("gongshi".map { it.code }, "攻势")
+        val ask = e.voicePutIn(commit).ask?.let { e.voiceConfirm("推导这个$commit", "") }
+        assertRows(
+            "corrected there again: asked whether always to" to { assertEquals(true, ask?.always) },
+            "of 公式" to { assertEquals("公式", ask?.heard) },
+        )
+        assertTrue(e.voiceRemember(ask!!))
+        assertEquals("taken: put in there too", "推导这个攻势", writes("推导这个公式"))
+    }
 
     private companion object {
         const val CANDIDATES = 200

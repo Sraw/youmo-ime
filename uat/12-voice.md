@@ -251,9 +251,9 @@
 ### VO-38 [P1] 同音的字换成你的词
 <!-- learning: 060-voice-userdict.md；用户 2026-11-10 定「同意你语音的方案」 -->
 - **前提**：B0-设置（导入了语音包），在 **词库与短语 → 用户词库** 里手动加「徐婧」（拼音 xu jing）、「攻势」（拼音 gong shi）和「方方」（拼音 fang fang）。
-- **操作**：回测试页，按住空格说"麻烦你去找一下徐婧"，松开；删光，再说"许静来了"；删光，再说"这个公式"；删光，再说"我想芳芳"。
-- **预期**：第一次框里是「麻烦你去找一下徐婧」（没加时是「徐静」；说的时候显示的也已是「徐婧」）；第二次仍是「许静来了」（声调不同不换）；第三次是「这个攻势」（常用词也换成你的「攻势」，手动加的、打字学到的都一样）；第四次是「我想方方」，不多写成「方方方方」。
-- **JVM**：`VoiceHomophonesTest`（读音带声调逐字相同、学到的词打过 3 次以上、自己的词不换、常用词也换、更长的词里不换（`lib/ime-core` 的确定链））；叠字热词不多写：`lib/sherpa-onnx/host-test.sh` 的 `ContextGraph.APhraseAgainRightAfterItselfGainsNothing`（紧接着又一遍的热词不再加分）；模拟器上（导入了语音包）也跑一遍。
+- **操作**：回测试页，按住空格说"麻烦你去找一下徐婧"，松开；删光，再说"许静来了"；删光，再说"推导这个公式"；删光，再说"敌人的攻势很猛"；删光，再说"我想芳芳"。
+- **预期**：第一次框里是「麻烦你去找一下徐婧」（没加时是「徐静」；说的时候显示的也已是「徐婧」）；第二次仍是「许静来了」（声调不同不换）；第三次仍是「推导这个公式」（换了整句说不通，不换）；第四次是「敌人的攻势很猛」（加了热词，识别器通常直接听成「攻势」；听成「公式」时换成「攻势」由 uatTest `VoiceRememberUatTest` 和 `EnginesVoiceEditsTest` 管，设备上这一步测不到换）；第五次是「我想方方」，不多写成「方方方方」。换不换由拼音引擎的语言模型看整句定，你的词加分：手动加的多加，打字学到的少加。
+- **JVM**：`VoiceHomophonesTest`（读音带声调逐字相同、学到的词打过 3 次以上、自己的词不换、更长的词里不换（`lib/ime-core` 的确定链）；按来源加分、几处一起换的组合最多 16 种、换出屏蔽的词不换、「总是换」的词直接换）、`EngineAssetsHomophonesTest`（真数据：学到的「攻势」比「公式」低 1.3 不换，手动加的换）、`VoiceChoiceTest`（只看重排挑出的那段，前文是上一段；引擎没答或超时照原样；说的时候显示的不等引擎：同一处前后几个字不变只问一次，只问最新的，答回来时还是那段才显示，出错后这一次说话不再问）、ime-eval uatTest `VoiceRememberUatTest`（app 的真数据：「莉莉」换成加了的「丽丽」；「她长得亭亭玉立」不换成「婷婷」；「推导这个公式」不换、「敌人的公式很猛」换成「攻势」）；叠字热词不多写：`lib/sherpa-onnx/host-test.sh` 的 `ContextGraph.APhraseAgainRightAfterItselfGainsNothing`（紧接着又一遍的热词不再加分）；模拟器上（导入了语音包）也跑一遍。
 
 ### VO-39 [P1] 语音出错时的提示
 <!-- R25 voice-3/voice-5：识别出错不再报成模型或麦克风的问题 -->
@@ -273,7 +273,7 @@
 <!-- learning: 061-voice-learn-from-edits.md 第 3 版；用户 2026-11-14 答 Q1–Q6（DECISIONS.md） -->
 - **前提**：B0-语音；用户词库里没有「徐婧」。
 - **操作**：在「普通文本」框按住空格说"麻烦你去找一下徐婧"，松开（框里是「…徐静」，见 VO-38）。按 ⌫ 删掉句末标点和「徐静」，用拼音打 x u j i n g，选「徐婧」（一个字一个字选也行）。看键盘上方；点 **记住**；再点 **撤销**。再点一次 **记住** 后打开 **用户词库 → 手动添加的词**。
-- **预期**：重打以后键盘上方问「让语音记住『徐婧』？」，带 **记住** 按钮；点了提示变成「语音记住了『徐婧』」带 **撤销**，候选栏清空（不留重打前的联想），手动添加的词里有「徐婧」（拼音 xu jing）；点 **撤销** 又拿掉（学到的不动，不算删过）；再记住后再说"麻烦你去找一下徐婧"直接是「徐婧」。
+- **预期**：重打以后键盘上方问「让语音记住『徐婧』？」（重打的地方语音加了以后真会换才问：按那一句、前面的字由语言模型判断），带 **记住** 按钮；点了提示变成「语音记住了『徐婧』」带 **撤销**，候选栏清空（不留重打前的联想），手动添加的词里有「徐婧」（拼音 xu jing）；点 **撤销** 又拿掉（学到的不动，不算删过）；再记住后再说"麻烦你去找一下徐婧"直接是「徐婧」。
 - **JVM**：`VoiceAskFieldTest.aFieldLeftBeforeTheEngineAnswersIsNotReadNorAskedOver`（提交后、问之前离开输入框：不读新框、不问）、`VoiceAskFieldTest.theCodeInTheFieldIsNotReadAsItsText`（引擎回答前又打了一个键、编码写在框里（编码行：输入框里）：交给引擎的是「我找徐婧」，不带框里的编码，照样问）、`VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap`（整段说完、全部进框后才把这段字和光标前的字交给引擎；之后上屏的报给引擎，弹提示前读框；提示、**记住**、加词后复位清掉候选栏、撤销、开发者页的两个计数）、ime-core `EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销`（真的 Engines：⌫ 两次、拼音重打，问「徐婧 / xu jing」；记住进手动添加的词；撤销不在学习记录里写「忘掉」）、`VoiceEditsTest.a word deleted and typed again, read the same, is asked about`；模拟器上（导入了语音包）留作冒烟：真的语音片段、真拼音、真提示；ime-eval uatTest `VoiceRememberUatTest.aNameTypedAgainIsAskedAboutCommonOrNot`（app 的真数据，全拼、连句号删、九键、手写四种改法：「丹丹」改「单单」问；「莉莉」是词库里的常见词，改「丽丽」也问，加了「丽丽」（手动加的、学到的都一样）语音把「莉莉」换成它；「徐静蕾」里的「徐静」、「和瑞典」里的「和瑞」不换）。
 
 ### VO-42 [P1] 不点就什么都不记，下次再这样改还问
@@ -285,7 +285,7 @@
 ### VO-43 [P1] 这些改法不问
 - **前提**：B0-语音。
 - **操作**：语音打出「徐静」后分别：重打成「许静」（声调不同）、「徐婧婧」（字数不同）；语音打出「徐静蕾」「和瑞典」后把「徐静」改「徐婧」、「和瑞」改「何芮」；用码表（五笔）、联想、粘贴打进去；打进标点或数字；只删不打。
-- **预期**：都不问。只问点了以后语音真会换的词：读音（连声调）逐字一样、两个字以上、加了以后语音真会把听到的那段换成它（词库里的常见词也换，见 VO-38：「公式」改「攻势」要问；在更长的词里、跟前面或后面的字连成常见词的不换，所以不问）。打进来的不是汉字（标点、数字）就不再跟着看。
+- **预期**：都不问「记住」。只问点了以后语音真会换的词：读音（连声调）逐字一样、两个字以上、加了以后语音在改的那一处真会把听到的那段换成它（词库里的常见词也可能换：「敌人的公式很猛」改「攻势」要问；在更长的词里、跟前面或后面的字连成常见词的不换，所以不问）。加了语音在那一处也不会换的（「推导这个公式」改「攻势」），问的是「以后总是换」（VO-59）。打进来的不是汉字（标点、数字）就不再跟着看。
 - **JVM**：ime-core `VoiceEditsTest.what is not asked about`（声调不同、字数不同、听到的就是你的词、只删不打、打的不是汉字……一张表）、`VoiceEditsTest.the word to ask about`（问的词和拼音按每个字共有的带调读音）、`VoiceEditsTest.typed by what is no word typed, the window ends (Q5)`（码表、联想、粘贴打的不算，窗口结束）、`EnginesVoiceEditsTest.nothing is followed where nothing would be learned`（真数据的声调不同不问）、ime-eval uatTest `VoiceRememberUatTest.aNameTypedAgainIsAskedAboutCommonOrNot`（app 的真数据，全拼、连句号删、九键、手写四种改法：「丹丹」改「单单」问；「莉莉」是词库里的常见词，改「丽丽」也问，加了「丽丽」（手动加的、学到的都一样）语音把「莉莉」换成它；「徐静蕾」里的「徐静」、「和瑞典」里的「和瑞」不换）；设备上不跑。
 
 ### VO-44 [P2] 同一处改两次：点了记住换掉上一次加的
@@ -384,3 +384,10 @@
 - **操作**：① 回测试页按住空格说「今天天气很好」，松开；② 点工具栏的麦克风说「我们走吧」，再点麦克风结束；③ 再按住空格说话，说到一半让另一部手机打进电话（或者用系统时钟设一个一分钟后的闹钟，等它响），挂断/关掉后看框里；④ 在 **按键** 里关掉 **语音输入时暂停播放**，回测试页按住空格说话；⑤ 打开开关，按住空格说话时让微信或 QQ 收一条消息（应用在后台，提示音开着）。
 - **预期**：①② 一按下（麦克风打开）音乐就停，框里是说的话、没有歌词；松开或点结束后约半秒内音乐接着放（个别播放器要手动点播放，记下是哪个）。③ 铃声一响语音就结束，已经说的上屏，之后松开手指不再上屏一遍；铃声没进框里（来电时手指已上滑到取消区、卡片是红的：什么也不上屏）。④ 音乐不停。⑤ 记下说话有没有被提示音打断（应用自己放的提示音可能要短暂焦点，会当作来电结束说话）。
 - **JVM**：同 VO-57（焦点的请求、交还和打断）；音乐应用怎么响应焦点是它们自己的，只能在真机上看。
+
+### VO-59 [P1] 语音没换的地方再改一次，问「以后总是换」
+<!-- learning: 063-voice-model-replace；用户 2026-11-20 定 Q6 按推荐 -->
+- **前提**：B0-语音；在 **用户词库 → 手动添加的词** 里加「攻势」（gong shi）。
+- **操作**：在「普通文本」框按住空格说"推导这个公式"，松开（框里是「推导这个公式」，见 VO-38）。按 ⌫ 删掉「公式」（连句末标点也行），用拼音打 g o n g s h i，选「攻势」。看键盘上方；点 **总是换**。删光再说一遍"推导这个公式"。最后打开 **用户词库 → 手动添加的词**，点「攻势」。
+- **预期**：重打以后键盘上方问「以后总是把『公式』写成『攻势』？」，带 **总是换** 按钮（不问「记住」：已经加过）；点了提示变成「语音以后总是写『攻势』」带 **撤销**；再说就是「推导这个攻势」（不再看整句）。手动添加的词里「攻势」下面写着「gong shi · 语音总是换」，点它的菜单里有 **取消语音总是换**，点了回到看整句换。没加过的词改在语音不换的地方也问「以后总是把…写成…？」，点了加进手动添加的词并且总是换；点 **撤销** 只取消总是换（原来就加了的词还留着，这次加的拿掉）。只标在手动加的词上，删掉这个词、全部清空时一起拿掉；删了再点 **撤销**（词库页或候选长按删的都一样）跟着回来。学习备份（`.fxlb`）和设置备份 zip 带着它，恢复时和手机上的合起来。
+- **JVM**：ime-core `VoiceEditsTest.where the word model would not put it in, asked whether always to`（模型不换的地方问「总是换」；已加过的问「总是换」，已总是换的不问）、`EnginesVoiceEditsTest`（真的 Engines：「敌人的攻势很猛，推导这个公式」里改后半句的「公式」问总是换，点了以后 `voicePick` 就换；已加的词问总是换，撤销后还在手动添加的词里、不再总是换）、`EnginesVoiceEditsTest.总是换 goes with a deleted word and comes back with its undo…`（词库页和候选删词后撤销）、`VoiceEditsGlueTest`（按语音判断的那一段判断，段里有逗号也是整段）、`WordListsTest.voiceAlwaysIsKeptBesideTheAddedList`（存在 `words.voice-always`，只标手动加的，删词、清空一起拿掉，旧版删掉的词下次启动时去掉标记）、`LearnBackupTest.voicesAlwaysReadsBackAndAnOlderBackupHasNone`／`BackupControlTest.voicesAlwaysIsMergedOnRestore…`（`.fxlb` 的 77 号记录，恢复合并、退回恢复前还原）、`EnginesBackupTest.aStashedZipsVoiceAlwaysIsMergedWithThePhones`、app `UserDataManagerTest.aBackupsLearningIsLeftToMergeThePhonesKept`（zip 恢复合并）、ime-eval uatTest `VoiceRememberUatTest.aWordTheModelDoesNotTakeThereIsAskedAboutAlwaysAndPutInAfter`（app 的真数据）；模拟器上（导入了语音包）跑问、点、再说，再到词库里看「语音总是换」、取消、再说这一段。

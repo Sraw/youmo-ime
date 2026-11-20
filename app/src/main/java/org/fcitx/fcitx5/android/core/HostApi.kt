@@ -184,7 +184,9 @@ interface LexiconApi {
 
     suspend fun voiceHomophones(words: List<UserWord>): VoiceHomophones
 
-    suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray
+    suspend fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String
+
+    suspend fun voiceStretches(texts: List<String>)
 
     suspend fun rareHeld(texts: Collection<String>): Set<String>
 
@@ -212,7 +214,7 @@ interface LexiconApi {
 
     suspend fun voiceRemember(ask: VoiceEdits.Ask): Boolean
 
-    suspend fun voiceForget(word: String)
+    suspend fun voiceForget(ask: VoiceEdits.Ask)
 
     /** False if it does not read so. */
     suspend fun blockUserWord(text: String, pinyin: String): Boolean

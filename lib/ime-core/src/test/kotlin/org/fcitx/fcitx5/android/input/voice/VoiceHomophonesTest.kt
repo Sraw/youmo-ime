@@ -14,9 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
 
 class VoiceHomophonesTest {
 
@@ -68,11 +65,14 @@ class VoiceHomophonesTest {
         override fun wordReading(text: String) = read[text]
     }
 
-    private fun replaced(h: VoiceHomophones, text: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()): String =
-        now { h.hold().replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
-
-    private fun replaced(hold: VoiceHomophones.Hold, text: String, dictionary: VoiceHomophones.Dictionary = FakeDictionary()): String =
-        now { hold.replace(text) { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], dictionary) } } }
+    // the stretches the dictionary allows, scored by [logProbs]: by default the model has no say, so each bonus puts its word in
+    private fun replaced(
+        h: VoiceHomophones,
+        text: String,
+        dictionary: VoiceHomophones.Dictionary = FakeDictionary(),
+        blocked: List<String> = emptyList(),
+        logProbs: (List<String>) -> FloatArray = { FloatArray(it.size) },
+    ): String = h.pick(text, h.candidates(text).filter { VoiceHomophones.allowed(it, dictionary) }, blocked, logProbs)
 
     private fun learned(text: String, count: Float) = UserWord(text, "", LEARNED, count)
 
@@ -139,104 +139,94 @@ class VoiceHomophonesTest {
         assertTrue(VoiceHomophones.NONE.candidates("徐静").isEmpty())
     }
 
+    // log10 P as the model would give it: a text's own, else [default]
+    private fun model(vararg scores: Pair<String, Float>, default: Float = 0f): (List<String>) -> FloatArray {
+        val of = scores.toMap()
+        return { texts -> FloatArray(texts.size) { of[texts[it]] ?: default } }
+    }
+
     @Test
-    fun `the engine not answering leaves the text as heard, and a heard text keeps its length`() {
+    fun `the word model decides, against a bonus by where the word came from`() {
+        fun row(why: String, word: UserWord, sub: Float, out: String) = why to {
+            assertEquals(why, out, replaced(homophones(word), "这个公式", logProbs = model("这个公式" to -10f, "这个攻势" to sub)))
+        }
+        assertRows(
+            row("added: 1.4 less likely, within its 1.5: put in", added("攻势"), -11.4f, "这个攻势"),
+            row("added: 1.6 less likely: left as heard", added("攻势"), -11.6f, "这个公式"),
+            row("added: exactly 1.5 less likely is no gain: left", added("攻势"), -11.5f, "这个公式"),
+            row("learned (typed more than 3 times): 1.2 less likely is past its 1", learned("攻势", 4f), -11.2f, "这个公式"),
+            row("learned: 0.8 less likely, within its 1: put in", learned("攻势", 4f), -10.8f, "这个攻势"),
+            row("always put in: the model's doubt does not count", added("攻势").copy(voiceAlways = true), -99f, "这个攻势"),
+            row("more likely as the user's word: put in", learned("攻势", 4f), -9f, "这个攻势"),
+        )
+    }
+
+    @Test
+    fun `of two stretches only the ones the model takes go in`() {
+        val h = homophones(added("徐婧"), added("何芮"))
+        // 何芮 is 5 less likely wherever it goes: 徐婧 alone, not both nor neither
+        val doubtsHeRui = { texts: List<String> -> FloatArray(texts.size) { if ("何芮" in texts[it]) -5f else 0f } }
+        assertRows(
+            "both in when the model has no say" to { assertEquals("徐婧和何芮", replaced(h, "徐静和和瑞")) },
+            "the one it doubts left out, the other in" to { assertEquals("徐婧和和瑞", replaced(h, "徐静和和瑞", logProbs = doubtsHeRui)) },
+        )
+    }
+
+    @Test
+    fun `none goes in that makes a blocked word`() {
         val h = homophones(added("徐婧"))
-        assertEquals("徐静", now { h.hold().replace("徐静") { null } })
-        val heard = now { h.hold().replace(VoiceLive.Heard("徐静，你好", 3)) { BooleanArray(it.size) { true } } }
-        assertEquals("徐婧，你好", heard.whole)
-        assertEquals(3, heard.settled)
+        assertRows(
+            "婧来 blocked: 徐婧 before 来 would make it" to { assertEquals("徐静来了", replaced(h, "徐静来了", blocked = listOf("婧来"))) },
+            "a blocked word apart from it stops nothing" to { assertEquals("徐婧来了，来了", replaced(h, "徐静来了，来了", blocked = listOf("来了"))) },
+            "an always word neither" to {
+                val always = homophones(added("徐婧").copy(voiceAlways = true))
+                assertEquals("徐静来了", replaced(always, "徐静来了", blocked = listOf("婧来")))
+            },
+        )
     }
 
     @Test
-    fun `what a hold put in stays put in, the engine silent after or the text split otherwise`() {
-        val hold = homophones(added("徐婧"), added("何芮")).hold()
-        var asked = 0
-        assertEquals("找徐婧，", now { hold.replace("找徐静，") { asked++; BooleanArray(it.size) { true } } })
-        // a timeout on the next step: what was put in stays, the new stretch stays as heard
-        assertEquals("找徐婧，和瑞", now { hold.replace("找徐静，和瑞") { asked++; null } })
-        // the raw text (the polish failed): no marks, the run another, 徐婧 still put in; silent now, not asked
-        assertEquals("找徐婧和瑞", now { hold.replace("找徐静和瑞") { asked++; BooleanArray(it.size) { true } } })
-        assertEquals(2, asked)
+    fun `always words go in unasked, the others scored with them in`() {
+        val h = homophones(added("徐婧").copy(voiceAlways = true), added("何芮"))
+        val scored = ArrayList<List<String>>()
+        val asked = { texts: List<String> -> scored += texts; FloatArray(texts.size) }
+        assertEquals("找徐婧", replaced(h, "找徐静", logProbs = asked))
+        assertTrue("only always words: the model not asked", scored.isEmpty())
+        assertEquals("徐婧和何芮", replaced(h, "徐静和和瑞", logProbs = asked))
+        assertEquals(listOf(listOf("徐婧和和瑞", "徐婧和何芮")), scored)
     }
 
     @Test
-    fun `a stretch the engine said no to stays as heard, the same put in elsewhere`() {
-        val hold = homophones(added("何芮")).hold()
-        // 和瑞典: a common word over its edge; 和瑞 alone put in
-        assertEquals("和瑞典，何芮", replaced(hold, "和瑞典，和瑞"))
-        assertEquals("和瑞典，何芮。", replaced(hold, "和瑞典，和瑞。"))
+    fun `a sentence of many stretches is scored a bounded number of ways`() {
+        val h = homophones(added("徐婧"), added("婧攻"), added("何芮"))
+        val scored = ArrayList<Int>()
+        val count = { texts: List<String> -> scored += texts.size; FloatArray(texts.size) { i -> if (i == 0) 0f else -9f } }
+        assertRows(
+            "20 apart: the first 16 alone, no pairs" to {
+                val text = List(20) { "徐静" }.joinToString("，")
+                assertEquals(text, replaced(h, text, logProbs = count))
+                assertEquals(VoiceHomophones.MAX_CHOICES + 1, scored.last())
+            },
+            "3 apart: 3 alone, 3 pairs, all three" to {
+                assertEquals("徐静，和瑞，徐静", replaced(h, "徐静，和瑞，徐静", logProbs = count))
+                assertEquals(1 + 3 + 3 + 1, scored.last())
+            },
+            "overlapping (徐静, 静公) never together" to {
+                assertEquals("徐静公", replaced(h, "徐静公", logProbs = count))
+                assertEquals(1 + 2, scored.last())
+            },
+        )
     }
 
     @Test
-    fun `a new place of a stretch put in is asked, not put in unasked`() {
-        val hold = homophones(added("何芮"), added("徐婧")).hold()
-        assertEquals("何芮来了，", replaced(hold, "和瑞来了，"))
-        assertEquals("何芮来了，和瑞典", replaced(hold, "和瑞来了，和瑞典"))
-        assertEquals("找徐婧，", replaced(hold, "找徐静，"))
-        assertEquals("找徐婧，徐静雨来了", replaced(hold, "找徐静，徐静雨来了"))
-    }
-
-    @Test
-    fun `a stretch put in where it was typed already stays, though the engine says no as the text grows`() {
-        val hold = homophones(added("何芮")).hold()
-        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], FakeDictionary()) } }
-        // 何 typed already (settled 3), then 典 makes 和瑞典 a common word over its edge: 何芮 stays, or tap to talk retypes it all
-        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
-        assertEquals("好，何芮典", now { hold.replace(VoiceLive.Heard("好，和瑞典", 3), yes) }.whole)
-        // not typed yet: the engine's no stands
-        val fresh = homophones(added("何芮")).hold()
-        assertEquals("好，何芮", now { fresh.replace(VoiceLive.Heard("好，和瑞", 2), yes) }.whole)
-        assertEquals("好，和瑞典", now { fresh.replace(VoiceLive.Heard("好，和瑞典", 2), yes) }.whole)
-    }
-
-    @Test
-    fun `a character typed already stays put in when the recognizer rewrites the rest of its stretch`() {
-        val hold = homophones(added("何芮")).hold()
-        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
-        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
-        // 何 typed (settled 3); the tail heard again as 平: no stretch of the word left, 何 stays typed
-        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
-        assertEquals("好，何平", now { hold.replace(VoiceLive.Heard("好，和平", 3), no) }.whole)
-    }
-
-    @Test
-    fun `a typed character is not put in by position into a text that changed before it`() {
-        val hold = homophones(added("何芮")).hold()
-        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
-        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
-        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
-        // the polish failing: the raw text has no comma and another 和 lands where 何 was typed: left as heard
-        assertEquals("好啊和平", now { hold.replace("好啊和平", no) })
-        // a text shorter than where 何 was typed: nothing put in, nothing out of range
-        assertEquals("好", now { hold.replace("好", no) })
-    }
-
-    @Test
-    fun `a new utterance does not keep the last one's typed stretches`() {
-        val hold = homophones(added("何芮")).hold()
-        val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { true } }
-        val no = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { false } }
-        assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
-        // the next utterance has 和瑞 at the same place and the engine says no: left as heard
-        assertEquals("好，和瑞典", now { hold.replace(VoiceLive.Heard("好，和瑞典", 3, utterance = 1), no) }.whole)
-    }
-
-    @Test
-    fun `a stretch is asked again only as what the dictionary reads around it changes`() {
-        val hold = homophones(added("徐婧")).hold()
-        var asked = 0
-        val text = "徐静" + "来".repeat(11)
-        // the run grows past the words that could cross 徐静: not asked again (a count alone would pass a wrong-word cache)
-        assertEquals("徐婧" + "来".repeat(11), now { hold.replace(text) { asked++; BooleanArray(it.size) { true } } })
-        assertEquals("徐婧" + "来".repeat(14), now { hold.replace(text + "来来来") { asked++; BooleanArray(it.size) { true } } })
-        assertEquals(1, asked)
-    }
-
-    // the fakes never suspend: it runs to its end at once
-    private fun <T> now(block: suspend () -> T): T {
-        var outcome: Result<T>? = null
-        block.startCoroutine(Continuation(EmptyCoroutineContext) { outcome = it })
-        return outcome!!.getOrThrow()
+    fun `a word added to the words read takes the bonus asked for`() {
+        val h = homophones(added("何芮"))
+        val doubts = model("徐静来了" to 0f, "徐婧来了" to -3f)
+        val ws = h.withAdded("徐婧", readings(added("徐婧")))
+        assertRows(
+            "added: 3 less likely is past 1.5" to { assertEquals("徐静来了", replaced(ws, "徐静来了", logProbs = doubts)) },
+            "always: in" to { assertEquals("徐婧来了", replaced(h.withAdded("徐婧", readings(added("徐婧")), VoiceHomophones.ALWAYS), "徐静来了", logProbs = doubts)) },
+            "made always over one added: in" to { assertEquals("徐婧来了", replaced(ws.withAdded("徐婧", readings(added("徐婧")), VoiceHomophones.ALWAYS), "徐静来了", logProbs = doubts)) },
+        )
     }
 }

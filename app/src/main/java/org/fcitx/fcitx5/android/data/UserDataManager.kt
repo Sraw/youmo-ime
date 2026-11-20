@@ -550,11 +550,11 @@ object UserDataManager {
     // kept over a backup's, which is merged into them
     private val PHONES = setOf(
         LearnLog.FILE, OLD_MARKER, "$OLD_MARKER.new",
-        OLD_PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, OLD_PINYIN, Engines.TABLE_LOGS_READ,
+        OLD_PINS_MOVED, WordLists.ADDED, WordLists.BLOCKED, WordLists.ALWAYS, EnglishBlocks.FILE, OLD_PINYIN, Engines.TABLE_LOGS_READ,
     )
 
     // merged by the engine at its next start, with the mark that its old logs are read
-    private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, EnglishBlocks.FILE, Engines.TABLE_LOGS_READ)
+    private val STASHED = listOf(LearnLog.FILE, WordLists.ADDED, WordLists.BLOCKED, WordLists.ALWAYS, EnglishBlocks.FILE, Engines.TABLE_LOGS_READ)
 
     // custom phrases, 常用词, 生僻字屏蔽, quick phrases; punctuation maps are dropped whole
     private val FOLLOWED = listOf("pinyin/customphrase", CommonWordsManager.FILE, RareCharsManager.FILE, "data/quickphrase.d")

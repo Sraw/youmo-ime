@@ -2032,7 +2032,10 @@ resets it and ends the engine's window.
   (written CER within ±0.5 points either way) and the segments do not wait on the VAD.
   Off the phone, `ime-eval voice-post` replays such recorded stretches (CLAUDE.md): `--source app` or `top` takes
   the recognizer's text as `seg_app.py` wrote it, `--source tagged` (with `--tagger`, voice-eval's tagger export) runs
-  the app's whole post-processing through `VoiceLive` and the polish stream, all but the homophone swap (no user words there).
+  the app's whole post-processing through `VoiceLive` and the polish stream. The user's words go in only with `--words`
+  (a list, `lib/ime-eval/data/voice-words/`) and `--data` (the engine's data): each stretch through `VoiceChoice.pick`
+  before the polish, as in the app, with its pick time; `--picked <dir>` writes the stretches so changed for voice-eval's
+  `tag_segs.py` to tag anew, the polish's marks then measured on what it now sees.
   Its labels are the whole clip's, tagged once by voice-eval, not the app's: on the phone the tagger sees only the
   window it is asked about (`VoicePolishStream.WINDOW`, 64 characters, nothing after it), so a clip longer than a window
   is scored with labels that saw more context than the app's would. The run's `tagged:` line counts those clips (`long=`).
@@ -2108,10 +2111,12 @@ resets it and ends the engine's window.
   the speech's end) the lift to the text took 1.1–1.7 s warm on 3 threads (1.2–1.8 s on 2), and over 40 aishell sentences on 3 threads
   (2026-11-14) 1.38 s on average, 1.74 s at the 90th percentile: the 0.3 s tail, a
   chunk's decoding ~600 ms (the encoder ~180 ms of it, the rest the beam search over the hotwords), a second chunk
-  as often as the padding asks; the polish ~30 ms, the homophones ~0; the first talk after the models were let go
+  as often as the padding asks; the polish ~30 ms, the user's words 6–18 ms a stretch reading as one on the emulator (none otherwise); the first talk after the models were let go
   ~1 s more (their load, overlapped with the capture). Debug line at the end, numbers only:
   `voice timing:` (first text shown from the first sample not zero; from the stop: the microphone closed, the
-  backlog drained, the tail decoded, the polish, the homophones, what was said).
+  backlog drained, the tail decoded, the polish; `pickMs`, `pickMaxMs`: the user's words of each closed stretch summed and the
+  longest, the last one's inside the tail's decode; `livePickMs`, `livePicks`: those of what showed, asked beside
+  the decoding, summed and counted, an ask still on its way at the end not counted; what was said).
 - Debug line at the recognizer's end: `voice segments: speechStart=` (the first token's frame, from the opening)
   `segments=` (closed with something in them), for the UAT's lift offset (VO-23/24).
 

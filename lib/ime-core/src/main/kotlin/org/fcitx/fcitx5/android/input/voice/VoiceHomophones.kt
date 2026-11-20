@@ -7,10 +7,10 @@ package org.fcitx.fcitx5.android.input.voice
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 
 /**
- * Puts the user's words in for what voice heard read the same, tones and all (婧 is never in the beam). Not
- * where it is a word of theirs, holds a dictionary word read otherwise, or is covered by a longer dictionary
- * word or crosses a common one; a common word read alike is replaced. BMP words of two characters or more; the text keeps its
- * length. Made once a hold on the engine's thread; the dictionary is asked only of stretches that read as a word.
+ * The user's words read the same, tones and all, as stretches of what voice heard (婧 is never in the beam): where
+ * one may go in ([candidates], [allowed]) and whether it does ([pick]). Not where it is a word of theirs, holds a
+ * dictionary word read otherwise, or is covered by a longer dictionary word or crosses a common one. BMP words of
+ * two characters or more; the text keeps its length. Made on the engine's thread, read on any.
  */
 class VoiceHomophones internal constructor(
     private val words: List<Word>,
@@ -19,18 +19,15 @@ class VoiceHomophones internal constructor(
     private val chars: (Char) -> IntArray?,
     private val added: Int = 0,
 ) {
-    class Word(val text: String, val readings: List<IntArray>)
+    /** [bonus]: what the word model's log10 odds against it are outweighed by; [ALWAYS] goes in unasked. */
+    class Word(val text: String, val readings: List<IntArray>, val bonus: Float = ADDED_BONUS)
 
     /** [at]: where [run] starts in the text. */
     class Span(val run: String, val start: Int, val end: Int, val word: Word, val at: Int = 0) {
         val text: String get() = run.substring(start, end)
 
-        // only what [allowed] reads (MAX_WORD either side): a growing run is not asked again
-        internal val key: String get() {
-            val from = maxOf(0, start - MAX_WORD + 1)
-            val to = minOf(run.length, end - 1 + MAX_WORD)
-            return "${run.substring(from, to)}\u0000${start - from}\u0000${word.text}"
-        }
+        internal val from: Int get() = at + start
+        internal val to: Int get() = at + end
     }
 
     /** On the engine's thread (EngineAssets). */
@@ -43,11 +40,6 @@ class VoiceHomophones internal constructor(
         fun wordReading(text: String): IntArray?
     }
 
-    /** Null if the engine cannot say in time. */
-    fun interface Lexicon {
-        suspend fun allowed(spans: List<Span>): BooleanArray?
-    }
-
     private val byFirst: Map<Int, List<Word>> = HashMap<Int, MutableList<Word>>().also { map ->
         for (w in words) for (r in w.readings[0]) map.getOrPut(r) { ArrayList() }.let { if (w !in it) it += w }
     }
@@ -55,6 +47,12 @@ class VoiceHomophones internal constructor(
     private val rank: Map<Word, Int> = words.withIndex().associate { (i, w) -> w to i }
 
     val isEmpty: Boolean get() = words.isEmpty()
+
+    /** The same words with an added word's bonus [added] and a learned one's [learned], for tuning them (`ime-eval voice-post --bonus`). */
+    fun withBonus(added: Float, learned: Float): VoiceHomophones = VoiceHomophones(
+        words.map { w -> Word(w.text, w.readings, if (w.bonus == ADDED_BONUS) added else if (w.bonus == LEARNED_BONUS) learned else w.bonus) },
+        own, chars, this.added,
+    )
 
     /** By where it starts, the longest word first, then as [words] has them. */
     fun candidates(text: String): List<Span> {
@@ -106,93 +104,114 @@ class VoiceHomophones internal constructor(
         return false
     }
 
-    /** With [text] added by hand after the others added; the rest not read again. */
-    internal fun withAdded(text: String, readings: List<IntArray>): VoiceHomophones {
-        if (words.indexOfFirst { it.text == text } in 0 until added) return this
-        val all = words.filterTo(ArrayList()) { it.text != text }.apply { add(added, Word(text, readings)) }
-        return VoiceHomophones(all, own + text, chars, added + 1)
+    /** With [text] added by hand after the others added, at [bonus]; the rest not read again. */
+    internal fun withAdded(text: String, readings: List<IntArray>, bonus: Float = ADDED_BONUS): VoiceHomophones {
+        val i = words.indexOfFirst { it.text == text }
+        if (i in 0 until added && words[i].bonus == bonus) return this
+        val all = words.filterTo(ArrayList()) { it.text != text }
+        val before = if (i in 0 until added) added - 1 else added
+        all.add(before, Word(text, readings, bonus))
+        return VoiceHomophones(all, own + text, chars, before + 1)
     }
 
-    /** On its decoder's thread alone. */
-    fun hold() = Hold(this)
-
     /**
-     * What one hold put in stays so: a stretch put in once is put in again wherever the engine has not answered
-     * for it, and one put in where it was typed already stays whatever the engine says later (typed words must
-     * not turn back). The engine not answering once, it is not asked again this hold.
+     * [text] with the user's words put in where the word model, after [before], takes them: a way of writing it wins
+     * over [text] when its log10 probability plus each word's [Word.bonus] is higher. [spans] are those [allowed];
+     * [ALWAYS] words go in first, unasked. Singles, then pairs and so on, [MAX_CHOICES] at most; none that makes a
+     * [blocked] word. [logProbs] scores whole texts, the first [text] with the [ALWAYS] ones in.
      */
-    class Hold internal constructor(private val homophones: VoiceHomophones) {
-        // by [Span.key]: asked again only as what is read around it changes
-        private val answered = HashMap<String, Boolean>()
-
-        // by where they start in the utterance's text
-        private val pinned = HashMap<Int, String>()
-        private var pinnedOf = -1
-
-        // per typed character: kept while a text still starts with the heard stretch up to it, never by position alone
-        private val pinnedChars = HashMap<Int, Pair<String, Char>>()
-
-        // stretches put in, as heard and as put in: "徐静\u0000徐婧"
-        private val putIn = HashSet<String>()
-
-        private var silent = false
-
-        /** From the start; a stretch overlapping one already put in is left as it is. */
-        suspend fun replace(text: String, lexicon: Lexicon): String = replaceTyped(text, lexicon, 0)
-
-        private suspend fun replaceTyped(text: String, lexicon: Lexicon, settled: Int): String {
-            val spans = homophones.candidates(text)
-            if (spans.isEmpty()) return keepTyped(text, text.toCharArray())
-            val ask = spans.filter { it.key !in answered }.distinctBy { it.key }
-            if (ask.isNotEmpty() && !silent) {
-                val said = lexicon.allowed(ask)
-                if (said == null) silent = true else ask.forEachIndexed { i, span -> answered[span.key] = said.getOrElse(i) { false } }
+    fun pick(text: String, spans: List<Span>, blocked: List<String>, logProbs: (List<String>) -> FloatArray): String {
+        val base = text.toCharArray()
+        val hard = ArrayList<Span>()
+        for (span in spans) {
+            if (span.word.bonus != ALWAYS || hard.any { it.overlaps(span) }) continue
+            val out = base.copyOf()
+            span.word.text.toCharArray(out, span.from)
+            if (!makesBlocked(String(out), listOf(span), blocked)) {
+                span.word.text.toCharArray(base, span.from)
+                hard += span
             }
-            val out = text.toCharArray()
-            var until = 0
-            for (span in spans) {
-                val from = span.at + span.start
-                // one typed already stays; else the engine's answer, never overturned; else one put in here, only where it never answered
-                val yes = pinned[from] == pair(span) || (answered[span.key] ?: (pair(span) in putIn))
-                if (from < until || !yes) continue
-                answered[span.key] = true
-                span.word.text.toCharArray(out, from)
-                putIn += pair(span)
-                if (from < settled) {
-                    pinned[from] = pair(span)
-                    for (k in from until minOf(settled, span.at + span.end)) {
-                        if (text[k] != out[k]) pinnedChars[k] = text.substring(0, k + 1) to out[k]
-                    }
-                }
-                until = span.at + span.end
+        }
+        val first = String(base)
+        val free = spans.filter { it.word.bonus != ALWAYS && hard.none { h -> h.overlaps(it) } }.sortedBy { it.from }
+        val choices = ArrayList<Pair<String, Float>>()
+        for (taken in combinations(free)) {
+            val out = base.copyOf()
+            for (span in taken) span.word.text.toCharArray(out, span.from)
+            val written = String(out)
+            if (!makesBlocked(written, taken, blocked)) choices += written to taken.sumOf { it.word.bonus.toDouble() }.toFloat()
+        }
+        if (choices.isEmpty()) return first
+        val lp = logProbs(listOf(first) + choices.map { it.first })
+        var best = first
+        var bestScore = lp[0]
+        for ((i, choice) in choices.withIndex()) {
+            val score = lp[i + 1] + choice.second
+            if (score > bestScore) {
+                best = choice.first
+                bestScore = score
             }
-            return keepTyped(text, out)
         }
+        return best
+    }
 
-        private fun keepTyped(text: String, out: CharArray): String {
-            for ((k, pin) in pinnedChars) if (text.startsWith(pin.first)) out[k] = pin.second
-            return String(out)
-        }
-
-        /** The same length, so what of it is settled stays so. */
-        suspend fun replace(heard: VoiceLive.Heard, lexicon: Lexicon): VoiceLive.Heard {
-            // a new utterance's text starts again: where the last one's were typed says nothing of it
-            if (heard.utterance != pinnedOf) {
-                pinned.clear()
-                pinnedChars.clear()
-                pinnedOf = heard.utterance
+    // a word put in may join what is around it into a blocked one
+    private fun makesBlocked(text: String, taken: List<Span>, blocked: List<String>): Boolean = blocked.any { b ->
+        b.isNotEmpty() && taken.any { span ->
+            var i = text.indexOf(b, maxOf(0, span.from - b.length + 1))
+            var hit = false
+            while (i in 0 until span.to && !hit) {
+                hit = i + b.length > span.from
+                i = text.indexOf(b, i + 1)
             }
-            val whole = replaceTyped(heard.whole, lexicon, heard.settled)
-            return if (whole == heard.whole) heard else VoiceLive.Heard(whole, heard.settled, heard.fallback, heard.utterance, heard.upTo)
+            hit
         }
-
-        private fun pair(span: Span) = span.text + "\u0000" + span.word.text
     }
 
     companion object {
         val NONE = VoiceHomophones(emptyList(), emptySet(), { null })
 
         const val LEARNED_MIN = 3f
+
+        /** Added by hand or with 「记住」: past this the model's doubt lets wrong ones in, short stretches and names most. */
+        const val ADDED_BONUS = 1.5f
+
+        /** Learned by typing, never asked for in voice: the fewest wrongly put in. */
+        const val LEARNED_BONUS = 1f
+
+        /** 「总是换」: the model is not asked. */
+        const val ALWAYS = Float.POSITIVE_INFINITY
+
+        /** Ways of writing one text scored at most: a sentence of many stretches costs a bounded time. */
+        const val MAX_CHOICES = 16
+
+        private fun Span.overlaps(o: Span) = from < o.to && o.from < to
+
+        /** Of [spans] by where they start: those not overlapping, singles first, then by how many, [MAX_CHOICES] at most. */
+        internal fun combinations(spans: List<Span>): List<List<Span>> {
+            val out = ArrayList<List<Span>>()
+            val taken = ArrayList<Span>()
+            fun walk(from: Int, k: Int) {
+                if (taken.size == k) {
+                    out += taken.toList()
+                    return
+                }
+                for (i in from until spans.size) {
+                    if (out.size >= MAX_CHOICES) return
+                    if (taken.isNotEmpty() && spans[i].from < taken[taken.size - 1].to) continue
+                    taken += spans[i]
+                    walk(i + 1, k)
+                    taken.removeAt(taken.size - 1)
+                }
+            }
+            for (k in 1..spans.size) {
+                val had = out.size
+                walk(0, k)
+                // none of k: none of more
+                if (out.size == had || out.size >= MAX_CHOICES) break
+            }
+            return out
+        }
 
         private const val MAX_WORD = 12
 
@@ -212,11 +231,17 @@ class VoiceHomophones internal constructor(
                 .filter { it.kind == UserWord.Kind.ADDED || it.count > LEARNED_MIN }
                 .filter { w -> w.text.length >= 2 && w.text.all(::isHan) }
                 .distinctBy { it.text }
-                .mapNotNull { w -> readingsOf(w)?.takeIf { r -> r.size == w.text.length && r.all { it.isNotEmpty() } }?.let { Word(w.text, it) } }
+                .mapNotNull { w -> readingsOf(w)?.takeIf { r -> r.size == w.text.length && r.all { it.isNotEmpty() } }?.let { Word(w.text, it, bonusOf(w)) } }
                 .toList()
             if (taking.isEmpty()) return NONE
             val added = mine.filter { it.kind == UserWord.Kind.ADDED }.mapTo(HashSet()) { it.text }
             return VoiceHomophones(taking, mine.mapTo(HashSet()) { it.text }, charReadings, taking.count { it.text in added })
+        }
+
+        private fun bonusOf(w: UserWord) = when {
+            w.kind == UserWord.Kind.LEARNED -> LEARNED_BONUS
+            w.voiceAlways -> ALWAYS
+            else -> ADDED_BONUS
         }
 
         /** No dictionary word in it read otherwise, no longer word covering it, no common word cut by its edge. */

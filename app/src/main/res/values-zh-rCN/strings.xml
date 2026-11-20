@@ -523,6 +523,11 @@
     <string name="voice_ask_remember">让语音记住『%1$s』？</string>
     <string name="voice_ask_remember_action">记住</string>
     <string name="voice_ask_remembered">语音记住了『%1$s』</string>
+    <string name="voice_ask_always">以后总是把『%1$s』写成『%2$s』？</string>
+    <string name="voice_ask_always_action">总是换</string>
+    <string name="voice_ask_always_done">语音以后总是写『%1$s』</string>
+    <string name="voice_always_detail">%1$s · 语音总是换</string>
+    <string name="voice_always_cancel">取消语音总是换</string>
     <string name="voice_ask_failed">没能加入用户词库</string>
     <string name="voice_ask_hint">把整个词删掉重打，语音才能记住</string>
     <string name="voice_ask_counts">语音改字：问过 %1$d 次，记住 %2$d 次</string>

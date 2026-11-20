@@ -523,6 +523,11 @@
     <string name="voice_ask_remember">讓語音記住『%1$s』？</string>
     <string name="voice_ask_remember_action">記住</string>
     <string name="voice_ask_remembered">語音記住了『%1$s』</string>
+    <string name="voice_ask_always">以後總是把『%1$s』寫成『%2$s』？</string>
+    <string name="voice_ask_always_action">總是換</string>
+    <string name="voice_ask_always_done">語音以後總是寫『%1$s』</string>
+    <string name="voice_always_detail">%1$s · 語音總是換</string>
+    <string name="voice_always_cancel">取消語音總是換</string>
     <string name="voice_ask_failed">沒能加入使用者詞庫</string>
     <string name="voice_ask_hint">把整個詞刪掉重打，語音才能記住</string>
     <string name="voice_ask_counts">語音改字：問過 %1$d 次，記住 %2$d 次</string>

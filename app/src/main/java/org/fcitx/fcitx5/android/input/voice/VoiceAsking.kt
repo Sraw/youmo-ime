@@ -79,7 +79,11 @@ class VoiceAsking(
             return
         }
         prefs.voiceAskShown.setValue(prefs.voiceAskShown.getValue() + 1)
-        service.say(service.getString(R.string.voice_ask_remember, ask.word), UndoChip.Undo({ rememberVoiceWord(ask) }, action = R.string.voice_ask_remember_action))
+        if (ask.always) {
+            service.say(service.getString(R.string.voice_ask_always, ask.heard, ask.word), UndoChip.Undo({ rememberVoiceWord(ask) }, action = R.string.voice_ask_always_action))
+        } else {
+            service.say(service.getString(R.string.voice_ask_remember, ask.word), UndoChip.Undo({ rememberVoiceWord(ask) }, action = R.string.voice_ask_remember_action))
+        }
     }
 
     // the word added drops the engine's sessions: the bar's 联想 of the old one reset away, not left to tap
@@ -92,9 +96,9 @@ class VoiceAsking(
                 if (!added) return@withContext service.say(R.string.voice_ask_failed)
                 val taken = AppPrefs.getInstance().internal.voiceAskTaken
                 taken.setValue(taken.getValue() + 1)
-                service.say(service.getString(R.string.voice_ask_remembered, ask.word), UndoChip.Undo({
+                service.say(service.getString(if (ask.always) R.string.voice_ask_always_done else R.string.voice_ask_remembered, ask.word), UndoChip.Undo({
                     taken.setValue(maxOf(0, taken.getValue() - 1))
-                    service.postFcitxJob { voiceForget(ask.word) }
+                    service.postFcitxJob { voiceForget(ask) }
                 }))
             }
         }

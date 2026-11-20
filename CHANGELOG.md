@@ -16,6 +16,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 双拼可以让编码行显示按下的双拼字母，不显示完整拼音：双拼设置里打开 **编码行显示双拼按键**（默认关），小鹤打 `nihc` 编码行就是 `ni hc`。全键盘、18 键、14 键、九键和每个方案都能用；18 键、14 键、九键显示每个键读出的那个字母（九键 6 4 4 5 显示 `ni hk`），按回车上屏的也是这些字母。
 - 剪贴板加了 **收藏**：面板栏上分「最近」「收藏」两页，在最近里长按一条选 **收藏**，它就一直留着，不算进上限，清空最近也不影响；收藏里能 **取消收藏**（可撤销）、**移到最前**。以前置顶的条目升级后在收藏里。恢复备份时收藏和手机上的合并，手机上的收藏（包括敏感的）都留着。关掉「记录剪贴板历史」后收藏照样能用。
 - 九键、14 键、18 键的拼音也能中英混输了：按英文词每个字母所在的键，比如九键 `474663` 出 iPhone，`9633474663` 出「我的iPhone」，和全键盘一样由 **中英混输** 开关管，也打得出英文里学到的词。编码行上英文那段显示小写字母，按回车上屏的就是它（`iphone`）。
+- 语音把听到的换成你的同音词时看整句：说得通才换，不再一见到同音就换。加了「攻势」，「敌人的公式很猛」打成「敌人的攻势很猛」，「推导这个公式」照样是「公式」；手动加的词比打字学成的更容易换。语音在那儿不肯换、你删掉重打成你的词时，会问「以后总是把『公式』写成『攻势』？」（语音在那儿会换的，问「记住」），点 **总是换** 以后这个词不看整句、总是换；在 **用户词库 → 手动添加的词** 里点这个词选 **取消语音总是换** 可以取消。
 
 ### 小改动
 
@@ -24,7 +25,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
 - 纯数字、小数、能填负数、数字密码这些框都用完整的数字键盘（和点 123 打开的一样），不再按框说的类型去掉 `-`、`.` 等键：框说的常和它收的不一样，比如记账应用的金额框说是小数，却能填负数，原来打不出 `-`。框不收的键点了由框自己滤掉。电话、日期时间框照旧是自己的符号键。导入过的数字键盘布局里写着这几种框的（`pads=` 的 `digits`、`signed`、`decimal`、`signed-decimal`）照样能读、能导入，算作完整的那种；布局编辑器的示例「大按键数字键盘」加了 `-` 键：导入过旧版这个示例的，重新导入新版，能填负数的框才打得出 `-`。导入数字键盘布局时，完整的那种缺 `-` 或 `.` 会提示；写着上面那几种框的键（`when="pad=decimal"` 等）不再显示，网页编辑器里会提示。
 - 导入自定义键盘布局只拦读不出、排不下、超出上限、不安全的；缺 ⌫、回车、返回、地球键、某个数字或字母、九键左列这些 App 自带那块有的键，改成在要注意的地方说一句缺了会怎样（「没有 ⌫：删不了字……」「没有数字键 0」），照样导入、照样画出来，从备份恢复也一样；分组键盘缺字母时照样用自己的分组。数字键盘上有键打出字母的也提醒一句。符号面板、九键左列的位置按 `kind=` 找，`id` 随便起；没有那个位置时那一块不显示。网页布局编辑器保存这样的布局时写 `min-app="0.6.3"`。替换正在用的布局、新的这版某个输入法用不了时，确认框里说一句，导入后那个输入法换回 App 自带的键盘。主题包里带的键盘布局照旧：缺键的不转。
-- 语音打出词库里的常见词（「莉莉」），你删掉重打成同音的「丽丽」，现在也问「让语音记住『丽丽』？」；你的词（手动加的、点了 **记住** 的、打字学成的）也换掉同音的常见词，加了「攻势」，说「这个公式」打出「这个攻势」。
+- 语音打出词库里的常见词（「莉莉」），你删掉重打成同音的「丽丽」，现在也问「让语音记住『丽丽』？」；你的词（手动加的、点了 **记住** 的、打字学成的）也可能换掉同音的常见词（见上）。
 
 ### 修复
 
@@ -45,6 +46,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - 中英混输 on pinyin's nine, 14 and 18 keys: tap the keys of an English word's letters, as `474663` for iPhone or `9633474663` for 我的iPhone on the nine keys, under the same **中英混输** switch as the full keyboard, words learned in English included. The code row shows such a word in lower case, and Enter commits that (`iphone`).
+- Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」: tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
 
 ### Smaller changes
 
@@ -53,7 +55,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.
 - Number, decimal, signed and numeric password fields all get the full number pad (the one 123 opens) instead of one trimmed to the field's declared type: what a field declares is often not what it takes (a bookkeeping app's amount, declared decimal, takes a minus, which could not be typed). A key the field refuses is dropped by the field. Phone and date-time fields keep their own signs. Imported number layouts naming those fields (`digits`, `signed`, `decimal`, `signed-decimal` in `pads=`) still read and import, as for the full pad; the layout maker's 大按键数字键盘 example gains a `-` key: whoever imported the old one imports the new one again for a minus in signed fields. Importing a number layout whose full pad lacks `-` or `.` says so; a key written for those fields (`when="pad=decimal"` and the like) no longer shows, and the web maker says so.
 - Importing a custom keyboard layout refuses only what cannot be read or laid out, goes past a limit or is unsafe; a layout lacking a key the app's board has (⌫, Return, back, the globe key, a digit or a letter, the nine keys' left column) is told in the notes, each with what it costs (「没有 ⌫：删不了字……」, 「没有数字键 0」), and imported and drawn as it is, from a backup too; a grouped one lacking letters keeps its own groups. A number layout with a key typing letters is told too. The symbol panel's and the nine keys' places are found by `kind=`, the `id` any; a place the layout has not is not shown. The web layout maker saves such a layout with `min-app="0.6.3"`. Replacing a layout in use with a version an input method cannot use says so in the confirmation, and that input method goes back to the app's own board after the import. A theme pack's layouts are as before: one lacking keys is not converted.
-- A common dictionary word voice wrote (莉莉), deleted and typed again as a homophone (丽丽), is now asked about too (「让语音记住『丽丽』？」), and the user's words (added by hand or **记住**, or learned from typing) now replace a common homophone in voice: with 攻势 added, 「这个公式」 is written 「这个攻势」.
+- A common dictionary word voice wrote (莉莉), deleted and typed again as a homophone (丽丽), is now asked about too (「让语音记住『丽丽』？」), and the user's words (added by hand or **记住**, or learned from typing) may now replace a common homophone in voice too (see above).
 
 ### Fixes
 

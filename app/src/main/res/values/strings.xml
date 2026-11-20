@@ -541,6 +541,11 @@
     <string name="voice_ask_remember">Have voice remember “%1$s”?</string>
     <string name="voice_ask_remember_action">Remember</string>
     <string name="voice_ask_remembered">Voice will remember “%1$s”</string>
+    <string name="voice_ask_always">Always write “%1$s” as “%2$s” in voice?</string>
+    <string name="voice_ask_always_action">Always</string>
+    <string name="voice_ask_always_done">Voice will always write “%1$s”</string>
+    <string name="voice_always_detail">%1$s · always in voice</string>
+    <string name="voice_always_cancel">Stop always writing it in voice</string>
     <string name="voice_ask_failed">Could not add it to the user dictionary</string>
     <string name="voice_ask_hint">For voice to remember it, delete the whole word and type it again</string>
     <string name="voice_ask_counts">Voice corrections: asked %1$d times, remembered %2$d</string>

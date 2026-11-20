@@ -246,7 +246,9 @@ class Engines(
 
     fun rareGrid(): RareGrid? = checked { words.rareGrid() }
 
-    fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray = checked { words.voiceHomophonesAllowed(spans) }
+    /** [VoiceHomophones.pick] on [text] after [before], the stretches the dictionary allows: one call for both. */
+    fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>): String =
+        checked { words.voicePick(homophones, text, before, blocked) }
 
     fun charReading(c: String): String = checked { words.charReading(c) }
 
@@ -424,6 +426,9 @@ class Engines(
         if (learner.useHabits) voiceEdits.edits.said(text, before) else voiceEdits.end()
     }
 
+    /** A talk's stretches as voice kept them, for 记住 to be judged on the stretch voice judged. */
+    fun voiceStretches(texts: List<String>) = checked { voiceEdits.stretches(texts) }
+
     /** [VoiceEdits.putIn]. */
     fun voicePutIn(text: String): VoiceEdits.Reply = checked { voiceEdits.edits.putIn(text) }
 
@@ -440,7 +445,7 @@ class Engines(
     fun voiceRemember(ask: VoiceEdits.Ask): Boolean = checked { voiceEdits.remember(ask) }
 
     /** 撤销 of [voiceRemember]: unadded, nothing forgotten (UserLexicon.unAdd). */
-    fun voiceForget(word: String) = checked { voiceEdits.forget(word) }
+    fun voiceForget(ask: VoiceEdits.Ask) = checked { voiceEdits.forget(ask) }
 
     // the factory's, whose pinyin blocks a polyphone by its parts in the reading shown
     private val candidateReadings get() = factory.candidateReadings

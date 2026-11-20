@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.glide.TableGlide
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -205,8 +206,9 @@ internal val COMMANDS = listOf(
     // voice post-processing on voice-eval's recorded stretches, no recognizer
     Command(
         "voice-post",
-        "<seg-set.jsonl>... [--source app|top|tagged] [--tagger <polish-tagger.json>] [--guard on|off] [--misses <out.tsv>] [--texts <out.tsv>]",
-        1..Int.MAX_VALUE, "source", "tagger", "guard", "misses", "texts",
+        "<seg-set.jsonl>... [--source app|top|tagged] [--tagger <polish-tagger.json>] [--guard on|off] [--misses <out.tsv>] [--texts <out.tsv>]" +
+            " [--words <words.tsv> --data <engine-assets dir> [--bonus <added>,<learned>] [--picked <out dir>]]",
+        1..Int.MAX_VALUE, "source", "tagger", "guard", "misses", "texts", "words", "data", "bonus", "picked",
     ) { args, out, err ->
         val source = args.options["source"] ?: "app"
         if (source !in setOf("app", "top", "tagged")) {
@@ -228,9 +230,31 @@ internal val COMMANDS = listOf(
             err.appendLine("voice-post: --guard goes with --source tagged, and only with it")
             return@Command null
         }
+        val wordsFile = args.options["words"]
+        val data = args.options["data"]
+        val withWords = args.options["bonus"] != null || args.options["picked"] != null
+        if ((wordsFile == null) != (data == null) || (withWords && wordsFile == null)) {
+            err.appendLine("voice-post: --words and --data go together, --bonus and --picked with them")
+            return@Command null
+        }
+        val bonus = args.options["bonus"]?.let { b -> b.split(',').mapNotNull { it.toFloatOrNull() }.takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+        if (args.options["bonus"] != null && bonus == null) {
+            err.appendLine("voice-post: --bonus <added>,<learned>, not ${args.options["bonus"]}")
+            return@Command null
+        }
         try {
             val polish = tagger?.let { VoicePostRun.Polish(VoicePostRun.tags(File(it)), guard == "on") }
-            VoicePostRun.run(args.operands, source, args.options["misses"], out, args.options["texts"], polish)
+            val words = wordsFile?.let { w ->
+                val engines = Engines({ path -> mapFile(File(data!!, path).path) }, null)
+                VoicePostRun.Words.read(engines, File(w), bonus)
+            }
+            val picked = args.options["picked"]
+            if (words != null && picked != null) {
+                args.operands.forEach { VoicePostRun.writePicked(it, words, File(picked)) }
+                0
+            } else {
+                VoicePostRun.run(args.operands, source, args.options["misses"], out, args.options["texts"], polish, words)
+            }
         } catch (e: VoicePostRun.BadInput) {
             // a bad tagger file or record: said as a failed run; anything else is the tool's bug and fails loudly
             err.appendLine("voice-post: ${e.message}")

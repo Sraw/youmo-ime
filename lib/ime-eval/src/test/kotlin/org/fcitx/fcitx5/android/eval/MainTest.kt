@@ -205,6 +205,12 @@ class MainTest {
             arrayOf("voice-post", "s", "--source", "tagged", "--tagger", "t.json", "--guard", "maybe"),
             // the guards are the tagger's labels': with any other source --guard would change nothing and say so nowhere
             arrayOf("voice-post", "s", "--source", "app", "--guard", "off"),
+            // the user's words need the engine's data to read their pinyin; a bonus or picked stretches need the words
+            arrayOf("voice-post", "s", "--words", "w.tsv"),
+            arrayOf("voice-post", "s", "--data", "d"),
+            arrayOf("voice-post", "s", "--bonus", "1.5,1"),
+            arrayOf("voice-post", "s", "--picked", "out"),
+            arrayOf("voice-post", "s", "--words", "w.tsv", "--data", "d", "--bonus", "1.5"),
             arrayOf(),
         )
         for (args in usageErrors) assertEquals(args.joinToString(" "), 2, exit(*args))

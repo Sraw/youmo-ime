@@ -48,6 +48,6 @@ object RestoreStash {
         val files = dir.files().sorted()
         val origin = LearnBackup.origin(*files.flatMap { listOf(it.toByteArray(), dir.file(it).read()) }.toTypedArray())
         val english = EnglishBlocks(dir, onError).blocked.map { ListedWord(it, "") }
-        return Backup(null, state, lists.addedWords.map(listed), lists.blockedWords.map(listed) + english, origin)
+        return Backup(null, state, lists.addedWords.map(listed), lists.blockedWords.map(listed) + english, origin, voiceAlways = lists.voiceAlways.toList())
     }
 }

@@ -21,7 +21,10 @@ import java.nio.charset.Charset
 import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 
-/** The words added by hand and the words blocked, a file per list in [dir] (`你好 ni'hao` a line), written whole on each change; in memory without [dir]. */
+/**
+ * The words added by hand and the words blocked, a file per list in [dir] (`你好 ni'hao` a line), written whole on each
+ * change; in memory without [dir]. Beside them the added words voice always puts in ([voiceAlways]), a text a line.
+ */
 class WordLists(private val dir: UserFiles?, private val onError: (IOException) -> Unit = {}) {
     // a list whose file did not read is not written over
     private val unread = HashSet<String>()
@@ -31,7 +34,36 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
     // an emoji blocked in its word's reading has that word's syllables, not one per code point
     private val blocked = read(BLOCKED) { line -> splitValues(line).takeIf { it.size == 2 || it.size == 3 && it[2].toFloatOrNull() != null }?.let { blockedEntry(it[0], it[1]) } }
 
+    // a file of its own: an older build reads the added list as it was, and drops none of it. One deleted by an older
+    // build goes here, or adding it again would bring its mark back
+    private val always: LinkedHashSet<String> = readTexts(ALWAYS).also { marked ->
+        if (ADDED !in unread && marked.retainAll(addedTexts())) writeTexts(ALWAYS, marked)
+    }
+
     val addedWords: List<Entry> get() = added.toList()
+
+    /** Of the added words' texts. */
+    val voiceAlways: Set<String> get() = addedTexts().let { texts -> always.filterTo(LinkedHashSet()) { it in texts } }
+
+    /** Whether it changed: only an added word's is set. */
+    fun setVoiceAlways(text: String, on: Boolean): Boolean {
+        val changed = if (on) added.any { it.text == text } && always.add(text) else always.remove(text)
+        if (changed) writeTexts(ALWAYS, always)
+        return changed
+    }
+
+    /** Marks the added ones of [texts], beside those marked ([merge]) or as the only ones. */
+    fun putVoiceAlways(texts: Collection<String>, merge: Boolean) {
+        val next = LinkedHashSet<String>()
+        if (merge) next += always
+        addedTexts().let { all -> texts.filterTo(next) { it in all } }
+        if (next == always) return
+        always.clear()
+        always += next
+        writeTexts(ALWAYS, always)
+    }
+
+    private fun addedTexts() = added.mapTo(HashSet()) { it.text }
     val blockedWords: List<Entry> get() = blocked.toList()
 
     fun add(entry: Entry): Boolean = addAll(listOf(entry)).isNotEmpty()
@@ -46,7 +78,10 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
 
     fun addAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.add(it) }
 
-    fun removeAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.remove(it) }
+    fun removeAll(entries: Collection<Entry>): List<Entry> = change(ADDED, added, entries) { added.remove(it) }.also { removed ->
+        // a word deleted is no longer always put in, nor is it again once added anew
+        if (always.removeAll(removed.map { it.text }.filterTo(HashSet()) { t -> added.none { it.text == t } })) writeTexts(ALWAYS, always)
+    }
 
     /** Puts [entries] back at their indexes (a delete taken back); those that were not there. */
     fun putBack(entries: List<IndexedValue<Entry>>): List<Entry> {
@@ -76,6 +111,10 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
                 unknown.remove(name)
                 write(name, list)
             }
+        }
+        if (always.isNotEmpty()) {
+            always.clear()
+            writeTexts(ALWAYS, always)
         }
     }
 
@@ -123,6 +162,28 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
         }
     }
 
+    private fun readTexts(name: String): LinkedHashSet<String> {
+        val file = dir?.file(name) ?: return LinkedHashSet()
+        return try {
+            if (!file.taken()) LinkedHashSet() else file.input().bufferedReader().useLines { lines -> lines.map { it.trim() }.filterTo(LinkedHashSet()) { it.isNotEmpty() } }
+        } catch (e: IOException) {
+            onError(e)
+            unread += name
+            LinkedHashSet()
+        }
+    }
+
+    private fun writeTexts(name: String, texts: Collection<String>) {
+        val dir = dir ?: return
+        if (name in unread) return onError(Unsaved("${dir.file(name)} did not read: not written over"))
+        try {
+            dir.mkdirs()
+            replaceFile(dir.file(name), dir.file("$name.new")) { temp -> temp.write(texts.joinToString("") { "$it\n" }.toByteArray()) }
+        } catch (e: IOException) {
+            onError(Unsaved("${dir.file(name)} not written", e))
+        }
+    }
+
     /** An imported word list line: a word and its pinyin either way round, a count after them ignored, or a word alone ([pinyin] null); `!` blocks it. */
     data class Line(val text: String, val pinyin: String?, val blocked: Boolean) {
         companion object {
@@ -133,6 +194,7 @@ class WordLists(private val dir: UserFiles?, private val onError: (IOException) 
     companion object {
         const val ADDED = "words.added"
         const val BLOCKED = "words.blocked"
+        const val ALWAYS = "words.voice-always"
 
         /** Whether [text] is a word as block lists take one: Han, or an ASCII letter or digit, and no keycap emoji (1️⃣); else a blocked text is an emoji in its word's reading. */
         fun isWordly(text: String): Boolean = KEYCAP !in text && text.codePoints().anyMatch(::wordly)

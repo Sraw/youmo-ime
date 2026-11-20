@@ -320,25 +320,31 @@ def vo56(d):
     return f"框里「{t}」"
 
 
+# the user's words' engine time of the last talk, from the debug timing line: all its stretches, the longest
+def pick_ms(d):
+    m = re.search(r"pickMs=(\d+) pickMaxMs=(\d+)", d.sh("logcat -d | grep 'voice timing:' | tail -1"))
+    return f"{m.group(1)}/{m.group(2)} ms" if m else "?"
+
+
 # also on the JVM (VoiceHomophonesTest); this one, the real recognizer's 徐静 made the user's 徐婧
 @case("VO-38", base="B0-设置", mutates=True, needs=EV)
 def vo38(d):
     script("13-words").add_word(d, "徐婧")
-    # added by hand, 攻势 is put in for the common 公式 heard too
+    # added by hand, 攻势 is put in where the sentence takes it, not in 推导这个公式
     script("13-words").add_word(d, "攻势")
     # a reduplicated hotword written once: the recognizer's 方方方方 before
     script("13-words").add_word(d, "方方")
     d.open_page("text")
     out = []
-    for clip, want, wrong in (("xujing", "徐婧", "徐静"), ("xujing3", "许静", "徐婧"), ("gongshi", "攻势", "公式"),
-                              ("fangfang", "方方", "方方方")):
+    for clip, want, wrong in (("xujing", "徐婧", "徐静"), ("xujing3", "许静", "徐婧"), ("gongshi", "公式", "攻势"),
+                              ("gongshi2", "攻势", "公式"), ("fangfang", "方方", "方方方")):
         d.clear()
         shown, t = dictate(d, clip)
         check(want in t and wrong not in t, f"说「{clip}」，框里「{t}」，要有「{want}」、没有「{wrong}」")
         if clip == "xujing":
             check(not any("徐静" in s for s in shown if "徐婧" not in s and "一下徐" in s), f"说的时候显示过「徐静」：{shown}")
-        out.append(t)
-    return "框里 " + " / ".join(f"「{t}」" for t in out)
+        out.append(f"「{t}」{pick_ms(d)}")
+    return "框里 " + " / ".join(out) + "（后面是同音换词的引擎用时：合计/最长一段）"
 
 
 # 徐静 of a talk deleted to the end and 徐婧 typed again in pinyin: asked 「让语音记住『徐婧』？」
@@ -372,6 +378,39 @@ def vo41(d):
     script("13-words").user_lexicon(d, "手动添加的词")
     check(d.wait_text("徐婧", timeout=5), "手动添加的词里没有「徐婧」")
     return f"说出「{t}」，删到句末重打「徐婧」后问了，点记住加进手动添加的词，候选栏清空"
+
+
+# also on the JVM; here the real recognizer, the real word model and the notice's 总是换
+@case("VO-59", base="B0-语音", mutates=True, needs=EV)
+def vo59(d):
+    script("13-words").add_word(d, "攻势")
+    d.open_page("text")
+    d.clear()
+    _, t = dictate(d, "gongshi")
+    check("公式" in t and "攻势" not in t, f"加了「攻势」说「推导这个公式」，框里「{t}」，要留着「公式」")
+    d.bksp(len(t) - t.index("公式"))
+    d.type("gongshi")
+    d.pick("攻势")
+    ask = "以后总是把『公式』写成『攻势』？"
+    check(d.wait_text(ask, timeout=5, where="all"), f"重打「攻势」后没问「{ask}」，框里「{d.field_text()}」")
+    d.tap_text("总是换", where="all", scroll=False, after=1.0)
+    check(d.wait_text("语音以后总是写『攻势』", timeout=3, where="all"), "点总是换后没说「语音以后总是写『攻势』」")
+    d.clear()
+    _, again = dictate(d, "gongshi")
+    check("攻势" in again and "公式" not in again, f"点了总是换再说「推导这个公式」，框里「{again}」，要换成「攻势」")
+    ms = pick_ms(d)
+    words = script("13-words")
+    words.user_lexicon(d, "手动添加的词")
+    texts = words.list_texts(d)
+    check(any("语音总是换" in x for x in texts), f"手动添加的词里「攻势」下面没写「语音总是换」：{texts[:10]}")
+    words.item_menu(d, "攻势", "取消语音总是换")
+    texts = words.list_texts(d)
+    check(not any("语音总是换" in x for x in texts), f"点了「取消语音总是换」还写着：{texts[:10]}")
+    d.open_page("text")
+    d.clear()
+    _, back = dictate(d, "gongshi")
+    check("公式" in back and "攻势" not in back, f"取消总是换再说「推导这个公式」，框里「{back}」，要回到「公式」")
+    return f"「{t}」留着公式，重打攻势后问总是换，点了以后「{again}」（同音换词 {ms}），词库里取消后「{back}」"
 
 
 CHROME = "com.android.chrome"

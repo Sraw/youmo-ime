@@ -76,17 +76,17 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
      * Undoes, in place, what the model gets wrong: an English letter is always kept (its del took sorry's
      * second r as a stutter) and nothing is written after 。？！. Also, whatever the model: a Chinese number's
      * character ([NUMBER_CHARS]) or an ASCII digit is never deleted (the vocabulary reads 0 and 9 as <unk>), and
-     * nothing inside an [IDIOMS] entry is a number. Applied by [VoicePolishStream], not in [apply] (which is
-     * tags.py to the letter). [lead]: the text before [text], so an idiom cut by a window's start is found.
+     * nothing inside an [IDIOMS] entry or one of [words] is a number. Applied by [VoicePolishStream], not in [apply]
+     * (which is tags.py to the letter). [lead]: the text before [text], so an idiom cut by a window's start is found.
      */
-    fun guarded(text: IntArray, op: IntArray, after: IntArray, num: IntArray? = null, lead: IntArray = IntArray(0)) {
+    fun guarded(text: IntArray, op: IntArray, after: IntArray, num: IntArray? = null, lead: IntArray = IntArray(0), words: List<IntArray> = emptyList()) {
         for (i in text.indices) {
             if (text[i] < 0x80 && Character.isLetter(text[i])) op[i] = KEEP
             if (text[i] in STOPS) after[i] = 0
             if (op[i] == DEL && (text[i] in NUMBER_CHARS || text[i] in '0'.code..'9'.code)) op[i] = KEEP
         }
         if (num == null) return
-        for (span in idioms(lead + text)) for (i in span) if (i >= lead.size) num[i - lead.size] = 0
+        for (span in idioms(lead + text, IDIOM_CODES + words)) for (i in span) if (i >= lead.size) num[i - lead.size] = 0
     }
 
     companion object {
@@ -129,9 +129,9 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         /** How far back of a stream window idioms are looked for. */
         internal val IDIOM_LONGEST = IDIOM_CODES.maxOf { it.size }
 
-        private fun idioms(text: IntArray): List<IntRange> {
+        private fun idioms(text: IntArray, idioms: List<IntArray>): List<IntRange> {
             val found = ArrayList<IntRange>()
-            for (idiom in IDIOM_CODES) for (i in 0..text.size - idiom.size) {
+            for (idiom in idioms) for (i in 0..text.size - idiom.size) {
                 if (idiom.indices.all { text[i + it] == idiom[it] }) found += i until i + idiom.size
             }
             return found
@@ -242,6 +242,8 @@ class VoicePolishStream(
     private val window: Int = WINDOW,
     /** False only for voice-eval's goldens and `ime-eval voice-post --guard off`. */
     private val guard: Boolean = true,
+    /** The user's words voice put in so far, kept as they are: before the polish now, no number rule may write 十一郎 11郎. */
+    private val words: Collection<String> = emptyList(),
 ) {
     fun interface Tagger {
         fun labels(text: IntArray): Labels
@@ -317,7 +319,11 @@ class VoicePolishStream(
         val after = labels.after
         val num = labels.num
         check(op.size == end - start && after.size == end - start && num.size == end - start) { "a label each of ${end - start} characters" }
-        if (guard) tags.guarded(part, op, after, num, text.copyOfRange(maxOf(0, start - (VoicePolishTags.IDIOM_LONGEST - 1)), start))
+        if (guard) {
+            val numbered = words.filter { w -> w.any { it.code in VoicePolishTags.NUMBER_CHARS } }.map { it.codePoints().toArray() }
+            val longest = maxOf(VoicePolishTags.IDIOM_LONGEST, numbered.maxOfOrNull { it.size } ?: 0)
+            tags.guarded(part, op, after, num, text.copyOfRange(maxOf(0, start - (longest - 1)), start), numbered)
+        }
         op.copyInto(seenOp, frozen, frozen - start, op.size)
         after.copyInto(seenAfter, frozen, frozen - start, after.size)
         num.copyInto(seenNum, frozen, frozen - start, num.size)

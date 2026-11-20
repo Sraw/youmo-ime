@@ -117,7 +117,10 @@ class FakeHostApi : HostApi {
     // all alike: the recognizer's order kept
     override suspend fun logProbs(texts: List<String>) = FloatArray(texts.size)
     override suspend fun voiceHomophones(words: List<UserWord>) = VoiceHomophones.NONE
-    override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = BooleanArray(spans.size)
+    override suspend fun voicePick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>) = text
+    override suspend fun voiceStretches(texts: List<String>) {
+        calls += "voiceStretches($texts)"
+    }
 
     override suspend fun rareHeld(texts: Collection<String>) = emptySet<String>()
 
@@ -156,9 +159,9 @@ class FakeHostApi : HostApi {
     }
 
     override suspend fun voiceRemember(ask: VoiceEdits.Ask) = addUserWord(ask.word, ask.pinyin)
-    override suspend fun voiceForget(word: String) {
-        calls += "voiceForget($word)"
-        userWords.removeAll { it.text == word && it.kind == UserWord.Kind.ADDED }
+    override suspend fun voiceForget(ask: VoiceEdits.Ask) {
+        calls += "voiceForget(${ask.word})"
+        userWords.removeAll { it.text == ask.word && it.kind == UserWord.Kind.ADDED }
     }
 
     override suspend fun blockUserWord(text: String, pinyin: String): Boolean {
