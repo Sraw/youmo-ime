@@ -40,7 +40,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
 |---|---|
 | `session` | `Session` (the host's view: `apply(Action): Snapshot`, `offers`, `candidates`), `PinyinSession` (全拼, 双拼, 九键), `NineKeys`, `CoarseCandidates` (the candidates' coarse first pass), `Predictions` (联想 for every session: pinyin's, a table's, handwriting's), `OfferRules` (what a long press offers, one rule for all: nothing but a phrase's delete where nothing is learned), `Pager` (every session's paging of its candidates) |
 | `pinyin` | Turning keys into syllables: `Syllables` (every syllable, append-only ids), `SpellingIndex`, `PinyinSegmenter` / `ShuangpinSegmenter` / `T9Segmenter` → `SyllableGraph` (the spelling index and the nine keys' tables made once for the settings that shape them, `SettingsMemo`); `Fuzzy`, `Typo`, `KeyNeighbours`, `ShuangpinScheme`, `NineKeyLetters`, `LatinWords` (the dictionary's Latin words) and `UserLatinWords` (English's learned words, its dictionary's aside, which `Engines.syncLatin` lists in the user model spelt by letters before a key of 全拼's: U-31 §3) |
-| `lattice` | Turning syllables into text: `PinyinDecoder` (word lattice + beam search), `Penalties`, `WordScorer`, `UserWords`, `LayerPrior`, `Predictor` (联想), `TextWords` (the model's words in text the engine did not commit), `CoarseWords` |
+| `lattice` | Turning syllables into text: `PinyinDecoder` (its `LatticeBuilder` collects the word lattice, `Lattice`, along a `Path`; `BeamSearch` searches it; the first words it ranks itself), `Penalties`, `WordScorer`, `UserWords`, `LayerPrior`, `Predictor` (联想), `TextWords` (the model's words in text the engine did not commit), `CoarseWords` |
 | `rerank` | The sentence models: `SentenceModel` (char-level transformer, int8 safetensors), `Reranker` (`SentencePicker` / `SentenceRefiner`), `MatrixKernel` (the hot loop; the app runs it in C++, `NativeMatrixKernel`), `Safetensors`, `Json` |
 | `user` | Learning: `UserModel` (counts of words and pairs, words made from pieces), `UserScorer` (mixes them into the model), `SyllableTrie` (the learned words by syllables), `Counts`, `HabitCounts` (the counts from the learning record), `WordLists` (added and blocked by hand; the text export (`exportWords`, `WordImport`) writes a blocked word `!text pin'yin`, an emoji's its word's reading read back by `WordLists.blockedEntry`, and English's `!@en word` (`WordListFiles.ENGLISH_BLOCK_MARK`: no reading, and letters alone read as pinyin) into `EnglishBlocks`; a table hides a word blocked everywhere (`UserLexicon.isBlockedWord`) only where it is of Han or of ASCII letters and digits: an emoji blocked in pinyin's reading stays in a code table; `blockedEntry` relaxes the syllable a code point only for a text of no Han nor ASCII letter or digit (ℹ️ too; the edge on purpose: a word of other letters, Cyrillic or accented Latin, is read as an emoji is, its syllables as given, and a table does not hide it); a build before this one reads neither back, and loses a block of an emoji of more or fewer code points than syllables from `words.blocked` too; the user dictionary's export is a learning backup since 0.3.1 (`BackupOp.Copy`, WD-10), which its import restores; an earlier build's text export, which `UserLexicon.exportWords` still writes for the tests, has added words as `词 pin'yin`, blocked ones with a `!` before them, learned ones with a `~` apart before them and their count after them (`~ 词 pin'yin 3.0`: apart, an older version's parser reads the line as two words and skips it, rather than adding a word `~词`; picked into the base, `WordListFiles.baseLines` takes the word without the count, and only from an export: `baseLine` alone drops a `~` line); both imports read `~` only after `WordListFiles.EXPORT_MARK`, the file's first non-blank line (byte order mark and spaces aside), as `WordListFiles.exportMark` tells it for `baseLines`, the user dictionary's import and `isOwnExport` alike; `isOwnExport` and `exportMark(old = true)` also take an older export's header, and say whether the user dictionary's import adds a list's words back (another list's are imported words, below); the default target dictionary asks `isUserExport` (`isOwnExport`, or a `!` line); the user dictionary's import makes those words the user's once each in the learning record (`Mine.TAKEN_IN`), the exported count as uses on the day (`~ 词 pin'yin 3.0` comes back at 3, under one as one), skipping any that are added, blocked or already learned; an older export has no `~`, so its learned words come back as added), `WordPack`, 生僻字屏蔽's `RareChoice` (the user's file `pinyin/rarechars.txt`: groups held, characters let through or held one by one; parsed and written keeping lines and groups it does not know, a later version's read as off and never written), `CharGate` (a text held?), `HeldWords` (the dictionary's words held, a bitmap by id), `RareGrid` (the page's characters with readings, copied off the engine in one call) |
 | `table` | Code tables (五笔, 仓颉, 自然码, 二笔, 五笔拼音): `TableDictionary`, `TableSession`, `PinyinLookUp` (拼音反查: a decorator over the pinyin session the table hands every action while it is on), `TableOptions`, `PhraseRules` (组词规则), `SavedPhrases` (the phrases an older build saved, from the learning record), `SharedWords`, `TableLanguage` (the five a table shares with pinyin), `TableText` (reading a table's sources), `IndexCounts` |
@@ -121,7 +121,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    nodes to them (`TypedNodes`), at each reading a word was typed at: a word that comes has its nodes
    marked there and then, and all are marked anew when asked after one went (a count to 0, a forget,
    an unpin), not on the key after each new word's first commit;
-   `PinyinDecoder.step` leaves the other nodes be, and looks no word ahead over such a key. A key read
+   `LatticeBuilder.step` leaves the other nodes be, and looks no word ahead over such a key. A key read
    as its neighbour is no key read alone (`Path.alone` counts the first, `Path.abbreviated` both): a
    slip reads the whole dictionary. The user's decision (DECISIONS.md 「0.6.1
    双拼中间简拼改 U」, dev/design/061-shuangpin-abbrev-research.md): every word behind a score of
@@ -188,8 +188,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    `withoutSlips` does in the graph: a key alone is the user's 简拼, 061-sp-abbrev §3.6); a code shows the syllable as meant (`Reading.slips`), and a word read
    through a slip is learned under the keys meant (`CommitRecorder`, `PressedKeys.keys(…, slips)`),
    so what the keys typed read as typed is not raised by it (user's N1-A).
-2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice and beam
-   searches it, scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
+2. **Decode.** `PinyinDecoder` puts every dictionary word along every path into a lattice (`LatticeBuilder`) and beam
+   searches it (`BeamSearch`), scoring each step by `WordScorer` (the n-gram model, through `UserScorer` with the
    user's counts added; a word of the user's whose text the model has, added by hand or typed at a
    reading of the user's, is that model word to it (one only imported, from a dictionary or a pack,
    is the model's unknown word, plus its pack score, till picked), scored and as context, in every input
@@ -330,7 +330,7 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   score and, where the graph reads keys alone, up to `TYPED_SLOTS` (8) more of the words typed read with no slip
   (`rankedWords`): on the grouped keyboards a word typed is otherwise not among the 64. The slots stay right after
   the first 64 whatever more is asked, so a list read further (`PinyinSession.readUntil`) begins with the one before. Over a key alone the
-  decoder walks the dictionary node's children that have a word typed below (`collectTyped`,
+  decoder walks the dictionary node's children that have a word typed below (`LatticeBuilder.collectTyped`,
   `UserWords.nextTypedBelow`, `TypedNodes.nextBelow`) instead of looking up each of the key's 20–60 syllables;
   `Reading.matched` walks a node's children the same way where they are few (`WALKED_PER_MATCH`). The lattice is
   the same either way (`PinyinDecoderTypedTest`, `ReadingSlipsTest`).
@@ -409,8 +409,8 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   unless the same file, day and count), then the phone's words, then the backup's: a word in both is
   the phone's batch's (review-G S10). U-86's 全部清空 drops the batches with the rest. Their ids are `UserModel`'s past `vocabulary.size + 2^28`, one per place; they are
   not in its trie but in `ImportTrie` (`UserWords.startWords`, packed arrays, made again when the
-  imports change), which `PinyinDecoder.collectStart` walks from the lattice's start alone: arcs
-  flagged `START_ONLY`, which `extend` skips, so such a word is never inside a sentence or after a
+  imports change), which `LatticeBuilder.collectStart` walks from the lattice's start alone: arcs
+  flagged `START_ONLY`, which `BeamSearch.extend` skips, so such a word is never inside a sentence or after a
   word, nor in handwriting's sentences (C19), scored as the model's unknown word and
   `Penalties.imported` (-2) below. Owned, added by hand or listed it is a whole word in the trie
   (`UserModel.settle`) and out of `ImportTrie`; out again as that ends, never dropped while
