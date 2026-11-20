@@ -78,20 +78,24 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
         titleText.isVisible = true
     }
 
-    fun addExtension(view: View, showTitle: Boolean) {
+    /** [inTitle]: from the back button to the end, in the title's place (the clipboard's page tabs). */
+    fun addExtension(view: View, showTitle: Boolean, inTitle: Boolean = false) {
         if (extension != null) {
             throw IllegalStateException("TitleBar extension is already present")
         }
-        backButton.isVisible = showTitle
-        titleText.isVisible = showTitle
+        backButton.isVisible = showTitle || inTitle
+        titleText.isVisible = showTitle && !inTitle
         extension = view
         root.run {
             add(view, lParams(matchConstraints, barHeight) {
                 centerVertically()
-                if (showTitle) {
-                    endOfParent(dp(5))
-                } else {
-                    centerHorizontally()
+                when {
+                    inTitle -> {
+                        after(backButton)
+                        endOfParent(dp(5))
+                    }
+                    showTitle -> endOfParent(dp(5))
+                    else -> centerHorizontally()
                 }
             })
         }

@@ -6,6 +6,9 @@ package org.fcitx.fcitx5.android.input.clipboard
 
 import android.view.ViewGroup
 import android.widget.PopupMenu
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.core.view.ViewCompat
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -22,10 +25,39 @@ abstract class ClipboardAdapter(
     private val theme: Theme,
     private val look: PanelLooks.Clipboard,
     private val entryRadius: Float,
-    private val maskSensitive: Boolean
+    private val maskSensitive: Boolean,
+    val page: ClipboardPage = ClipboardPage.Recent,
 ) : PagingDataAdapter<ClipboardEntry, ClipboardAdapter.ViewHolder>(diffCallback) {
 
     companion object {
+        private const val PLACE_CHANGED = "place"
+
+        private val A11Y_ACTIONS = setOf(ClipboardAction.Favorite, ClipboardAction.Unfavorite, ClipboardAction.MoveFirst)
+
+        @StringRes
+        fun label(action: ClipboardAction) = when (action) {
+            ClipboardAction.Favorite -> R.string.clipboard_favorite
+            ClipboardAction.Unfavorite -> R.string.clipboard_unfavorite
+            ClipboardAction.MoveFirst -> R.string.clipboard_move_first
+            ClipboardAction.Split -> R.string.clipboard_split
+            ClipboardAction.Edit -> R.string.edit
+            ClipboardAction.SaveQuickPhrase -> R.string.clipboard_save_quick_phrase
+            ClipboardAction.Share -> R.string.share
+            ClipboardAction.Delete -> R.string.delete
+        }
+
+        @DrawableRes
+        private fun icon(action: ClipboardAction) = when (action) {
+            ClipboardAction.Favorite -> R.drawable.ic_baseline_star_24
+            ClipboardAction.Unfavorite -> R.drawable.ic_outline_star_border_24
+            ClipboardAction.MoveFirst -> R.drawable.ic_baseline_arrow_upward_24
+            ClipboardAction.Split -> R.drawable.ic_baseline_content_cut_24
+            ClipboardAction.Edit -> R.drawable.ic_baseline_edit_24
+            ClipboardAction.SaveQuickPhrase -> R.drawable.ic_quick_phrase
+            ClipboardAction.Share -> R.drawable.ic_baseline_share_24
+            ClipboardAction.Delete -> R.drawable.ic_baseline_delete_24
+        }
+
         private val diffCallback = object : DiffUtil.ItemCallback<ClipboardEntry>() {
             override fun areItemsTheSame(
                 oldItem: ClipboardEntry,
@@ -80,15 +112,47 @@ abstract class ClipboardAdapter(
 
     private var popupMenu: PopupMenu? = null
 
-    class ViewHolder(val entryUi: ClipboardEntryUi) : RecyclerView.ViewHolder(entryUi.root)
+    init {
+        // 移到最前 is offered by place, and a card moved down by another's coming first keeps its contents: bound again
+        if (page == ClipboardPage.Favorites) {
+            addOnPagesUpdatedListener { notifyItemRangeChanged(0, min(2, itemCount), PLACE_CHANGED) }
+        }
+    }
+
+    class ViewHolder(val entryUi: ClipboardEntryUi) : RecyclerView.ViewHolder(entryUi.root) {
+        // a recycled card's, taken off before this entry's go on
+        val a11yActions = mutableListOf<Int>()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
         ViewHolder(ClipboardEntryUi(parent.context, theme, look, entryRadius))
 
+    private fun act(action: ClipboardAction, entry: ClipboardEntry) = when (action) {
+        ClipboardAction.Favorite -> onFavorite(entry.id)
+        ClipboardAction.Unfavorite -> onUnfavorite(entry.id)
+        ClipboardAction.MoveFirst -> onMoveFirst(entry.id)
+        ClipboardAction.Split -> onSplit(entry)
+        ClipboardAction.Edit -> onEdit(entry.id)
+        ClipboardAction.SaveQuickPhrase -> onSaveQuickPhrase(entry)
+        ClipboardAction.Share -> onShare(entry)
+        ClipboardAction.Delete -> onDelete(entry.id)
+    }
+
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val entry = getItem(position) ?: return
+        val masked = entry.sensitive && maskSensitive
+        val actions = ClipboardPages.actions(page, entry.sensitive, masked, first = position == 0)
         with(holder.entryUi) {
-            setEntry(excerptText(entry.text, entry.sensitive && maskSensitive), entry.pinned)
+            setEntry(excerptText(entry.text, masked), masked)
+            holder.a11yActions.forEach { ViewCompat.removeAccessibilityAction(root, it) }
+            holder.a11yActions.clear()
+            // in TalkBack's actions menu without the long press
+            actions.filter { it in A11Y_ACTIONS }.forEach { action ->
+                holder.a11yActions += ViewCompat.addAccessibilityAction(root, ctx.getString(label(action))) { _, _ ->
+                    act(action, entry)
+                    true
+                }
+            }
             root.setOnClickListener {
                 onPaste(entry)
             }
@@ -96,36 +160,7 @@ abstract class ClipboardAdapter(
                 val popup = PopupMenu(ctx, root)
                 val menu = popup.menu
                 val iconTint = ctx.styledColor(android.R.attr.colorControlNormal)
-                if (entry.pinned) {
-                    menu.item(R.string.unpin, R.drawable.ic_outline_push_pin_24, iconTint) {
-                        onUnpin(entry.id)
-                    }
-                } else {
-                    menu.item(R.string.pin, R.drawable.ic_baseline_push_pin_24, iconTint) {
-                        onPin(entry.id)
-                    }
-                }
-                // not for a password shown as dots: its pieces would show it
-                if (!(entry.sensitive && maskSensitive)) {
-                    menu.item(R.string.clipboard_split, R.drawable.ic_baseline_content_cut_24, iconTint) {
-                        onSplit(entry)
-                    }
-                }
-                menu.item(R.string.edit, R.drawable.ic_baseline_edit_24, iconTint) {
-                    onEdit(entry.id)
-                }
-                // nor a password kept as quick input, where every keyboard would offer it
-                if (!entry.sensitive) {
-                    menu.item(R.string.clipboard_save_quick_phrase, R.drawable.ic_quick_phrase, iconTint) {
-                        onSaveQuickPhrase(entry)
-                    }
-                }
-                menu.item(R.string.share, R.drawable.ic_baseline_share_24, iconTint) {
-                    onShare(entry)
-                }
-                menu.item(R.string.delete, R.drawable.ic_baseline_delete_24, iconTint) {
-                    onDelete(entry.id)
-                }
+                actions.forEach { action -> menu.item(label(action), icon(action), iconTint) { act(action, entry) } }
                 if (!DeviceUtil.isSamsungOneUI && !DeviceUtil.isFlyme) {
                     popup.setForceShowIcon(true)
                 }
@@ -149,9 +184,11 @@ abstract class ClipboardAdapter(
 
     abstract fun onPaste(entry: ClipboardEntry)
 
-    abstract fun onPin(id: Int)
+    abstract fun onFavorite(id: Int)
 
-    abstract fun onUnpin(id: Int)
+    abstract fun onUnfavorite(id: Int)
+
+    abstract fun onMoveFirst(id: Int)
 
     abstract fun onEdit(id: Int)
 

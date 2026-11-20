@@ -48,7 +48,7 @@ import splitties.views.dsl.recyclerview.recyclerView
 import splitties.views.setPaddingDp
 
 /** 「上屏」 commits those picked in the order tapped or swept (a sweep's appended in text order). */
-class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInputWindow<ClipboardChunksWindow>() {
+class ClipboardChunksWindow(private val text: String, private val page: ClipboardPage = ClipboardPage.Recent) : InputWindow.ExtendedInputWindow<ClipboardChunksWindow>() {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
@@ -86,7 +86,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
 
     override val title: String by lazy { context.getString(R.string.clipboard_split) }
 
-    override val returnTo: () -> InputWindow = { ClipboardWindow() }
+    override val returnTo: () -> InputWindow = { ClipboardWindow(backFrom = page) }
     override val returnLabel = R.string.back_to_clipboard
 
     private val extension by lazy {

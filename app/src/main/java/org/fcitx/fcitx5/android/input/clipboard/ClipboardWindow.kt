@@ -28,13 +28,6 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardDbEmpty
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.BooleanKey.ClipboardListeningEnabled
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.AddMore
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.EnableListening
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.Normal
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardDbUpdated
-import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardListeningUpdated
 import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -43,61 +36,93 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.EventStateMachine
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 
-class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), InputBroadcastReceiver {
+/** [backFrom]: the page 切词 was opened from, shown again on the way back. */
+class ClipboardWindow(private val backFrom: ClipboardPage? = null) :
+    InputWindow.ExtendedInputWindow<ClipboardWindow>(), InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
     private val imeScope by manager.imeScope()
 
-    private lateinit var stateMachine: EventStateMachine<ClipboardStateMachine.State, ClipboardStateMachine.TransitionEvent, ClipboardStateMachine.BooleanKey>
-
-    @Keep
-    private val clipboardEnabledListener = ManagedPreference.OnChangeListener<Boolean> { _, it ->
-        stateMachine.push(
-            ClipboardListeningUpdated, ClipboardListeningEnabled to it
-        )
-    }
-
     private val prefs = AppPrefs.getInstance().clipboard
+    private val internal = AppPrefs.getInstance().internal
 
     private val clipboardEnabledPref = prefs.clipboardListening
     private val clipboardReturnAfterPaste by prefs.clipboardReturnAfterPaste
     private val clipboardMaskSensitive by prefs.clipboardMaskSensitive
 
-    private val clipboardEntriesPager by lazy {
-        Pager(PagingConfig(pageSize = 16)) { ClipboardManager.allEntries() }
-    }
-    private var adapterSubmitJob: Job? = null
+    @Keep
+    private val clipboardEnabledListener = ManagedPreference.OnChangeListener<Boolean> { _, _ -> showPage() }
 
-    private val loadStateListener: (CombinedLoadStates) -> Unit = {
-        // not while a load is under way: its append is not at the end only because no page is in yet, which taken for
-        // a list turned the empty history's hint into the clear button over no rows till Room's query came back
-        if (it.refresh !is LoadState.Loading) {
-            val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
-            stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
+    // the empty favourites' hint names a limit of 0
+    private val clipboardLimitListener = ManagedPreference.OnChangeListener<Int> { _, _ -> showPage() }
+
+    private var page = ClipboardPage.Recent
+
+    private val empty = mutableMapOf(ClipboardPage.Recent to false, ClipboardPage.Favorites to false)
+
+    private inner class PageList(val page: ClipboardPage) {
+        val pager = Pager(PagingConfig(pageSize = 16)) {
+            if (page == ClipboardPage.Recent) ClipboardManager.recentEntries() else ClipboardManager.favoriteEntries()
         }
+
+        val adapter = adapter(page)
+
+        val loadStateListener: (CombinedLoadStates) -> Unit = {
+            // not while a load is under way: its append is not at the end only because no page is in yet, which taken for
+            // a list turned the empty history's hint into the clear button over no rows till Room's query came back
+            if (it.refresh !is LoadState.Loading) {
+                empty[page] = it.append.endOfPaginationReached && adapter.itemCount < 1
+                if (page == this@ClipboardWindow.page) showPage()
+            }
+        }
+
+        var submitJob: Job? = null
     }
 
-    private val adapter: ClipboardAdapter by lazy {
+    private val lists by lazy { ClipboardPage.entries.associateWith { PageList(it) } }
+
+    private fun adapter(page: ClipboardPage): ClipboardAdapter {
         val look = ScenePanels.clipboard(context, theme)
-        object : ClipboardAdapter(
+        return object : ClipboardAdapter(
             theme,
             look,
             ScenePanels.clipboardRadius(context, look),
-            clipboardMaskSensitive
+            clipboardMaskSensitive,
+            page,
         ) {
-            override fun onPin(id: Int) {
-                service.lifecycleScope.launch { ClipboardManager.pin(id) }
+            override fun onFavorite(id: Int) {
+                service.lifecycleScope.launch {
+                    val said = when (ClipboardManager.favorite(id) ?: return@launch) {
+                        ClipboardManager.Favorited.Added -> R.string.clipboard_favorited
+                        ClipboardManager.Favorited.AddedSensitive -> R.string.clipboard_favorited_sensitive
+                        ClipboardManager.Favorited.Already -> R.string.clipboard_already_favorite
+                        ClipboardManager.Favorited.Gone -> R.string.clipboard_entry_gone
+                    }
+                    service.say(said)
+                }
             }
 
-            override fun onUnpin(id: Int) {
-                service.lifecycleScope.launch { ClipboardManager.unpin(id) }
+            override fun onUnfavorite(id: Int) {
+                service.lifecycleScope.launch {
+                    val unfavored = ClipboardManager.unfavorite(id) ?: return@launch
+                    val (_, undo) = unfavorites.deleted(listOf(unfavored))
+                    val said = when {
+                        unfavored.dropped -> R.string.clipboard_unfavorited_dropped
+                        unfavored.timestamp != null -> R.string.clipboard_unfavorited_moved
+                        else -> R.string.clipboard_unfavorited
+                    }
+                    service.say(context.getString(said), undo)
+                }
+            }
+
+            override fun onMoveFirst(id: Int) {
+                service.lifecycleScope.launch { ClipboardManager.moveFavoriteFirst(id) }
             }
 
             override fun onEdit(id: Int) {
@@ -109,7 +134,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
             }
 
             override fun onSplit(entry: ClipboardEntry) {
-                windowManager.attachWindow(ClipboardChunksWindow(entry.text))
+                windowManager.attachWindow(ClipboardChunksWindow(entry.text, page))
             }
 
             override fun onShare(entry: ClipboardEntry) {
@@ -141,10 +166,11 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
 
     private val ui by lazy {
         ClipboardUi(context, theme).apply {
-            recyclerView.apply {
-                layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
-                adapter = this@ClipboardWindow.adapter
+            for ((list, view) in listOf(ClipboardPage.Recent to recentList, ClipboardPage.Favorites to favoritesList)) {
+                view.layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+                view.adapter = lists.getValue(list).adapter
             }
+            // a favourite goes by 取消收藏 only: a scroll gone sideways would lose it
             ItemTouchHelper(object : ItemTouchHelper.Callback() {
                 override fun getMovementFlags(
                     recyclerView: RecyclerView,
@@ -164,45 +190,40 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
                 override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                     // NO_POSITION while a page update is pending: getItem(-1) would throw
                     val position = viewHolder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION } ?: return
-                    val entry = adapter.getEntryAt(position) ?: return
+                    val entry = lists.getValue(ClipboardPage.Recent).adapter.getEntryAt(position) ?: return
                     service.lifecycleScope.launch {
                         ClipboardManager.delete(entry.id)
                         sayDeleted(entry.id)
                     }
                 }
-            }).attachToRecyclerView(recyclerView)
+            }).attachToRecyclerView(recentList)
             enableUi.enableButton.setOnClickListener {
                 clipboardEnabledPref.setValue(true)
             }
-            deleteAllButton.setOnClickListener {
-                // the menu it shows is anchored to this view
-                promptJob?.cancel()
-                promptJob = imeScope.launch {
-                    promptDeleteAll(ClipboardManager.haveUnpinned())
-                }
-            }
+            deleteAllButton.setOnClickListener { promptDeleteAll() }
+            recentTab.setOnClickListener { selectPage(ClipboardPage.Recent) }
+            favoritesTab.setOnClickListener { selectPage(ClipboardPage.Favorites) }
         }
     }
 
     override fun onCreateView(): View = ui.root
 
-    private var promptJob: Job? = null
     private var promptMenu: PopupMenu? = null
 
-    private fun promptDeleteAll(skipPinned: Boolean) {
+    private fun promptDeleteAll() {
         promptMenu?.dismiss()
         promptMenu = PopupMenu(context, ui.deleteAllButton).apply {
             menu.add(buildSpannedString {
                 bold {
                     color(context.styledColorOrDefault(android.R.attr.colorAccent, theme.genericActiveForegroundColor)) {
-                        append(context.getString(if (skipPinned) R.string.delete_all_except_pinned else R.string.delete_all_pinned_items))
+                        append(context.getString(R.string.delete_all_recent))
                     }
                 }
             }).isEnabled = false
             menu.add(android.R.string.cancel)
             menu.item(android.R.string.ok) {
                 service.lifecycleScope.launch {
-                    val ids = ClipboardManager.deleteAll(skipPinned)
+                    val ids = ClipboardManager.deleteAllRecent()
                     sayDeleted(*ids)
                 }
             }
@@ -213,35 +234,55 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
         }
     }
 
-    private val deleted = DeletedEntries(
-        undoDelete = { ids -> service.lifecycleScope.launch { ClipboardManager.undoDelete(*ids) } },
-        purge = { ids -> service.lifecycleScope.launch { ClipboardManager.purgeMarked(*ids) } },
+    // one per page: an undo on one never brings back what the other took
+    private val deleted = DeletedEntries<Int>(
+        undoDelete = { ids -> service.lifecycleScope.launch { ClipboardManager.undoDelete(*ids.toIntArray()) } },
+        purge = { ids -> service.lifecycleScope.launch { ClipboardManager.purgeMarked(*ids.toIntArray()) } },
+    )
+
+    private val unfavorites = DeletedEntries<ClipboardManager.Unfavored>(
+        undoDelete = { u -> service.lifecycleScope.launch { ClipboardManager.undoUnfavorite(*u.toTypedArray()) } },
+        purge = { u -> service.lifecycleScope.launch { ClipboardManager.purgeUnfavored(*u.toTypedArray()) } },
     )
 
     private fun sayDeleted(vararg id: Int) {
-        val (count, undo) = deleted.deleted(*id)
+        val (count, undo) = deleted.deleted(id.toList())
         service.say(context.resources.getString(R.string.num_items_deleted, count), undo)
     }
 
+    private fun selectPage(to: ClipboardPage) {
+        page = to
+        internal.clipboardPage.setValue(to.name)
+        ui.select(to)
+        showPage()
+    }
+
+    private fun showPage() {
+        val listening = clipboardEnabledPref.getValue()
+        if (page == ClipboardPage.Favorites) {
+            ui.favoritesEmptyUi.setHint(ClipboardPages.favoritesEmpty(listening, prefs.clipboardHistoryLimit.getValue()))
+        }
+        ui.show(page, ClipboardPages.shows(page, listening, empty.getValue(page)))
+    }
+
     override fun onAttached() {
-        val isEmpty = ClipboardManager.itemCount == 0
-        val isListening = clipboardEnabledPref.getValue()
-        val initialState = when {
-            !isListening -> EnableListening
-            isEmpty -> AddMore
-            else -> Normal
-        }
-        stateMachine = ClipboardStateMachine.new(initialState, isEmpty, isListening) {
-            ui.switchUiByState(it)
-        }
-        ui.switchUiByState(initialState)
-        adapter.addLoadStateListener(loadStateListener)
-        adapterSubmitJob = imeScope.launch {
-            clipboardEntriesPager.flow.collect {
-                adapter.submitData(it)
+        empty[ClipboardPage.Recent] = ClipboardManager.recentCount == 0
+        empty[ClipboardPage.Favorites] = ClipboardManager.favoriteCount == 0
+        val remembered = ClipboardPage.entries.firstOrNull { it.name == internal.clipboardPage.getValue() } ?: ClipboardPage.Recent
+        selectPage(ClipboardPages.opening(remembered, copiesAtLeave, ClipboardManager.copies, clipboardEnabledPref.getValue(), backFrom))
+        for (list in lists.values) {
+            list.adapter.addLoadStateListener(list.loadStateListener)
+            list.submitJob = imeScope.launch {
+                list.pager.flow.collect { list.adapter.submitData(it) }
             }
         }
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
+        prefs.clipboardHistoryLimit.registerOnChangeListener(clipboardLimitListener)
+        // said once: an upgrade's pins are the favourites now; a new install has none and is told nothing
+        if (!internal.clipboardPinsMovedTold.getValue()) {
+            internal.clipboardPinsMovedTold.setValue(true)
+            if (ClipboardManager.favoriteCount > 0) service.say(R.string.clipboard_pins_moved)
+        }
     }
 
     private val pasted = mutableListOf<Int>()
@@ -258,11 +299,14 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
 
     override fun onDetached() {
         movePasted()
+        copiesAtLeave = ClipboardManager.copies
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
-        adapter.onDetached()
-        adapter.removeLoadStateListener(loadStateListener)
-        adapterSubmitJob?.cancel()
-        promptJob?.cancel()
+        prefs.clipboardHistoryLimit.unregisterOnChangeListener(clipboardLimitListener)
+        for (list in lists.values) {
+            list.adapter.onDetached()
+            list.adapter.removeLoadStateListener(list.loadStateListener)
+            list.submitJob?.cancel()
+        }
         promptMenu?.dismiss()
     }
 
@@ -270,5 +314,12 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
         context.getString(R.string.clipboard)
     }
 
+    override val extensionInTitle = true
+
     override fun onCreateBarExtension(): View = ui.extension
+
+    private companion object {
+        // in memory: a restarted process has copied nothing since, as its count starts at 0 too
+        var copiesAtLeave = 0L
+    }
 }

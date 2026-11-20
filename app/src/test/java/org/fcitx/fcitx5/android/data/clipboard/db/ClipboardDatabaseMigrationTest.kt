@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.data.clipboard.db
 
 import android.content.Context
+import androidx.paging.PagingSource
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -73,7 +74,10 @@ class ClipboardDatabaseMigrationTest {
             try {
                 val clip = db.clipboardDao().get(1)
                 assertEquals("from $version", "kept", clip?.text)
-                assertTrue("from $version", clip?.pinned == true)
+                assertTrue("from $version", clip?.favorite == true)
+                // a pin of 0.6.2 and before is a favourite, on its page
+                val favorites = db.clipboardDao().favoriteEntries().load(PagingSource.LoadParams.Refresh(null, 10, false))
+                assertEquals("from $version", listOf("kept"), (favorites as PagingSource.LoadResult.Page).data.map { it.text })
             } finally {
                 db.close()
                 context.deleteDatabase(name)

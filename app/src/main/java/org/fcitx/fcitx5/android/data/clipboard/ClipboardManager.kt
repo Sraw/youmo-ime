@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.clipboard
 import android.content.ClipboardManager
 import android.content.Context
 import android.database.sqlite.SQLiteAccessPermException
+import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteCantOpenDatabaseException
 import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteDiskIOException
@@ -27,6 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.Kept
@@ -41,6 +44,7 @@ import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.fcitx.fcitx5.android.utils.snapshot
 import timber.log.Timber
 import java.io.File
+import java.io.IOException
 
 object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
@@ -70,12 +74,21 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     private val mutex = Mutex()
 
-    var itemCount: Int = 0
+    var recentCount: Int = 0
+        private set
+
+    var favoriteCount: Int = 0
         private set
 
     private suspend fun updateItemCount() {
-        itemCount = clbDao.itemCount()
+        recentCount = clbDao.recentCount()
+        favoriteCount = clbDao.favoriteCount()
     }
+
+    /** Clips taken this run, a copy of the same text again too: the panel opens on 最近 after one. */
+    @Volatile
+    var copies = 0L
+        private set
 
     private val onUpdateListeners = WeakHashSet<OnClipboardUpdateListener>()
 
@@ -227,6 +240,15 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
             )
             // kept for what may pass, the file is still the backup's; else the next start takes it for the user's and keeps it forever
             if (startedOver || !inMemoryForWhatMayPass) marker.deleteRecursively()
+            // in memory, they would be lost with this run: kept for the file's next open
+            if (clbDb.openHelper.databaseName != null) {
+                try {
+                    mergeKeptFavorites(clbDb, path.parentFile!!)
+                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                    if (e is CancellationException) throw e
+                    Timber.w(e, "Favourites kept at a restore not merged: tried again at the next open")
+                }
+            }
         }
     }
 
@@ -248,17 +270,78 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     suspend fun get(id: Int): ClipboardEntry? = orNeutral(null) { clbDao.get(id) }
 
-    suspend fun haveUnpinned(): Boolean = orNeutral(false) { clbDao.haveUnpinned() }
+    fun recentEntries() = clbDao.recentEntries()
 
-    fun allEntries() = clbDao.allEntries()
+    fun favoriteEntries() = clbDao.favoriteEntries()
 
-    suspend fun pin(id: Int) = orNeutral(Unit) { clbDao.updatePinStatus(id, true) }
+    enum class Favorited { Added, AddedSensitive, Already, Gone }
 
-    suspend fun unpin(id: Int) = orNeutral(Unit) { clbDao.updatePinStatus(id, false) }
+    /** A copy of the entry, first among the favourites; the entry stays in 最近. Null if it could not be written. */
+    suspend fun favorite(id: Int, now: Long = System.currentTimeMillis()): Favorited? = orNeutral(null) {
+        clbDb.withTransaction {
+            // swiped away or outdated between the long press and the pick
+            val entry = clbDao.get(id) ?: return@withTransaction Favorited.Gone
+            if (clbDao.findFavorite(entry.text, entry.sensitive) != null) return@withTransaction Favorited.Already
+            clbDao.insert(entry.copy(id = 0, favorite = true, timestamp = firstFavoriteTime(now)))
+            if (entry.sensitive) Favorited.AddedSensitive else Favorited.Added
+        }.also { updateItemCount() }
+    }
+
+    /**
+     * What an undo puts back: [timestamp] its place, when it was moved to 最近 rather than marked deleted;
+     * [dropped]: marked with no copy in 最近, which keeps none.
+     */
+    class Unfavored(val id: Int, val timestamp: Long?, val dropped: Boolean = false)
+
+    /**
+     * Marked deleted when 最近 has its text; else moved there first: an upgrade's pins have no other
+     * copy, and taken out they would be gone. With the history off or its limit 0, 最近 would hide it, then
+     * trim it: marked deleted too, and said so.
+     */
+    suspend fun unfavorite(id: Int, now: Long = System.currentTimeMillis()): Unfavored? = orNeutral(null) {
+        // a copy of the same text between the look in 最近 and the move would make a second
+        mutex.withLock {
+            clbDb.withTransaction {
+                val entry = clbDao.get(id)?.takeIf { it.favorite } ?: return@withTransaction null
+                val keeps = enabledPref.getValue() && limitPref.getValue() > 0
+                when {
+                    clbDao.findRecent(entry.text, entry.sensitive) != null -> Unfavored(id, null).also { clbDao.markAsDeleted(id) }
+                    !keeps -> Unfavored(id, null, dropped = true).also { clbDao.markAsDeleted(id) }
+                    else -> Unfavored(id, entry.timestamp).also { clbDao.setFavorite(id, false, now) }
+                }
+            }
+        }.also { updateItemCount() }
+    }
+
+    // a favourite of the same text made since is kept alone: two would show
+    suspend fun undoUnfavorite(vararg undone: Unfavored) = orNeutral(Unit) {
+        clbDb.withTransaction {
+            for (u in undone) {
+                val entry = clbDao.getEvenMarked(u.id) ?: continue
+                val again = clbDao.findFavorite(entry.text, entry.sensitive) != null
+                when {
+                    u.timestamp == null && again -> clbDao.purgeMarked(u.id)
+                    u.timestamp == null -> clbDao.undoDelete(u.id)
+                    !again -> clbDao.setFavorite(u.id, true, u.timestamp)
+                }
+            }
+        }
+        updateItemCount()
+    }
+
+    suspend fun purgeUnfavored(vararg unfavored: Unfavored) =
+        purgeMarked(*unfavored.filter { it.timestamp == null }.map { it.id }.toIntArray())
+
+    suspend fun moveFavoriteFirst(id: Int, now: Long = System.currentTimeMillis()) = orNeutral(Unit) {
+        clbDb.withTransaction { clbDao.setFavorite(id, true, firstFavoriteTime(now)) }
+    }
+
+    // above the newest even when the clock went back: the time is only their order
+    private suspend fun firstFavoriteTime(now: Long) = maxOf(now, (clbDao.newestFavoriteTimestamp() ?: Long.MIN_VALUE) + 1)
 
     /** As a copy would be; the last pasted first. */
     suspend fun used(ids: List<Int>, now: Long = System.currentTimeMillis()) = orNeutral(Unit) {
-        ids.forEachIndexed { i, id -> clbDao.updateTimeIfUnpinned(id, now + i) }
+        ids.forEachIndexed { i, id -> clbDao.updateTimeIfRecent(id, now + i) }
     }
 
     suspend fun updateText(id: Int, text: String) {
@@ -274,12 +357,8 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     }
 
     // none, for the undo hint to offer back, if they cannot be marked
-    suspend fun deleteAll(skipPinned: Boolean = true): IntArray = orNeutral(IntArray(0)) {
-        val ids = if (skipPinned) {
-            clbDao.findUnpinnedIds()
-        } else {
-            clbDao.findAllIds()
-        }
+    suspend fun deleteAllRecent(): IntArray = orNeutral(IntArray(0)) {
+        val ids = clbDao.findRecentIds()
         inBatches(ids) { clbDao.markAsDeleted(*it) }
         updateItemCount()
         ids
@@ -302,12 +381,16 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     }
 
     suspend fun outdatedBy(limit: Int): Int = orNeutral(0) {
-        val last = lastKept(limit, System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return@orNeutral 0
-        clbDao.countUnpinnedEarlierThan(last)
+        val last = lastKept(limit, System.currentTimeMillis()) { clbDao.recentTimestampAt(it) } ?: return@orNeutral 0
+        clbDao.countRecentEarlierThan(last)
     }
 
     /** False when some may be left: in an unopenable file, one kept for what may pass, or tables not cleared. */
     suspend fun nukeTable(): Boolean = withContext(coroutineContext) {
+        // else a restore's favourites would come back at the next open
+        val toMerge = favoritesToMerge(appContext.getDatabasePath(CLIPBOARD_DATABASE).parentFile!!)
+        toMerge.delete()
+        File(toMerge.parentFile, "${toMerge.name}.tmp").delete()
         val deleted = deleteAFileKeptUnopenable(appContext)
         val cleared = clearTables()
         orNeutral(Unit) { updateItemCount() }
@@ -373,8 +456,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
             mutex.withLock {
                 val entry = ClipboardEntry.fromClipData(clip, ::transform) ?: return@withLock
                 if (entry.text.isBlank()) return@withLock
+                copies++
                 try {
-                    clbDao.find(entry.text, entry.sensitive)?.let {
+                    clbDao.findRecent(entry.text, entry.sensitive)?.let {
                         updateLastEntry(it.copy(timestamp = entry.timestamp))
                         clbDao.updateTime(it.id, entry.timestamp)
                         return@withLock
@@ -396,9 +480,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     }
 
     private suspend fun removeOutdated() {
-        val last = lastKept(limitPref.getValue(), System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return
+        val last = lastKept(limitPref.getValue(), System.currentTimeMillis()) { clbDao.recentTimestampAt(it) } ?: return
         // outright: no undo offers them back, and a purge takes only what its hint showed
-        clbDao.deleteUnpinnedEarlierThan(last)
+        clbDao.deleteRecentEarlierThan(last)
     }
 
 }
@@ -429,10 +513,10 @@ internal suspend fun clearedTables(
 }
 
 /** Null below [limit] or for [CLIPBOARD_UNLIMITED] (OFFSET 2147483646 would sort the whole table); [now] with no room. */
-internal suspend fun lastKept(limit: Int, now: Long, unpinnedAt: suspend (Int) -> Long?): Long? = when {
+internal suspend fun lastKept(limit: Int, now: Long, recentAt: suspend (Int) -> Long?): Long? = when {
     limit == CLIPBOARD_UNLIMITED -> null
     // not OFFSET -1, which SQLite takes as 0, keeping the newest
-    limit > 0 -> unpinnedAt(limit - 1)
+    limit > 0 -> recentAt(limit - 1)
     else -> now
 }
 
@@ -514,6 +598,71 @@ const val CLIPBOARD_UNLIMITED = Int.MAX_VALUE
 
 /** The app exits after a successful import, so the next open takes the file as imported. */
 internal fun importedClipboardMarker(databases: File) = File(databases, "$CLIPBOARD_DATABASE.imported")
+
+/** Not named after the database: it would be taken for one of its journals, and exported (it holds the sensitive ones). */
+internal fun favoritesToMerge(databases: File) = File(databases, "favorites-to-merge.json")
+
+@Serializable
+internal class KeptFavorite(val text: String, val type: String, val sensitive: Boolean, val timestamp: Long)
+
+private val keptJson = Json { ignoreUnknownKeys = true }
+
+private fun readKept(file: File): List<KeptFavorite> =
+    if (file.isFile) keptJson.decodeFromString<List<KeptFavorite>>(file.readText()) else emptyList()
+
+/**
+ * Before a restore replaces the phone's database: its favourites, the sensitive ones the backup lacks too, for the
+ * next open to merge back. With those of a restore not yet opened, whose database this one replaces.
+ */
+internal fun keepFavoritesToMerge(databases: File) {
+    val db = File(databases, CLIPBOARD_DATABASE)
+    // one that cannot be opened holds nothing to save: the restore goes on
+    val phone = runCatching { if (db.isFile) phonesFavorites(db) else emptyList() }
+        .onFailure { Timber.w(it, "Clipboard favourites unreadable: the backup's alone restored") }
+        .getOrElse { emptyList() }
+    val file = favoritesToMerge(databases)
+    // one never readable is dropped at the next open anyway
+    val pending = runCatching { readKept(file) }.getOrElse { emptyList() }
+    val all = (pending + phone).distinctBy { it.text to it.sensitive }
+    if (all.isEmpty()) return
+    // half written, the next open could not read it and the phone's sensitive ones, in no backup, would be gone
+    val tmp = File(databases, "${file.name}.tmp")
+    try {
+        tmp.writeText(keptJson.encodeToString(all))
+        if (!tmp.renameTo(file)) throw IOException("cannot rename ${tmp.name}")
+    } finally {
+        tmp.delete()
+    }
+}
+
+// read-write: a read-only open cannot rebuild the WAL index a connection not closed left, and would miss its rows
+private fun phonesFavorites(db: File) = SQLiteDatabase.openDatabase(db.path, null, SQLiteDatabase.OPEN_READWRITE).use {
+    it.rawQuery("SELECT text, type, sensitive, timestamp FROM ${ClipboardEntry.TABLE_NAME} WHERE pinned=1 AND deleted=0", null).use { c ->
+        buildList { while (c.moveToNext()) add(KeptFavorite(c.getString(0), c.getString(1), c.getInt(2) != 0, c.getLong(3))) }
+    }
+}
+
+/** The phone's first, in their order; one already there is skipped, so a merge cut short and run again adds none. */
+internal suspend fun mergeKeptFavorites(db: ClipboardDatabase, databases: File) {
+    val file = favoritesToMerge(databases)
+    if (!file.exists()) return
+    val kept = try {
+        readKept(file)
+    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+        // never readable: kept, it would be tried at every start
+        Timber.w(e, "Favourites kept at a restore unreadable: dropped")
+        file.delete()
+        return
+    }
+    val dao = db.clipboardDao()
+    db.withTransaction {
+        val base = dao.newestFavoriteTimestamp() ?: 0L
+        kept.filter { dao.findFavorite(it.text, it.sensitive) == null }.sortedBy { it.timestamp }.forEachIndexed { i, k ->
+            dao.insert(ClipboardEntry(text = k.text, favorite = true, timestamp = base + 1 + i, type = k.type, sensitive = k.sensitive))
+        }
+    }
+    file.delete()
+}
 
 /** A throwing cleaner must not cost the entry: the original text is kept. */
 internal fun cleanClipboardText(text: String, clearUrls: ((String) -> String)?): String =

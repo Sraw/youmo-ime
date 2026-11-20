@@ -67,7 +67,7 @@ class ClipboardLoadingTest {
         val shown = KeyboardHarness.all(h.inputView).filter(h::shown)
         val hint = h.service.getString(R.string.instruction_copy)
         assertTrue("the hint shown", shown.any { it is TextView && it.text.toString() == hint })
-        val clear = h.service.getString(R.string.delete_all)
+        val clear = h.service.getString(R.string.delete_all_recent_description)
         assertFalse("the clear button shown", shown.any { it.contentDescription == clear })
     }
 }

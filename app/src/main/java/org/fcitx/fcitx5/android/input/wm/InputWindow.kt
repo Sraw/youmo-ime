@@ -71,6 +71,9 @@ sealed class InputWindow : Dependent {
 
         open val showTitle: Boolean = true
 
+        /** The bar extension in the title's place, after the back button. */
+        open val extensionInTitle: Boolean = false
+
         open val title: String = ""
 
         open fun onCreateBarExtension(): View? {

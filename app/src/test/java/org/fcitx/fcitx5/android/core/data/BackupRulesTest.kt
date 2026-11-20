@@ -36,6 +36,10 @@ class BackupRulesTest {
                     assertTrue("$section: $domain/$path", (domain to path) in excluded)
                 }
             }
+            // the phone's favourites kept at a restore, sensitive ones too
+            for (path in listOf("favorites-to-merge.json", "favorites-to-merge.json.tmp")) {
+                assertTrue("$section: database/$path", ("database" to path) in excluded)
+            }
         }
     }
 

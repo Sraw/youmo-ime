@@ -214,9 +214,9 @@ class UndoChipTest {
     fun clipboardDeletesAreUndoneTogetherFromTheChip() {
         val chip = chip()
         val calls = mutableListOf<String>()
-        val deleted = DeletedEntries({ calls += "undo ${it.toList()}" }, { calls += "purge ${it.toList()}" })
-        deleted.deleted(1).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
-        deleted.deleted(2, 3).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
+        val deleted = DeletedEntries<Int>({ calls += "undo ${it.toList()}" }, { calls += "purge ${it.toList()}" })
+        deleted.deleted(listOf(1)).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
+        deleted.deleted(listOf(2, 3)).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
         assertEquals(listOf("3", undoLabel), windows().single().texts())
         windows().single().find(undoLabel)!!.performClick()
         assertEquals("the first notice replaced purges nothing", listOf("undo [1, 2, 3]"), calls)
@@ -226,8 +226,8 @@ class UndoChipTest {
     fun clipboardDeletesArePurgedWhenAnotherNoticeTakesTheirPlace() {
         val chip = chip()
         val calls = mutableListOf<String>()
-        val deleted = DeletedEntries({ calls += "undo ${it.toList()}" }, { calls += "purge ${it.toList()}" })
-        deleted.deleted(1).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
+        val deleted = DeletedEntries<Int>({ calls += "undo ${it.toList()}" }, { calls += "purge ${it.toList()}" })
+        deleted.deleted(listOf(1)).let { (n, undo) -> chip.show("$n", undo, aboveKeys = true) }
         chip.show("已复制", aboveKeys = true)
         assertEquals(listOf("purge [1]"), calls)
     }

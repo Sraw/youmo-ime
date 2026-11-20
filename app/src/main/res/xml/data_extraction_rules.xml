@@ -3,7 +3,8 @@
      upgraded from 0.3.x still has and nothing reads: excluded so a backup does not carry them. The clipboard history (databases/clbdb and its journals)
      stays on the phone, and the one made in device-protected storage (device_database) by a start
      before the first unlock: it holds clips marked sensitive, a password from a password manager say,
-     which the app's own export takes out (UserDataManager) and these rules cannot. The resource packs
+     which the app's own export takes out (UserDataManager) and these rules cannot; so does
+     favorites-to-merge.json, the phone's favourites kept at a restore till the next open, sensitive ones too. The resource packs
      (PackStore, device_file packs/, some 300-500 MB) are over cloud backup's 25 MB. The manifest's
      allowBackup="false" turns cloud backup off anyway; the exclusion stays as a guard should it be turned
      on. A phone-to-phone transfer (Android 12 and later, where these rules apply despite allowBackup)
@@ -38,6 +39,12 @@
         <exclude
             domain="database"
             path="clbdb-journal" />
+        <exclude
+            domain="database"
+            path="favorites-to-merge.json" />
+        <exclude
+            domain="database"
+            path="favorites-to-merge.json.tmp" />
         <exclude
             domain="device_database"
             path="clbdb" />
@@ -76,6 +83,12 @@
         <exclude
             domain="database"
             path="clbdb-journal" />
+        <exclude
+            domain="database"
+            path="favorites-to-merge.json" />
+        <exclude
+            domain="database"
+            path="favorites-to-merge.json.tmp" />
         <exclude
             domain="device_database"
             path="clbdb" />

@@ -56,6 +56,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val lastSymbolLayout = string("last_symbol_layout", PickerWindow.Key.Symbol.name)
         val lastPickerType = string("last_picker_type", PickerWindow.Key.Emoji.name)
         val symbolPanelLocked = bool("symbol_panel_locked", false)
+        /** A [org.fcitx.fcitx5.android.input.clipboard.ClipboardPage]'s name. */
+        val clipboardPage = string("clipboard_page", "Recent")
+        // a restored 0.6.2 backup sets it back: its pins are favourites again
+        val clipboardPinsMovedTold = bool("clipboard_pins_moved_told", false)
 
         /** The symbol panel's category picked last, by its [org.fcitx.fcitx5.android.input.picker.PickerData.Category.id] (`arrows`); empty, none yet (PAN-29). */
         val symbolPanelCategory = string("symbol_panel_category", "")
@@ -645,12 +649,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val clipboardSuggestion = switch(
             R.string.clipboard_suggestion, "clipboard_suggestion", true
         ) { clipboardListening.getValue() }
+        // not tied to the history: they rule the favourites too, which stay usable with it off
         val clipboardReturnAfterPaste = switch(
             R.string.clipboard_return_after_paste, "clipboard_return_after_paste", true
-        ) { clipboardListening.getValue() }
+        )
         val clipboardMaskSensitive = switch(
             R.string.clipboard_mask_sensitive, "clipboard_mask_sensitive", true
-        ) { clipboardListening.getValue() }
+        )
         val clipboardClearUrls = switch(
             R.string.clipboard_clear_urls,
             "clipboard_clear_urls",

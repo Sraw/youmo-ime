@@ -299,3 +299,10 @@
 - **预期**：横屏：四张卡片一行，键盘卡片一行八张，编辑框打开时三张都收起、三行摘要和「确定」都在屏幕里；深色：卡片的底、边、选中、角标都看得清，字不发灰；
   大字号：键盘卡片 3 列，名字不被切，编辑框开头没有那一大段说明。
 - **JVM**：`SettingsCardsLayoutTest.onItsSide`（横屏一行、三张收起、标题行和「确定」在可见区里）；截图 `KeyShortcutsPageScreenshotTest.landscape`、`KeyShortcutsPageScreenshotTest.theLargestFont`、`RareCharsCardsUatTest.theCardsAtNight`、`RareCharsCardsUatTest.theCardsInTheLargestFont`、`RareCharsCardsUatTest.theCardsOnTheSide`；设备上各看一次。
+
+### LS-54 [P1] 横屏分体时剪贴板面板靠边，收藏页能粘贴
+<!-- dev/design/063-clipboard-favorites -->
+- **前提**：B0，横屏，键盘是分体（靠右）；复制「横屏收藏」。英文界面再看一次。
+- **操作**：打开剪贴板面板，长按「横屏收藏」选 **收藏**；看栏；点 **收藏** 标签（截图），点「横屏收藏」。再把 **键盘高度** 调到最矮看一次。
+- **预期**：面板在靠边的那一半，栏上 **←**、最近、收藏和垃圾桶都在；收藏页列出它，点了粘贴；矮键盘时也一样；英文界面标签 Recent、Favorites 不截断。
+- **JVM**：`LandscapeUatTest.clipboardsTabsAtTheSideAndAFavouritePastes`（靠边、垃圾桶在、收藏页粘贴；图）、`ClipboardFavoritesUatTest.oneHandedTheBarHoldsBothTabsAndTheTrash`（单手时两个标签不截断、垃圾桶在；英文；图）、截图 `LowLandscapeScreenshotTest` 的 `clipboard_28dp`、`clipboard_36dp`；设备上不跑。

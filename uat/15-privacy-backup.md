@@ -49,11 +49,11 @@
 
 ## 备份与恢复
 
-### PR-10 [P0] 备份全部，从备份恢复；恢复时设置、短语和剪贴板照备份覆盖
+### PR-10 [P0] 备份全部，从备份恢复；恢复时设置、短语和剪贴板的最近条目照备份覆盖
 <!-- learning: U-100 -->
 - **前提**：B0-设置，在 **词库与短语 → 自定义短语** 里加 `dz` → 北京市海淀区，手动加一个词「澜境花园」（拼音 lan jing hua yuan；没加时这个拼音第一个是整句拼出的「蓝鲸花园」），按 WD-11 把 `dict-words.txt` 并入基础词库。
 - **操作**：**备份与恢复 → 备份全部**，存到"下载"；重置应用（README「重置」）；**备份与恢复 → 从备份恢复**，选那个文件并确认；等应用重启；回测试页打 d z，再打 lanjinghuayuan，看词库页，打 k e m i a o t a n g p u。接着加一个短语 `yx` → test@example.com，把 **实体键盘 → 每页候选数** 改成 5，在「长文本」框里选中「公园」复制；从同一个备份再恢复一次；看 **实体键盘 → 每页候选数**；回测试页点底排的 **，**，打 y x，打开剪贴板面板。
-- **预期**：备份得到 `youmo_<时间>.zip`，提示备份成功；选文件前的确认框写着"导入用户数据会覆盖设置、自定义短语、常用词、快速输入和剪贴板，标点用自带的（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开；0.6.0 以前的备份没有常用词，手机上的会没了；备份里没有生僻字屏蔽的（0.6.1 以前的，或做备份时没开过它），恢复后它是关的），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？"（字符串 `confirm_import_user_data`）；应用自动重启；`dz` 出「北京市海淀区」，「澜境花园」排第一；词库页"基础词库"一节列出 dict-words 和它的词数；合好以后（备份不带合成的 `merged.ymd`，恢复后重新合，小词库几秒）kemiaotangpu 候选里有「氪喵糖铺」；备份里的词库是 `external/data/pinyin/dictionaries/dict-words.txt.gz`，没有 `merged.ymd` 和 `.tmp` 文件（`unzip -l` 看）；第二次恢复后每页候选数回到 7（设置被备份覆盖），`yx` 那条短语没有了（自定义短语照备份覆盖），点 **，** 打出「，」（自带的标点表：0.6.1 起备份里的标点表不恢复，PR-62），剪贴板面板里没有备份之后复制的「公园」（剪贴板照备份覆盖，不和手机上的合并）。
+- **预期**：备份得到 `youmo_<时间>.zip`，提示备份成功；选文件前的确认框写着"导入用户数据会覆盖设置、自定义短语、常用词、快速输入和剪贴板的最近条目（剪贴板收藏和手机上的合并，手机上的收藏都留着），标点用自带的（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开；0.6.0 以前的备份没有常用词，手机上的会没了；备份里没有生僻字屏蔽的（0.6.1 以前的，或做备份时没开过它），恢复后它是关的），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？"（字符串 `confirm_import_user_data`）；应用自动重启；`dz` 出「北京市海淀区」，「澜境花园」排第一；词库页"基础词库"一节列出 dict-words 和它的词数；合好以后（备份不带合成的 `merged.ymd`，恢复后重新合，小词库几秒）kemiaotangpu 候选里有「氪喵糖铺」；备份里的词库是 `external/data/pinyin/dictionaries/dict-words.txt.gz`，没有 `merged.ymd` 和 `.tmp` 文件（`unzip -l` 看）；第二次恢复后每页候选数回到 7（设置被备份覆盖），`yx` 那条短语没有了（自定义短语照备份覆盖），点 **，** 打出「，」（自带的标点表：0.6.1 起备份里的标点表不恢复，PR-62），剪贴板最近页里没有备份之后复制的「公园」（最近条目照备份覆盖，不和手机上的合并；收藏合并，见 PR-70）。
 - **JVM**：`BackupUatTest.aBackupRestoredReplacesSettingsAndPhrasesItsPunctuationTableDropped`（备份里是 dict-words.txt.gz、没有 merged.ymd 和 .tmp；恢复后设置、短语照备份覆盖，标点表没有了，启动后有氪喵糖铺）；设备上留作冒烟（从选文件、确认、重启到打字看整条）。
 
 ### PR-10a [P1] 在已有导入词库的手机上恢复 0.3.2 的备份
@@ -331,3 +331,22 @@
 - **操作**：**从备份恢复** 选 0.6.0 的那份，等应用重启；看 **外观 → 布局**、**输入法 → 拼音 → 键盘**，到测试页弹出键盘。再恢复 0.6.1 的那份。
 - **预期**：恢复 0.6.0 的备份后，布局页有「薄荷 · 17 键」，拼音的 **键盘** 是它，键盘和 0.6.0 里一样是 17 键，提示一次「主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用」。恢复 0.6.1 的备份不再转、不改选择（备份里的布局和选择本来就是转过的）；0.6.1 的备份带进来、备份里还没转过的主题，它的布局放进列表，不换选择；导入时没勾 **一起导入** 的主题恢复后也不放进列表。换不换看备份里的转换记录有没有 0.6.1 的标记（`#l7`），不看版本号：0.6.1 测试版的备份也换。升级后第一次启动还在把主题带的布局放进列表时恢复：被拒的备份（太旧等）什么设置都没拷进来，升级该换的照样换上、提示照样出，不因为这次恢复丢掉；换已经开始了才来的恢复等它换完，再拷备份的设置（备份的盖过换的）。
 - **JVM**：`ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched`（0.6.0 的记下要换、0.6.1 的转过的不记、没转过的只放进列表、测试版的（有布局没有 `#l7`）要换、0.6.1 没有布局的只放进列表、两次恢复之间没启动时有一次要换就换、下次启动放进列表并换上、只动备份带来的主题）、`ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone`、`onePackImportedUntickedIsRecordedNotListed`（没勾一起导入的记下、不放进列表）、`aRestoreAsTheStartListsDropsItsSwitchOnlyPastItsChecks`（升级后第一次启动还在后台转换时恢复：等转换做完；过了检查的不再换，恢复记下的留给下次启动；被拒的照样换上、提示照样出）、`aRestoreWaitsForASwitchBegunBeforeIt`（换已经开始时来的恢复等它换完，备份的设置盖过换的）；要 0.6.0 的备份，设备上不跑。
+
+### PR-69 [P1] 收藏进备份，敏感的收藏不进
+<!-- dev/design/063-clipboard-favorites -->
+- **前提**：B0，复制「公园」并收藏；按 PR-08 的前提放上标为敏感的「mima1234」并收藏。
+- **操作**：**备份与恢复 → 备份全部**；重置应用（README「重置」）；从这个文件恢复；打开剪贴板面板点 **收藏** 标签。
+- **预期**：收藏页只有「公园」（敏感的不进备份）。
+- **JVM**：`BackupFavoritesTest.theFavouritesGoInTheBackupTheSensitiveOnesNot`；设备上不跑。
+
+### PR-70 [P1] 恢复时收藏和手机上的合并
+- **前提**：B0，复制「公园」并收藏，放上标为敏感的「mima1234」并收藏；**备份全部**；再复制「散步」并收藏。
+- **操作**：**不重置**，从这份备份恢复，看确认框；恢复后看收藏页和最近页；再恢复一次。再拿一份 0.6.2 的备份（置顶了「钉」）恢复。
+- **预期**：确认框写着「剪贴板收藏和手机上的合并，手机上的收藏都留着」；收藏页「公园」「散步」「mima1234」都在，「公园」只一条，再恢复一次不多；最近页照备份；0.6.2 备份里置顶的「钉」也在收藏里。
+- **JVM**：`BackupFavoritesTest.aRestoreReplaces最近AndMergesTheFavouritesThePhonesSensitiveOnesKept`、`BackupFavoritesTest.theFavouritesNotKeptFailTheRestoreBeforeAnythingIsReplaced`、`BackupFavoritesTest.anOlderBackupsPinIsAFavouriteBesideThePhones`（按 0.6.2 的表写入置顶的一行当夹具）、`BackupFavoritesTest.aRestoreNotYetOpenedKeepsItsPhonesFavouritesThroughTheNext`、`BackupFavoritesTest.theFavouritesKeptAtARestoreNeverGoInABackupNorComeFromOne`、`ClipboardFavoritesTest.theFavouritesKeptAtARestoreAreMergedAtTheNextOpen`、`ClipboardFavoritesTest.aKeptFileNeverReadableIsDroppedNotTriedAtEveryStart`；设备上手动，发版时跑。
+
+### PR-71 [P2] 0.6.3 的备份恢复到 0.6.2
+- **前提**：这一版里收藏两条，最近有几条；**备份全部**。
+- **操作**：卸载，装 0.6.2，从这份备份恢复；打开剪贴板面板；复制一段和某条收藏同样的字。
+- **预期**：收藏的两条显示成置顶，最近的都在；最近里也有的那条收藏出现两次（置顶一条、下面一条）；复制同样的字后置顶的先后可能变，不丢东西。
+- **JVM**：没有（要 0.6.2 的包）；库的版本和列名不变见 `ClipboardDatabaseMigrationTest`；设备上手动，发版时跑。

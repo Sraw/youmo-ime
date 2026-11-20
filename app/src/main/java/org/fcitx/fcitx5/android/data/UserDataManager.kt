@@ -17,7 +17,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.data.clipboard.CLIPBOARD_DATABASE
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
+import org.fcitx.fcitx5.android.data.clipboard.favoritesToMerge
 import org.fcitx.fcitx5.android.data.clipboard.importedClipboardMarker
+import org.fcitx.fcitx5.android.data.clipboard.keepFavoritesToMerge
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.pinyin.CommonWordsManager
@@ -175,7 +177,9 @@ object UserDataManager {
         if (!dirs.settled) errorRuntime(R.string.user_data_not_settled)
         ZipOutputStream(dest.buffered()).use { zipStream ->
             writeFileTree(dirs.sharedPrefs, "shared_prefs", zipStream)
-            writeFileTree(dirs.dataBases, "databases", zipStream) { it.name.startsWith(CLIPBOARD_DATABASE) }
+            writeFileTree(dirs.dataBases, "databases", zipStream) {
+                it.name.startsWith(CLIPBOARD_DATABASE) || it.name.startsWith(favoritesToMerge(dirs.dataBases).name)
+            }
             withTempDir { dir ->
                 clipboardWithoutSensitive(dirs.dataBases, dir)?.let { db ->
                     zipStream.putNextEntry(ZipEntry("databases/${db.name}"))
@@ -287,6 +291,14 @@ object UserDataManager {
         }
     }
 
+    // the clipboard's history is the backup's, its favourites both; one not kept fails the import before anything is replaced
+    private fun keepPhonesFavorites(backup: File, dirs: Dirs) {
+        // only this import's file is merged, never one the backup brings
+        favoritesToMerge(backup).deleteRecursively()
+        File(backup, "${favoritesToMerge(backup).name}.tmp").deleteRecursively()
+        if (File(backup, CLIPBOARD_DATABASE).exists()) keepFavoritesToMerge(dirs.dataBases)
+    }
+
     fun import(src: InputStream) = import(src, appDirs)
 
     // zip bomb and entry-count guards: the end record refuses too many entries first, the unpack counts again as it may lie.
@@ -388,6 +400,8 @@ object UserDataManager {
                     throw IOException("cannot rename ${legacy.name}")
                 }
             }
+            val databases = File(tempDir, "databases")
+            keepPhonesFavorites(databases, dirs)
             // reset at the next start, not here, where AppPrefs would write its copy over the imported one
             importedUserDataMarker(appContext).createNewFile()
             // merged at the next start; the phone's kept for 退回恢复前
@@ -395,7 +409,6 @@ object UserDataManager {
             // made after the copy it would write the phone's over the backup's; dropped only after the checks
             ThemeLayoutsToList.dropStart()
             copyDir(File(tempDir, "shared_prefs"), dirs.sharedPrefs)
-            val databases = File(tempDir, "databases")
             // only this import's copy marks the clipboard file the backup's, not a marker the backup brings
             importedClipboardMarker(databases).deleteRecursively()
             copyDir(databases, dirs.dataBases)

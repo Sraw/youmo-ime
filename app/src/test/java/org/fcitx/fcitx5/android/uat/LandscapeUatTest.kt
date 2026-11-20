@@ -284,6 +284,28 @@ class LandscapeUatTest {
     }
 
     @Test
+    @Uat("LS-54")
+    fun clipboardsTabsAtTheSideAndAFavouritePastes() {
+        h.start()
+        h.copied("横屏收藏")
+        h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
+        h.after(1000)
+        h.relayout()
+        h.tap(h.described(h.service.getString(R.string.clipboard)))
+        h.waitFor("横屏收藏 listed") { h.relayout(); h.entry("横屏收藏") != null }
+        h.entry("横屏收藏")!!.performLongClick()
+        h.idle()
+        h.menuPick(h.service.getString(R.string.clipboard_favorite))
+        assertTrue("${board()}", onRight(board()))
+        assertTrue(h.shown(h.described(h.service.getString(R.string.delete_all_recent_description))))
+        h.tap(h.entry(h.service.getString(R.string.clipboard_favorites))!!)
+        h.waitFor("横屏收藏 in 收藏") { h.relayout(); h.entry("横屏收藏") != null }
+        h.capture("LandscapeUatTest/clipboard_favorites")
+        h.tap(h.entry("横屏收藏")!!)
+        assertEquals("横屏收藏", h.field.text.toString())
+    }
+
+    @Test
     @Uat("LS-20")
     fun nineKeysAtTheSide() {
         harness = KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS)

@@ -17,7 +17,9 @@ data class ClipboardEntry(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val text: String,
-    val pinned: Boolean = false,
+    // 0.6.2 and before read this column as 置顶: renamed, their restore of a newer backup would drop the clipboard
+    @ColumnInfo(name = "pinned")
+    val favorite: Boolean = false,
     @ColumnInfo(defaultValue = "-1")
     val timestamp: Long = System.currentTimeMillis(),
     @ColumnInfo(defaultValue = ClipDescription.MIMETYPE_TEXT_PLAIN)

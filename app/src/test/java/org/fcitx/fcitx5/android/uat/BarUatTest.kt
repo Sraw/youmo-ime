@@ -386,7 +386,7 @@ class BarUatTest {
         h.copied("公园")
         h.waitFor("公园 offered") { KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text == "公园" } }
         for ((open, d) in listOf(
-            R.string.clipboard to R.string.delete_all,
+            R.string.clipboard to R.string.delete_all_recent_description,
             R.string.status_area to R.string.open_input_method_settings,
             R.string.text_editing to R.string.clipboard,
         )) {

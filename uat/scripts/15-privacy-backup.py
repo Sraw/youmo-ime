@@ -353,3 +353,6 @@ case("PR-68", needs="jvm:ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheS
                      "ThemeLayoutsToListTest.onePackImportedUntickedIsRecordedNotListed、"
                      "ThemeLayoutsToListTest.aRestoreAsTheStartListsDropsItsSwitchOnlyPastItsChecks、"
                      "ThemeLayoutsToListTest.aRestoreWaitsForASwitchBegunBeforeIt")(lambda d: None)
+
+
+case("PR-71", needs="release:这一版的备份卸载后装 0.6.2 恢复；发版时手动跑")(lambda d: None)

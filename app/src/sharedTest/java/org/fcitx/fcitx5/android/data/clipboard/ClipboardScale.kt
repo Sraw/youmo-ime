@@ -20,7 +20,7 @@ import kotlin.random.Random
  * How long the clipboard takes with many entries (「无上限」, E2), on the JVM (ClipboardScaleBenchmark)
  * and on a device (ClipboardScaleDeviceBenchmark): opening its panel (the count and the first page, as
  * ClipboardWindow loads them), a page deep down the list, the list again after a copy, the check on
- * each copy, a search by a part of the text (the panel has none yet: what one would cost), 清空全部
+ * each copy, a search by a part of the text (the panel has none yet: what one would cost), 清空最近
  * and its undo, and the backup (UserDataManager.export). Each the median of [RUNS] after one run to warm up.
  */
 object ClipboardScale {
@@ -32,7 +32,7 @@ object ClipboardScale {
             ms.entries.joinToString { (what, t) -> "$what %.1f ms".format(t) }
     }
 
-    // as people copy: most a line or two, one in ten a long text, some pinned, some marked sensitive
+    // as people copy: most a line or two, one in ten a long text, some favourites, some marked sensitive
     private fun entryText(i: Int, random: Random): String = when (random.nextInt(10)) {
         0 -> "第 $i 段：" + "会议纪要，下周一前提交预算和排期。".repeat(random.nextInt(40, 120))
         1, 2 -> "https://example.com/item/$i?from=clip&ref=${random.nextInt()}"
@@ -88,17 +88,18 @@ object ClipboardScale {
             val start = System.nanoTime()
             val db = open(context, file)
             val dao = db.clipboardDao()
-            check(dao.itemCount() == size)
-            page = dao.allEntries().load(PagingSource.LoadParams.Refresh(null, 48, false))
+            check(dao.recentCount() + dao.favoriteCount() == size)
+            page = dao.recentEntries().load(PagingSource.LoadParams.Refresh(null, 48, false))
             openRuns += (System.nanoTime() - start) / 1e6
             db.close()
         }
-        check((page as PagingSource.LoadResult.Page).data.size == minOf(size, 48))
+        // every 500th a favourite, from the first
+        check((page as PagingSource.LoadResult.Page).data.size == minOf(size - (size + 499) / 500, 48))
         ms["open"] = middle(openRuns.drop(1))
 
         val db = open(context, file)
         val dao = db.clipboardDao()
-        suspend fun at(position: Int) = dao.allEntries().load(PagingSource.LoadParams.Refresh(position, 16, false))
+        suspend fun at(position: Int) = dao.recentEntries().load(PagingSource.LoadParams.Refresh(position, 16, false))
         // scrolled half way down: what a fling far down loads
         ms["page at half"] = median { runBlocking { at(size / 2) } }
         // a copy while open: inserted, the list loaded again from the top, as Room's invalidation has it
@@ -106,25 +107,25 @@ object ClipboardScale {
         ms["after a copy"] = median {
             runBlocking {
                 dao.insert(ClipboardEntry(text = "又复制了一条 ${n++}", timestamp = size + n.toLong()))
-                dao.itemCount()
-                dao.allEntries().load(PagingSource.LoadParams.Refresh(null, 48, false))
+                dao.recentCount()
+                dao.recentEntries().load(PagingSource.LoadParams.Refresh(null, 48, false))
             }
         }
-        ms["find (each copy)"] = median { runBlocking { check(dao.find("没有这一条") == null) } }
+        ms["find (each copy)"] = median { runBlocking { check(dao.findRecent("没有这一条", false) == null) } }
         ms["search"] = median {
             db.openHelper.readableDatabase.query(
                 "SELECT id FROM ${ClipboardEntry.TABLE_NAME} WHERE deleted=0 AND text LIKE ?", arrayOf<Any>("%item/${size - 3}?%")
             ).use { while (it.moveToNext()) Unit }
         }
-        // 清空全部 as ClipboardManager.deleteAll marks them, in its batches; then its undo
+        // 清空最近 as ClipboardManager.deleteAllRecent marks them, in its batches; then its undo
         val clear = ArrayList<Double>()
         val undo = ArrayList<Double>()
         repeat(RUNS + 1) { run ->
             runBlocking {
                 val start = System.nanoTime()
-                val ids = dao.findUnpinnedIds()
+                val ids = dao.findRecentIds()
                 db.withTransaction { for (b in idBatches(ids)) dao.markAsDeleted(*b) }
-                check(dao.itemCount() < size / 100 + 2)
+                check(dao.recentCount() == 0)
                 val marked = System.nanoTime()
                 db.withTransaction { for (b in idBatches(ids)) dao.undoDelete(*b) }
                 val done = System.nanoTime()

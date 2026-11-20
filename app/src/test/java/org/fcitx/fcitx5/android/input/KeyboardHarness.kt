@@ -799,10 +799,9 @@ class KeyboardHarness(
         if (closed) return
         closed = true
         // the clipboard's database outlives the test, held open by the app's object
-        runBlocking {
-            val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
-            cm.purgeMarked(*cm.deleteAll(skipPinned = false))
-        }
+        runBlocking { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.nukeTable() }
+        // the next test's fake clock starts where this one's did: its first clip would carry the last one's time
+        org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.resetDuplicateCheck()
         // posted recognizer reads run first; what that throws is rethrown once the rest is let go, after the test's own failure
         val idleFailed = runCatching { idle() }.exceptionOrNull()
         // first: it learns the last field's address

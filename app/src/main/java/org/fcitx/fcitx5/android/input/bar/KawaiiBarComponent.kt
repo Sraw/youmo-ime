@@ -701,7 +701,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         when (window) {
             is InputWindow.ExtendedInputWindow<*> -> {
                 titleUi.setTitle(window.title)
-                window.onCreateBarExtension()?.let { titleUi.addExtension(it, window.showTitle) }
+                window.onCreateBarExtension()?.let { titleUi.addExtension(it, window.showTitle, window.extensionInTitle) }
                 titleUi.setReturnButtonDescription(context.getString(window.returnLabel))
                 titleUi.setReturnButtonOnClickListener {
                     val back = window.returnTo

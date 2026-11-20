@@ -1081,3 +1081,10 @@
   6. 平板竖拿也按横屏排：布局页写「800 dp 宽，按横屏排」；主题制作页的预览是横屏的键盘高度，主题里横屏的样式（`@landscape`、尺寸的第二个值）也按横屏用，和 App 在平板上一样。
   7. 26 键、18 键都按包里的那块画，**问题** 里没有把另一块当片段读不出的行；布局页列出这两块可以从它开始，读不出的 `k14` 写着原因，原因是中文（如「读不出来」），没有英文。
 - **JVM**：web/theme-maker 的 `layout-maker.test.mjs`（`保存: errors keep it from being saved; …`、`a theme pack's boards are offered made layouts of the user's, …`、`the draft is the theme maker's, in the layout maker's own database`）、`layout-smoke.mjs`（保存、草稿找回、打开 .theme）、`maker.test.mjs`（`a .layout opened for the preview: …`，含 `qwerty` 等 App 自带 id 被拒；`the environment is the engine's: …`（平板竖拿按横屏）；`a pack's two boards the app still reads are each drawn as the pack's, its fragment where they include it`）、`layout-maker.test.mjs` 的 `group letters set: …`（旧版 `{group:hjk}` 打开、恢复时改写）和 `LM.refusal` 那几行（原因写成中文）、`layout-smoke.mjs`（平板竖拿「800 dp 宽，按横屏排」）、`panels-smoke.mjs`（环境 › 键盘 › 打开 .layout）；页面上的样子在电脑浏览器上手工看。
+
+### ST-196 [P2] 开发者「清空剪贴板数据库」连收藏一起清
+<!-- dev/design/063-clipboard-favorites -->
+- **前提**：B0-设置，复制「公园」并收藏。
+- **操作**：**开发者 → 清空剪贴板数据库**，看确认框，点确定；打开剪贴板面板看两页。
+- **预期**：确认框写「剪贴板数据库将会被完全清空，包括收藏。继续吗？」；确认后最近和收藏都空了。
+- **JVM**：`DeveloperUatTest.clearingTheClipboardDatabaseTakesTheFavouritesToo`；设备上不跑。

@@ -49,6 +49,7 @@
         <item>background</item>
     </string-array>
     <string-array name="kw_clipboard">
+        <item>favorites</item>
         <item>copy history</item>
     </string-array>
     <string-array name="kw_prediction">

@@ -81,7 +81,7 @@ class LowLandscapeScreenshotTest {
             // a clip another test stored after its harness emptied the database once showed here
             runBlocking {
                 ClipboardManager.coroutineContext.job.children.forEach { it.join() }
-                ClipboardManager.purgeMarked(*ClipboardManager.deleteAll(skipPinned = false))
+                ClipboardManager.nukeTable()
             }
             val insets = WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, dp(48))).build()
             ViewCompat.dispatchApplyWindowInsets(h.inputView, insets)

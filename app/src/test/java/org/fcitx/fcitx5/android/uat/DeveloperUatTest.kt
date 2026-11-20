@@ -4,20 +4,26 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.ClipData
 import android.text.InputType
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.PreferenceManager
 import androidx.preference.TwoStatePreference
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.daemon.HostDaemon
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.utils.appContext
+import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -112,6 +118,31 @@ class DeveloperUatTest {
             assertEquals(appContext.getString(R.string.restart_fcitx_still_starting), restartSays())
         } finally {
             HostDaemon.testRestarted = true
+        }
+    }
+
+    @Test
+    @Uat("ST-196")
+    fun clearingTheClipboardDatabaseTakesTheFavouritesToo() {
+        ClipboardManager.resetDuplicateCheck()
+        appContext.clipboardManager.setPrimaryClip(ClipData.newPlainText(null, "公园"))
+        runBlocking {
+            ClipboardManager.coroutineContext.job.children.forEach { it.join() }
+            ClipboardManager.favorite(ClipboardManager.lastEntry!!.id)
+        }
+        assertEquals(1 to 1, ClipboardManager.recentCount to ClipboardManager.favoriteCount)
+        SettingsHarness().use { st ->
+            st.activity
+            st.open(SettingsRoute.Developer)
+            st.pref(R.string.clear_clb_db).performClick()
+            st.idle()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            assertEquals(st.s(R.string.clear_clp_db_confirm), dialog.findViewById<TextView>(android.R.id.message)!!.text.toString())
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            until("cleared", { ClipboardManager.recentCount to ClipboardManager.favoriteCount }) {
+                st.idle()
+                ClipboardManager.recentCount == 0 && ClipboardManager.favoriteCount == 0
+            }
         }
     }
 }

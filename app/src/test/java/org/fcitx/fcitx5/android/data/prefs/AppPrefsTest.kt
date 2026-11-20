@@ -369,4 +369,18 @@ class AppPrefsTest {
         prefs.keyboard.soundOnKeyPress.setValue(InputFeedbacks.InputFeedbackMode.Enabled)
         assertTrue(slider.isEnabled())
     }
+
+    // they rule the favourites too, which stay usable with the history off; the rest is about new copies
+    @Test
+    @Uat("TB-75")
+    fun withTheHistoryOffWhatAlsoRulesTheFavouritesStaysSettable() {
+        val prefs = AppPrefs(sp)
+        prefs.clipboard.clipboardListening.setValue(false)
+        val enabled = prefs.clipboard.managedPreferencesUi.associate { it.key to it.isEnabled() }
+        assertNamedRows(
+            "粘贴后回到键盘" to { assertEquals(true, enabled["clipboard_return_after_paste"]) },
+            "隐藏敏感信息" to { assertEquals(true, enabled["clipboard_mask_sensitive"]) },
+            "the limit: copies alone" to { assertEquals(false, enabled["clipboard_limit"]) },
+        )
+    }
 }

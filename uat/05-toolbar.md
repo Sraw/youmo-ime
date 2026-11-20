@@ -62,11 +62,11 @@
 - **预期**：先是工具栏上显示「散步」；复制超过 30 秒后提示消失。
 - **JVM**：`ToolbarUatTest.justCopiedGoneAfterThirtySeconds`（刚复制的提示 30 秒后从候选栏消失）；设备上不跑。
 
-### TB-10 [P1] 剪贴板条目置顶，不被自动清掉
+### TB-10 [P1] 收藏的条目不被自动清掉
 - **前提**：B0-设置，**剪贴板与表情 → 剪贴板历史记录上限** 设为 3（或最小值）；回到测试页打开 `fields.html#clips`（「短词1」到「短词5」五个预先填好的框：公园、今天、天气、我们、一起），在「短词1」里用文本编辑面板的 **全选**、**复制** 复制「公园」。
-- **操作**：打开剪贴板面板，长按「公园」选 **置顶**；再依次在「短词2」到「短词5」里用文本编辑面板 **全选**、**复制**；打开剪贴板面板。
-- **预期**：「公园」还在且标着置顶；未置顶的只保留最近的几条（不超过上限）。
-- **JVM**：`ToolbarUatTest.aPinnedEntryOutlivesTheLimit`（置顶的条目超过条数上限也留着）；设备上不跑。
+- **操作**：打开剪贴板面板，长按「公园」选 **收藏**；再依次在「短词2」到「短词5」里用文本编辑面板 **全选**、**复制**；打开剪贴板面板，看最近和收藏两页。
+- **预期**：收藏页里「公园」还在；最近页只保留最近的几条（不超过上限，收藏不算），最近里那份「公园」按上限清掉。
+- **JVM**：`ToolbarUatTest.aFavoriteOutlivesTheLimit`（收藏的超过条数上限也留着，最近里的照上限清）；设备上不跑。
 
 ### TB-11 [P1] 剪贴板条目编辑、删除
 - **前提**：B0，复制「公园」。
@@ -74,11 +74,11 @@
 - **预期**：编辑后条目显示「公园门口」；删除后这一条消失。
 - **JVM**：`ToolbarUatTest.editingAndDeletingAnEntry`（编辑条目打开编辑页带原文，删除后列表里没了）；设备上不跑。
 
-### TB-33 [P1] 清空：确认、撤销、只剩置顶的条目
-- **前提**：B0，复制「公园」并置顶，再复制「散步」。
-- **操作**：打开剪贴板面板，点右上角垃圾桶；确认后点键盘上方提示里的 **撤销**；再点垃圾桶确认一次；只剩「公园」时再点垃圾桶并确认。
-- **预期**：第一次问「要删除所有未置顶条目吗？」，删后键盘上方提示「已删除 1 项」，点 **撤销**「散步」回来；第二次删后只剩「公园」；这时垃圾桶改为问「要删除所有置顶条目吗？」，确认后面板空了。
-- **JVM**：`ToolbarUatTest.clearingAskedUndoneThenThePinned`（清空先问，撤销回来；再清空连置顶的一起）；设备上不跑。
+### TB-33 [P1] 清空最近：确认、撤销，收藏不动
+- **前提**：B0，复制「公园」并收藏，再复制「散步」。
+- **操作**：打开剪贴板面板，点右上角垃圾桶；确认后点键盘上方提示里的 **撤销**；再点垃圾桶确认一次；点 **收藏** 标签。
+- **预期**：问「要删除全部最近条目吗？收藏不受影响」，删后键盘上方提示「已删除 2 项」，点 **撤销** 两条回来；第二次删后最近页空了；收藏页「公园」还在，收藏页没有垃圾桶。
+- **JVM**：`ToolbarUatTest.clearingRecentAskedUndoneFavoritesStay`（清空先问，撤销回来；再清空只清最近，收藏页还有、没有垃圾桶）；设备上不跑。
 
 ### TB-13 [P1] 复制的链接去掉跟踪参数
 - **前提**：B0，点「链接」框（预先填好 `https://example.com/a?id=1&utm_source=x`），用文本编辑面板的 **全选**、**复制** 复制它。
@@ -267,10 +267,10 @@
 - **JVM**：`ToolbarUatTest.aPieceOfAnEntryCommittedAlone`（返回回到列表；点一块只选中、上屏才输入 x.com 并回到键盘）；切分规则见 `ClipboardChunksTest`；模型 1 秒内没答则保持逐字见 `ClipboardChunksWindowTest.theModelsWordsOnlyWithinASecondAndForChinese`（虚拟时钟）；设备上不跑。
 
 ### TB-45 [P1] 剪贴板历史上限可设「无上限」，调低时先确认
-- **前提**：B0-设置，**剪贴板与表情 → 剪贴板历史记录上限** 是 10。回测试页，依次复制「今天」「天气」「我们」「一起」「散步」，打开剪贴板面板把「今天」置顶。
+- **前提**：B0-设置，**剪贴板与表情 → 剪贴板历史记录上限** 是 10。回测试页，依次复制「今天」「天气」「我们」「一起」「散步」，打开剪贴板面板把「今天」收藏。
 - **操作**：回设置点 **剪贴板历史记录上限**，点对话框里的 **无上限**（截图）；再点它，输入 2，点确定，在确认框里点 **取消**；再输入 2、确定，确认框里点 **确定**；打开剪贴板面板。
-- **预期**：对话框里有说明「条数设得太大可能会影响性能。」和 **无上限** 按钮，点后摘要显示「无上限」，五条都在；输入 2 后先问「将删除 2 条，置顶的保留」，取消后仍是无上限、五条都在；确定后只剩「今天」（置顶）、「一起」「散步」。
-- **JVM**：`ClipboardLimitUatTest.unlimitedIsTheLimitsButtonAndLoweringAsksFirst`（无上限按钮与摘要、调低先问删几条、取消不变、确定后置顶保留）；设备上不跑。
+- **预期**：对话框里有说明「条数设得太大可能会影响性能。」和 **无上限** 按钮，点后摘要显示「无上限」，五条都在；输入 2 后先问「将删除 3 条，收藏的不受影响」，取消后仍是无上限、五条都在；确定后最近只剩「一起」「散步」，收藏页「今天」还在。
+- **JVM**：`ClipboardLimitUatTest.unlimitedIsTheLimitsButtonAndLoweringAsksFirst`（无上限按钮与摘要、调低先问删几条、取消不变、确定后收藏保留）；设备上不跑。
 
 ### TB-46 [P1] 切词面板点选多块，按点的顺序上屏，重选清空
 - **前提**：B0，在「长文本」里复制「发到 li@x.com 看看」。
@@ -294,7 +294,7 @@
 ### TB-48 [P1] 很长的条目只切前 5000 字；打点的条目没有切词
 - **前提**：B0，设备是 Android 13 或更新。按 PR-08 的前提把标为敏感的「mima1234」放上剪贴板（面板里显示成一串点）；再在测试页的「很长的文本」框（6000 字）里全选、复制。
 - **操作**：打开剪贴板面板，长按那条长文本选 **切词**，滑到最后；返回，长按显示成点的那一条。
-- **预期**：长文本切成一块块，最后一格是灰的「只切了前 5000 字」，点了没反应；打点的那条长按菜单里没有 **切词**（切开就能看到密码），置顶、编辑、删除照常。
+- **预期**：长文本切成一块块，最后一格是灰的「只切了前 5000 字」，点了没反应；打点的那条长按菜单里没有 **切词**（切开就能看到密码），收藏、编辑、删除照常。
 - **JVM**：`ClipboardSplitUatTest.aLongEntrySplitsItsStartAndADottedOneNotAtAll`（6000 字只切前 5000 字，最后一格是提示；打点的条目菜单里没有切词）；设备上不跑。
 
 ### TB-49 [P1] 切词面板横着滑一下连选多块
@@ -303,11 +303,11 @@
 - **预期**：点「li」照常选中（1）；上下拖什么都不选；从已选的「li」滑过「@」，「li」取消、「@」不选；从「x.com」往左滑到「li」，三块一起选中，序号按原文顺序 1、2、3（li、@、x.com），往回退时退出范围的块恢复原样；上屏的是 `li@x.com`，回到键盘。沿最上一行横滑不滚动，只选中滑过的块；拖到下边缘按住，面板一直往下滚，选区跟着手指下面的块变长；拖出面板外按住，面板照样往下滚，选区接着变长。
 - **JVM**：`ClipboardSplitUatTest.piecesPickedBySweepingAcross`（点仍是选中、竖拖不选、从已选的块滑开取消、往左滑按原文顺序选中并上屏）；范围、往回退恢复、已选块的位置、何时贴边滚动见 `SwipePickTest`；`ClipboardSwipeTest`（拖到下边缘或拖出面板外按住一直滚、选区跟着变长，第二根手指按下就结束，沿最上一行横滑不滚，滑到一半换了切分就结束，从「只切了前 5000 字」起滑什么都不选）；设备上不跑。
 
-### TB-50 [P1] 剪贴板里点了的条目在面板关掉后移到最前，置顶的不动
-- **前提**：B0，关掉「粘贴后回到键盘」；依次复制「钉」「甲」「乙」「丙」，把「钉」置顶。
-- **操作**：打开剪贴板面板，依次点「甲」「乙」「钉」；看面板；回到键盘，再打开面板。
-- **预期**：上屏 甲乙钉；面板开着时顺序不变（钉、丙、乙、甲）；再打开时是 钉、乙、甲、丙。
-- **JVM**：`ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays`（置顶的不动，上限按最久没用过的清）；设备上不跑。
+### TB-50 [P1] 剪贴板里点了的条目在面板关掉后移到最前，收藏的不动
+- **前提**：B0，关掉「粘贴后回到键盘」；依次复制「钉」「甲」「乙」「丙」，把「钉」收藏。
+- **操作**：打开剪贴板面板，依次点「甲」「乙」；看面板；点 **收藏** 标签点「钉」；回到键盘，再打开面板。
+- **预期**：上屏 甲乙钉；面板开着时最近的顺序不变（丙、乙、甲、钉）；再打开时最近是 乙、甲、丙、钉；收藏里点了「钉」不挪。
+- **JVM**：`ClipboardOrderUatTest.entriesPastedFromThePanelMoveFirstWhenItCloses`；`ClipboardDaoTest.aRecentEntryUsedComesFirstOfTheRecentAFavouriteStays`（收藏的不动，上限按最久没用过的清）；设备上不跑。
 
 ### TB-51 [P1] 展开候选右侧一列（设备）
 - **前提**：B0（右侧一列由引擎画，060-render-p2 S6）。
@@ -412,3 +412,46 @@
 - **操作**：回测试页看工具栏；点最左边的按钮；开读屏摸它；复制一段字让剪贴板提示出来，再点它；开悬浮键盘再看一次。再把 **手写** 拖到分隔线上面勾上，切到英文看。
 - **预期**：最左是 ⋯（不是 ›），点了直接打开状态面板，没有展开的工具栏；读屏念「更多」；剪贴板提示亮着时点它也是开面板；悬浮时一样；右边的按钮照旧。手写在工具栏那段时，英文里它灰着也算显示得了：菜单键还是 ›，展开有灰的手写和 ⋯。
 - **JVM**：`ToolbarConfigTest.aToolbarWithNothingToShowIsMoreAlone`（ime-core：没勾、勾的用不上、灰的手写、右边很多）、`ToolbarMoreUatTest.aToolbarWithNothingToShowHasMoreForTheMenuKey`（菜单键是 ⋯、读「更多」、点了开面板、剪贴板提示时也是、不展开）；设备上不跑。
+
+### TB-70 [P0] 收藏一条，从收藏页粘贴
+<!-- dev/design/063-clipboard-favorites -->
+- **前提**：B0，复制「公园」。
+- **操作**：打开剪贴板面板，长按「公园」选 **收藏**；点栏上的 **收藏** 标签（截图）；点「公园」。浅色、深色主题各看一次。
+- **预期**：键盘上方提示「已收藏」，最近里「公园」还在；收藏页列出「公园」，标签「收藏」是选中的颜色；点它粘贴「公园」并回到键盘。
+- **JVM**：`ClipboardFavoritesUatTest.aFavouriteIsMadeFrom最近AndPastedFrom收藏`（提示、最近还在、收藏页有、点了粘贴；图）；设备上冒烟。
+
+### TB-71 [P1] 最近和收藏互不干扰
+- **前提**：B0，复制「公园」「散步」，收藏「公园」。
+- **操作**：在最近里长按「公园」选 **删除**；点垃圾桶清空最近；点 **收藏** 标签；回到键盘再复制「公园」，打开面板看两页。
+- **预期**：删除、清空最近后收藏页「公园」还在；再复制「公园」，最近多一条，收藏仍只有一条。
+- **JVM**：`ClipboardFavoritesUatTest.deletingAndClearing最近LeaveTheFavourites`、`ClipboardFavoritesTest.movedFirstPastedTrimmedOrClearedTheFavouritesStay`；设备上不跑。
+
+### TB-72 [P1] 取消收藏：可撤销；最近里没有同样的就放回最近
+- **前提**：B0，复制「公园」「北京」，两条都收藏，再在最近里删掉「北京」。
+- **操作**：点 **收藏** 标签，试着左右滑一条；长按「公园」选 **取消收藏**，点提示里的 **撤销**；长按「北京」选 **取消收藏**，看最近，再撤销。
+- **预期**：收藏页不能左右滑删除，没有垃圾桶；取消「公园」后它从收藏消失（最近里那份还在），提示「已取消收藏」，撤销回到原位；取消「北京」后它出现在最近第一条，提示「已取消收藏，放回「最近」」，撤销后回到收藏原位、最近里不再有它。
+- **JVM**：`ClipboardFavoritesUatTest.unfavouritingTakesTheCopyOrMovesTheOnlyOneTo最近AndIsUndone`、`ClipboardFavoritesTest.unfavouritingWithTheTextIn最近TakesTheCopyAndItsUndoBringsItBack`、`ClipboardFavoritesTest.unfavouritingOneWithNoCopyIn最近MovesItThereFirstAndItsUndoBackInPlace`、`ClipboardFavoritesTest.anUndoAfterTheSameTextWasFavouritedAgainMakesNoSecond`；设备上不跑。
+
+### TB-73 [P1] 移到最前；重复收藏；收藏敏感的
+- **前提**：B0，复制「甲」「乙」并依次收藏；按 PR-08 的前提把标为敏感的「mima1234」放上剪贴板。
+- **操作**：在最近里再收藏一次「甲」；收藏显示成圆点的那条；点 **收藏** 标签，长按第一条和「甲」看菜单，选 **移到最前**。
+- **预期**：再收藏「甲」提示「已在收藏里」；收藏敏感的提示「已收藏（敏感内容不进备份）」，收藏页里它也是圆点；第一条的菜单没有 **移到最前**，圆点那条没有 **切词**、**存为快速输入**，收藏页的菜单没有 **删除**；「甲」移到最前。
+- **JVM**：`ClipboardFavoritesUatTest.movedFirstAlreadyThereAndASensitiveOneSaid`、`ClipboardFavoritesTest.aFavouriteIsACopyWithTheEntrysKindAndSensitivity`、`ClipboardPagesTest.theMenuGoesByPageAndWhatTheEntryIs`（ime-core）；设备上不跑。
+
+### TB-74 [P1] 打开面板时在哪一页
+- **前提**：B0，关掉「粘贴后回到键盘」；复制「公园」并收藏。
+- **操作**：点 **收藏** 标签，回到键盘再打开面板；回到键盘复制「散步」，打开面板；点「散步」，回到键盘再打开；点 **收藏** 标签，长按「公园」选 **切词**，点返回。
+- **预期**：停在收藏页关掉再开仍是收藏；复制「散步」后再开是最近，「散步」在第一个；粘贴不算复制，再开仍是最近；从切词返回仍在收藏页。
+- **JVM**：`ClipboardFavoritesUatTest.thePanelOpensWhereItWasLeftUnlessSomethingWasCopied`、`ClipboardPagesTest.thePanelOpensOnTheRememberedPageUnlessSomethingWasCopiedSince`（ime-core）；设备上不跑。
+
+### TB-75 [P1] 关掉记录剪贴板历史：收藏照常
+- **前提**：B0，复制「公园」并收藏；**剪贴板与表情** 里关掉「记录剪贴板历史」。
+- **操作**：看「粘贴后回到键盘」「隐藏敏感信息」能不能改；回测试页打开剪贴板面板，看最近页，点 **收藏** 标签，点「公园」。再清空剪贴板数据库（ST-196）看收藏页；打开记录，面板开着时在设置里把上限设为 0，回来看收藏页。上限改回 10，复制「北京」并收藏，在最近里删掉「北京」；关掉记录，在收藏页取消收藏「北京」，点 **撤销**。
+- **预期**：两个设置都能改；最近页是开启记录的提示；收藏页照常列出，点了粘贴；收藏空着、记录关着时写「还没有收藏」和打开记录那句；上限是 0 时写上限是 0 那句；记录关着时取消收藏「北京」提示「已取消收藏并删除：「最近」不保留」，它不进最近，撤销后回到收藏。
+- **JVM**：`ClipboardFavoritesUatTest.withTheHistoryOffTheFavouritesStillPaste`、`ClipboardFavoritesUatTest.withTheHistoryOffUnfavouritingTheOnlyCopyDeletesItSaidAndUndone`、`ClipboardFavoritesTest.unfavouritingTheOnlyCopyWithTheHistoryOffOrALimitOf0DeletesItAndItsUndoBringsItBack`、`ClipboardFavoritesUatTest.theEmptyFavouritesSayHowToGetOneWithTheHistoryOff`（图）、`ClipboardFavoritesUatTest.theEmptyFavouritesSayHowToGetOneWithALimitOf0`、`ClipboardFavoritesUatTest.theEmptyFavouritesHintFollowsALimitChangedWhileOpen`、`AppPrefsTest.withTheHistoryOffWhatAlsoRulesTheFavouritesStaysSettable`、`ClipboardPagesTest.eachPageShowsItsListItsEmptyHintOrTheHistoryPrompt`、`ClipboardPagesTest.theEmptyFavouritesSayHowToGetOne`（ime-core）；设备上不跑。
+
+### TB-76 [P1] 从 0.6.2 升级：置顶的在收藏里
+- **前提**：装 0.6.2，复制两条并置顶（一条用 PR-08 的前提放上标为敏感的）。
+- **操作**：覆盖安装这一版，打开剪贴板面板；关掉再开；点 **收藏** 标签，取消收藏那条不敏感的。
+- **预期**：键盘上方提示一次「置顶的条目移到了「收藏」」，再开不说；收藏页里是那两条，敏感的显示成圆点；取消收藏那条后它出现在最近第一条（0.6.2 的置顶最近里没有副本）。
+- **JVM**：`ClipboardFavoritesUatTest.anUpgradesPinsAreSaidMovedOnce`（有收藏时提示一次）、`ClipboardDatabaseMigrationTest`（库的版本不变，置顶的就是收藏）；要两个版本的包，设备上手动，发版时跑。

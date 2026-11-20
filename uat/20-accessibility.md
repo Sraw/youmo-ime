@@ -127,3 +127,10 @@
 - **预期**：生僻字页依次读「扩展区，14,802 个，已屏蔽 14,802，按钮」「扩展区，14,802 个，全部屏蔽，复选框」「三级字，……，按钮」……（一张卡的两个挨着），样字和箭头不单独读；
   键盘读「全键盘，单选按钮，已选中，改过 N 个键，8 项中的第 1 项」；编辑框读「长按菜单，首选 @，共 N 个，已展开」「上滑，长按首选 @，已收起」，双击展开后下一个就是卡里的第一个单选。
 - **JVM**：`GroupCardTest.a card read body then strip, the next card after this strip`、`ChoiceCardTest.the body is one node read as a radio button named by the keyboard`、`FoldCardTest.the title row is one button saying the summary and whether it is open`、`RareCharsCardsUatTest.theCardsAndTheLettersAreReadOut`（节点的类名、文字、说法、状态、顺序）；TalkBack 本身真机上手工听一次。
+
+### AX-22 [P1] 读屏：剪贴板的标签、圆点卡片和卡片的动作
+<!-- dev/design/063-clipboard-favorites -->
+- **前提**：B0，开着 TalkBack；复制「公园」，放上标为敏感的「mima1234」。
+- **操作**：打开剪贴板面板，逐个滑过栏上的标签和卡片；在「公园」上打开动作菜单（TalkBack 的「操作」）；收藏它和圆点那条，切到收藏页再看第二条的动作菜单。
+- **预期**：标签读「最近，标签，已选中」「收藏，标签」；圆点卡片读「敏感内容，已隐藏」，不读一串圆点；最近页卡片的动作里有「收藏」，收藏页的有「取消收藏」「移到最前」（第一条没有移到最前）。
+- **JVM**：`ClipboardFavoritesUatTest.tabsCardsAndTheirActionsAreRead`（节点的角色说明、选中、圆点卡片的说明、动作的名字）；TalkBack 本身真机上手工听一次。

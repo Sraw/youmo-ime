@@ -38,9 +38,10 @@ class ClipboardOrderUatTest {
 
     private fun s(id: Int) = h.service.getString(id)
 
-    private fun order() = runBlocking {
+    private fun order(favorites: Boolean = false) = runBlocking {
         ClipboardManager.coroutineContext.job.children.forEach { it.join() }
-        val page = ClipboardManager.allEntries().load(PagingSource.LoadParams.Refresh(null, 50, false))
+        val source = if (favorites) ClipboardManager.favoriteEntries() else ClipboardManager.recentEntries()
+        val page = source.load(PagingSource.LoadParams.Refresh(null, 50, false))
         (page as PagingSource.LoadResult.Page).data.map { it.text }
     }
 
@@ -56,17 +57,21 @@ class ClipboardOrderUatTest {
         h.clipboard("丙")
         h.entry("钉")!!.performLongClick()
         h.idle()
-        h.menuPick(s(R.string.pin))
-        h.waitFor("pinned") { order().first() == "钉" }
+        h.menuPick(s(R.string.clipboard_favorite))
+        h.waitFor("a favourite") { order(favorites = true) == listOf("钉") }
         h.tap(h.entry("甲")!!)
         h.tap(h.entry("乙")!!)
-        h.tap(h.entry("钉")!!)
-        assertEquals("甲乙钉", h.field.text.toString())
         // nothing moves while the panel is open: the next tap lands where the finger is
         h.after(500)
-        assertEquals(listOf("钉", "丙", "乙", "甲"), order())
+        assertEquals(listOf("丙", "乙", "甲", "钉"), order())
+        h.tap(h.entry(s(R.string.clipboard_favorites))!!)
+        h.waitFor("钉 in 收藏") { h.entry("钉") != null }
+        h.tap(h.entry("钉")!!)
+        assertEquals("甲乙钉", h.field.text.toString())
         h.tap(h.described(s(R.string.back_to_keyboard)))
-        h.waitFor("moved") { order() == listOf("钉", "乙", "甲", "丙") }
+        // a favourite pasted stays where it is, and its copy in 最近 with it
+        h.waitFor("moved") { order() == listOf("乙", "甲", "丙", "钉") }
+        assertEquals(listOf("钉"), order(favorites = true))
     }
 
     @Test

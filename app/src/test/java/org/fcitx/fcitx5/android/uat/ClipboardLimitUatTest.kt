@@ -72,8 +72,9 @@ class ClipboardLimitUatTest {
         prefs.set(limit, 10)
         val words = listOf("今天", "天气", "我们", "一起", "散步")
         for (w in words) copy(w)
-        val pinned = runBlocking { (0 until 50).firstNotNullOf { ClipboardManager.get(it)?.takeIf { e -> e.text == "今天" } } }
-        runBlocking { ClipboardManager.pin(pinned.id) }
+        val kept = runBlocking { (0 until 50).firstNotNullOf { ClipboardManager.get(it)?.takeIf { e -> e.text == "今天" } } }
+        // a copy in 收藏: its recent one counts against the limit, the favourite not
+        runBlocking { ClipboardManager.favorite(kept.id) }
         st.open(SettingsRoute.Clipboard)
         // another test's dialog may still be the latest: wait for this one
         val before = ShadowDialog.getLatestDialog()
@@ -99,7 +100,7 @@ class ClipboardLimitUatTest {
         until("asked") { st.idle(); ShadowDialog.getLatestDialog()?.isShowing == true && dialog().getButton(AlertDialog.BUTTON_POSITIVE) != null }
         val ask = dialog()
         assertEquals(
-            st.activity.resources.getQuantityString(R.plurals.clipboard_limit_deletes, 2, 2),
+            st.activity.resources.getQuantityString(R.plurals.clipboard_limit_deletes, 3, 3),
             ask.findViewById<TextView>(android.R.id.message)!!.text.toString(),
         )
         ask.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
@@ -112,6 +113,8 @@ class ClipboardLimitUatTest {
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         until("set", { limit.getValue() }) { st.idle(); limit.getValue() == 2 }
         until("trimmed", { history() }) { "天气" !in history() }
-        assertEquals(listOf("今天", "一起", "散步"), words.filter { it in history() })
+        assertEquals("the favourite's copy of 今天 stays", listOf("今天", "一起", "散步"), words.filter { it in history() })
+        assertEquals(1, ClipboardManager.favoriteCount)
+        assertEquals(2, ClipboardManager.recentCount)
     }
 }

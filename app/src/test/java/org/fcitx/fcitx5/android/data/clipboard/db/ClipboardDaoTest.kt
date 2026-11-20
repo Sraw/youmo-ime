@@ -8,6 +8,7 @@ import androidx.paging.PagingSource
 import androidx.room.Room
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.data.clipboard.lastKept
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -29,8 +30,8 @@ class ClipboardDaoTest {
     @After
     fun close() = db.close()
 
-    private suspend fun add(text: String, timestamp: Long = 1000L, pinned: Boolean = false) =
-        dao.get(dao.insert(ClipboardEntry(text = text, timestamp = timestamp, pinned = pinned)))!!.id
+    private suspend fun add(text: String, timestamp: Long = 1000L, favorite: Boolean = false, sensitive: Boolean = false) =
+        dao.get(dao.insert(ClipboardEntry(text = text, timestamp = timestamp, favorite = favorite, sensitive = sensitive)))!!.id
 
     @Test
     fun aPurgeTakesOnlyTheMarkedRowsItIsGiven() = runTest {
@@ -68,49 +69,99 @@ class ClipboardDaoTest {
         add("c", timestamp = 300L)
         add("d", timestamp = 500L)
         dao.updateTime(copiedAgain, 450L)
-        add("pinned", timestamp = 900L, pinned = true)
+        add("favourite", timestamp = 900L, favorite = true)
         dao.markAsDeleted(add("deleted", timestamp = 800L))
-        assertEquals(300L, dao.unpinnedTimestampAt(2))
+        assertEquals(300L, dao.recentTimestampAt(2))
         // room for 5: none outdated
-        assertNull(dao.unpinnedTimestampAt(4))
+        assertNull(dao.recentTimestampAt(4))
     }
 
     @Test
     fun anOutdatedEntryGoesOutrightAndOneAwaitingItsUndoStays() = runTest {
         val outdated = add("old", timestamp = 100L)
         val awaitingUndo = add("deleted", timestamp = 200L)
-        val pinned = add("pinned", timestamp = 50L, pinned = true)
+        val favorite = add("favourite", timestamp = 50L, favorite = true)
         val recent = add("new", timestamp = 1000L)
         dao.markAsDeleted(awaitingUndo)
-        dao.deleteUnpinnedEarlierThan(500L)
+        dao.deleteRecentEarlierThan(500L)
         dao.undoDelete(outdated, awaitingUndo)
         assertNull(dao.get(outdated))
         assertNotNull(dao.get(awaitingUndo))
-        assertNotNull(dao.get(pinned))
+        assertNotNull(dao.get(favorite))
         assertNotNull(dao.get(recent))
     }
 
-    private suspend fun order(): List<String> {
-        val page = dao.allEntries().load(PagingSource.LoadParams.Refresh(null, 50, false))
+    private suspend fun texts(source: PagingSource<Int, ClipboardEntry>): List<String> {
+        val page = source.load(PagingSource.LoadParams.Refresh(null, 50, false))
         return (page as PagingSource.LoadResult.Page).data.map { it.text }
     }
 
     @Test
     @Uat("TB-50")
-    fun anUnpinnedEntryUsedComesFirstOfTheUnpinnedAPinnedOneStays() = runTest {
-        add("p1", 500L, pinned = true)
-        val p2 = add("p2", 400L, pinned = true)
+    fun aRecentEntryUsedComesFirstOfTheRecentAFavouriteStays() = runTest {
+        add("p1", 500L, favorite = true)
+        val p2 = add("p2", 400L, favorite = true)
         add("a", 3000L)
         val b = add("b", 2000L)
         add("c", 1000L)
-        dao.updateTimeIfUnpinned(b, 5000L)
-        assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
-        dao.updateTimeIfUnpinned(p2, 6000L)
-        assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
+        dao.updateTimeIfRecent(b, 5000L)
+        assertEquals(listOf("b", "a", "c"), texts(dao.recentEntries()))
+        dao.updateTimeIfRecent(p2, 6000L)
+        assertEquals(listOf("p1", "p2"), texts(dao.favoriteEntries()))
         // least recently used goes first: c, not b
-        val last = lastKept(2, 0L) { dao.unpinnedTimestampAt(it) }
+        val last = lastKept(2, 0L) { dao.recentTimestampAt(it) }
         assertEquals(3000L, last)
-        dao.deleteUnpinnedEarlierThan(last!!)
-        assertEquals(listOf("p1", "p2", "b", "a"), order())
+        dao.deleteRecentEarlierThan(last!!)
+        assertEquals(listOf("b", "a"), texts(dao.recentEntries()))
+        assertEquals(listOf("p1", "p2"), texts(dao.favoriteEntries()))
+    }
+
+    @Test
+    fun thePagesAndTheirCountsHoldTheirOwnRowsOnly() = runTest {
+        add("r1", 100L)
+        add("f1", 900L, favorite = true)
+        dao.markAsDeleted(add("r gone", 300L))
+        dao.markAsDeleted(add("f gone", 950L, favorite = true))
+        add("f2", 200L, favorite = true)
+        val recent = texts(dao.recentEntries())
+        val favorites = texts(dao.favoriteEntries())
+        val counts = dao.recentCount() to dao.favoriteCount()
+        val newest = dao.newestFavoriteTimestamp()
+        val recentIds = dao.findRecentIds().size
+        assertRows(
+            "最近 lists the recent alone, a marked one not" to { assertEquals(listOf("r1"), recent) },
+            "收藏 lists the favourites by their time, a marked one not" to { assertEquals(listOf("f1", "f2"), favorites) },
+            "each page counts its own" to { assertEquals(1 to 2, counts) },
+            "the newest favourite's time counts a marked one: its undo must not land above a newer" to { assertEquals(950L, newest) },
+            "the recent ids, for the trash: no favourite" to { assertEquals(1, recentIds) },
+        )
+    }
+
+    @Test
+    fun theSameTextIsFoundOnItsOwnPageWithTheSameSensitivityAndNotWhenMarked() = runTest {
+        val recent = add("同", 100L)
+        val favorite = add("同", 200L, favorite = true)
+        add("密", 300L, sensitive = true)
+        val marked = add("删", 400L, favorite = true)
+        dao.markAsDeleted(marked)
+        val found = listOf(
+            dao.findRecent("同", false)?.id, dao.findFavorite("同", false)?.id, dao.findRecent("密", false)?.id,
+            dao.findRecent("密", true)?.text, dao.findFavorite("删", false)?.id, dao.getEvenMarked(marked)?.text, dao.get(marked)?.id,
+        )
+        assertRows(
+            "a recent by text" to { assertEquals(recent, found[0]) },
+            "a favourite by text" to { assertEquals(favorite, found[1]) },
+            "the same text not sensitive is another entry" to { assertNull(found[2]) },
+            "sensitive found as sensitive" to { assertEquals("密", found[3]) },
+            "a favourite marked deleted is not there: a second may be made" to { assertNull(found[4]) },
+            "an undo still reads the marked row" to { assertEquals("删", found[5]) },
+            "the plain read does not" to { assertNull(found[6]) },
+        )
+    }
+
+    @Test
+    fun noFavouriteHasNoNewestTime() = runTest {
+        add("r", 100L)
+        assertNull(dao.newestFavoriteTimestamp())
     }
 }

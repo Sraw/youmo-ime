@@ -61,6 +61,7 @@
         <item>背景图</item>
     </string-array>
     <string-array name="kw_clipboard">
+        <item>收藏</item>
         <item>粘贴板</item>
         <item>复制历史</item>
     </string-array>

@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.clipboard
 
 import android.content.Context
+import android.view.Gravity
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -58,17 +59,34 @@ sealed class ClipboardInstructionUi(override val ctx: Context, protected val the
         }
     }
 
-    class Empty(ctx: Context, theme: Theme) : ClipboardInstructionUi(ctx, theme) {
+    /** 最近's, or [favorites]': its hint set by [setHint]. */
+    class Empty(ctx: Context, theme: Theme, favorites: Boolean = false) : ClipboardInstructionUi(ctx, theme) {
 
         private val icon = imageView {
-            imageDrawable = drawable(R.drawable.ic_baseline_content_paste_24)!!.apply {
+            val icon = if (favorites) R.drawable.ic_outline_star_border_24 else R.drawable.ic_baseline_content_paste_24
+            // mutated: the menus tint this same icon their own way
+            imageDrawable = drawable(icon)!!.mutate().apply {
                 setTint(theme.altKeyTextColor)
             }
         }
 
         private val instructionText = textView {
-            setText(R.string.instruction_copy)
+            if (favorites) {
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPaddingDp(12, 0, 12, 0)
+            } else {
+                setText(R.string.instruction_copy)
+            }
             setTextColor(theme.keyTextColor)
+        }
+
+        fun setHint(empty: FavoritesEmpty) {
+            val hint = when (empty) {
+                FavoritesEmpty.LongPressARecent -> R.string.favorites_empty_long_press
+                FavoritesEmpty.TurnOnHistory -> R.string.favorites_empty_history_off
+                FavoritesEmpty.LimitIsZero -> R.string.favorites_empty_limit_zero
+            }
+            instructionText.text = "${ctx.getString(R.string.favorites_empty)}\n${ctx.getString(hint)}"
         }
 
         // turned, the panel can be four rows of 36 dp high, where a 90 dp icon pushed the words out of the bottom. The

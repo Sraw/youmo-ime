@@ -188,18 +188,20 @@ class ToolbarUatTest {
 
     @Test
     @Uat("TB-10")
-    fun aPinnedEntryOutlivesTheLimit() {
+    fun aFavoriteOutlivesTheLimit() {
         prefs.set(AppPrefs.getInstance().clipboard.clipboardHistoryLimit, 3)
         h.start()
         h.copied("公园")
         h.clipboard("公园")
-        menu("公园", R.string.pin)
+        menu("公园", R.string.clipboard_favorite)
         h.tap(h.described(s(R.string.back_to_keyboard)))
         for (w in listOf("今天", "天气", "我们", "一起")) h.copied(w)
         h.clipboard("一起")
-        h.waitFor("the limit kept") { h.entry("今天") == null }
-        assertNotNull(h.entry("公园"))
+        // its copy in 最近 the oldest, gone with 今天
+        h.waitFor("the limit kept") { h.entry("今天") == null && h.entry("公园") == null }
         assertEquals(listOf("天气", "我们", "一起"), listOf("今天", "天气", "我们", "一起").filter { h.entry(it) != null })
+        h.tap(h.entry(s(R.string.clipboard_favorites))!!)
+        h.waitFor("公园 in 收藏") { h.entry("公园") != null }
     }
 
     @Test
@@ -284,7 +286,7 @@ class ToolbarUatTest {
 
     private fun deleteAll(confirm: Boolean = true): String {
         val before = ShadowPopupMenu.getLatestPopupMenu()
-        h.tap(h.described(s(R.string.delete_all)))
+        h.tap(h.described(s(R.string.delete_all_recent_description)))
         h.waitFor("the question") { ShadowPopupMenu.getLatestPopupMenu() !== before }
         val question = ShadowPopupMenu.getLatestPopupMenu().menu.getItem(0).title.toString()
         if (confirm) h.menuPick(h.service.getString(android.R.string.ok))
@@ -295,26 +297,27 @@ class ToolbarUatTest {
 
     @Test
     @Uat("TB-33")
-    fun clearingAskedUndoneThenThePinned() {
+    fun clearingRecentAskedUndoneFavoritesStay() {
         h.start()
         h.copied("公园")
         h.clipboard("公园")
-        menu("公园", R.string.pin)
+        menu("公园", R.string.clipboard_favorite)
         h.tap(h.described(s(R.string.back_to_keyboard)))
         h.copied("散步")
         h.clipboard("散步")
-        assertEquals(s(R.string.delete_all_except_pinned), deleteAll())
+        assertEquals(s(R.string.delete_all_recent), deleteAll())
         h.waitFor("the notice") { h.notice() != null }
         // the list drops 散步 after the notice says so: else, still listed, it passes "back" below before the undo is in
-        h.waitFor("散步 gone") { h.entry("散步") == null }
-        h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in it) }
+        h.waitFor("散步 gone") { h.entry("散步") == null && h.entry("公园") == null }
+        h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 2) in it) }
         val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.undo) }
         assertTrue(undo.performClick())
-        h.waitFor("散步 back") { h.entry("散步") != null }
+        h.waitFor("散步 back") { h.entry("散步") != null && h.entry("公园") != null }
         deleteAll()
-        h.waitFor("only 公园") { h.entry("散步") == null && h.entry("公园") != null }
-        assertEquals(s(R.string.delete_all_pinned_items), deleteAll())
-        h.waitFor("empty") { h.entry("公园") == null }
+        h.waitFor("empty") { h.entry("散步") == null && h.entry("公园") == null }
+        h.tap(h.entry(s(R.string.clipboard_favorites))!!)
+        h.waitFor("公园 in 收藏") { h.entry("公园") != null }
+        assertFalse("no trash on 收藏", has(R.string.delete_all_recent_description))
     }
 
     private fun opened(entry: String?, description: Int? = null): Intent {

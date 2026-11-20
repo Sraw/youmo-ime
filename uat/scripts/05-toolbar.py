@@ -70,8 +70,8 @@ def copy_word(d, word, at_copy=None):
 
 def clip_items(d):
     s = d.screen()
-    # below the panel's title bar, as the first row's centre is above BAR_BOTTOM
-    title = next((n for n in s.ime() if n.text == "剪贴板"), None)
+    # below the panel's bar (its back button: the tabs stand in its title), as the first row's centre is above BAR_BOTTOM
+    title = next((n for n in s.ime() if n.desc == "返回键盘"), None)
     top = title.b[3] if title else BAR_BOTTOM
     return [n for n in s.ime() if n.text and n.b[1] >= top and n.text not in ("试着复制些东西",)]
 
@@ -93,6 +93,55 @@ def tb08(d):
     check(t == "公园", f"框里「{t}」")
     check(d.key_node("q", s), "粘贴后没有回到键盘（还在剪贴板面板）")
     return f"最上面「公园」，点后框里「{t}」，回到键盘"
+
+
+@case("TB-70", mutates=True, visual=True)
+def tb70(d):
+    copy_word(d, "公园")
+    d.open_page("text")
+    shots = []
+    try:
+        for night in (False, True):
+            if night:
+                d.sh("cmd uimode night yes")
+                time.sleep(1.5)
+                d.open_page("text")
+            clip_panel(d)
+            if not night:
+                item = clip_item(d, "公园")
+                check(item, f"最近 {[n.text for n in clip_items(d)][:4]}")
+                d.hold(item.c, 800)
+                time.sleep(0.6)
+                # the menu's 收藏, in a window of its own; the tab of the same name is on the bar
+                s = d.screen()
+                tab = next((n for n in s.ime() if n.text == "收藏" and n.b[1] < BAR_BOTTOM), None)
+                pick = next((n for n in s.nodes if n.text == "收藏" and (not tab or n.b != tab.b)), None)
+                check(pick, "长按菜单里没有「收藏」")
+                d.tap(pick.c, 0.3)
+                said = d.screen().find(text="已收藏", where="all")
+                check(said, "没有提示「已收藏」")
+                time.sleep(3.5)
+                check(clip_item(d, "公园"), "收藏后最近里没有「公园」了")
+            tab = next((n for n in d.screen().ime() if n.text == "收藏" and n.b[1] < BAR_BOTTOM), None)
+            check(tab, "栏上没有「收藏」标签")
+            d.tap(tab.c, 0.8)
+            check(clip_item(d, "公园"), f"收藏页 {[n.text for n in clip_items(d)][:4]}")
+            back = d.screen().find(desc="返回键盘", where="ime")
+            d.shot((0, back.b[1], 1080, 2340) if back else "full", ("深色" if night else "浅色") + "：收藏页列出「公园」，标签「收藏」是选中的颜色，栏上没有垃圾桶")
+            shots.append(night)
+            if night:
+                d.tap(clip_item(d, "公园").c, 0.8)
+                t = d.field_text(d.screen())
+                check(t == "公园", f"框里「{t}」")
+            else:
+                back_to_keys(d)
+    finally:
+        d.sh("cmd uimode night no")
+    time.sleep(1.5)
+    return "收藏后提示「已收藏」、最近里还在；收藏页列出它（浅色、深色各一张图），点了粘贴「公园」"
+
+
+case("TB-76", needs="release:要 0.6.2 装好、置顶两条（一条敏感）后覆盖安装这一版；发版时手动跑")(lambda d: None)
 
 
 def status_find(d, *texts):

@@ -300,6 +300,9 @@ foreground app. What the keyboard says goes in its notice instead, `FcitxInputMe
 - A downgrade to 0.3.2 lists no `.txt.gz`: imported base dictionaries are hidden there (the files
   stay; 0.3.2 deletes `merged.ymd` v2 and the `.ymc`s) and come back on re-upgrade; a same-name
   import made in 0.3.2 wins then (its `.txt` is converted over the `.gz`).
+- The clipboard's `pinned` column holds 收藏 (the property is `favorite`). Renaming the column or bumping
+  `clbdb`'s version makes 0.6.2 and before, restoring a newer backup, drop the whole clipboard: they
+  fall back destructively on a downgrade.
 - Data releases are pinned by SHA-256; a re-uploaded asset with the same name fails the build. Make
   a new release instead.
 
