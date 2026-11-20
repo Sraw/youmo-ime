@@ -151,7 +151,7 @@ class LayoutCheckTest {
     fun itsIdNameFamilyAndBaseAreItsOwn() {
         assertEquals(listOf("id-built-in", "based-on"), errors(testData("qwerty.xml")), "the app's board as it is")
         val bare = testData("number.xml")
-        assertEquals(listOf("id-built-in", "based-on", "lacks"), errors(replaceKey(bare, "back", "<gap width=\"14\"/>")).distinct())
+        assertEquals(listOf("id-built-in", "based-on"), errors(replaceKey(bare, "back", "<gap width=\"14\"/>")).distinct())
         assertEquals(listOf("full"), check(bare).pads)
         assertEquals(listOf("id-length"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"${"a".repeat(33)}\"")))
         assertEquals(listOf("id-prefix"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"g18\"")))
@@ -193,14 +193,6 @@ class LayoutCheckTest {
     }
 
     @Test
-    fun itKeepsWhatItsBaseMustBeTypedOn() {
-        val r = check(replaceKey(qwerty, "backspace", ""))
-        assertEquals(listOf(LayoutCheck.Finding(0, "base", listOf("it has no key [backspace]"))), r.errors)
-        val nine = own("nine")
-        assertEquals(listOf("base"), errors(nine.replace(Regex("<slot [^>]*kind=\"nine-side\"[^>]*/>"), "<gap width=\"16\"/>")).take(1))
-    }
-
-    @Test
     fun aNameOfItsOwnHasItsBoardBeforeIt() {
         val named = { name: String -> qwerty.replace("shortcut=\"full/q\"", "shortcut=\"$name\"") }
         assertEquals(emptyList(), errors(named("my-qwerty/q")))
@@ -219,43 +211,6 @@ class LayoutCheckTest {
     }
 
     @Test
-    fun itHasTheKeysItsFamilyNeeds() {
-        assertEquals(listOf("lacks"), errors(replaceKey(qwerty, "shift", "")))
-        val k18 = own("k18")
-        assertEquals(listOf("groups"), errors(k18.replaceFirst("letters=\"we\"", "letters=\"w\"")))
-        val symbols = own("symbols")
-        assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("panel-back"))), check(symbols.replace("send=\"panel-back\"", "send=\"layout:Text\"")).errors)
-        val number = own("number")
-        assertEquals(listOf(LayoutCheck.Finding(0, "lacks", listOf("pad=full: back"))), check(replaceKey(number, "back", "<gap width=\"14\"/>")).errors)
-        // every number field has the full pad: without - or . an amount's minus or point cannot be typed (told, not refused)
-        val noDot = Regex("<key id=\"\\.\"[^>]*/>").replace(number, "<gap width=\"10\"/>")
-        val noMinus = Regex("<key id=\"-\" kind=\"function\" width=\"(\\d+)\"[^>]*/>").replace(noDot, "<gap width=\"\$1\"/>")
-        assertRows(
-            listOf(
-                Triple("the app's own: both", number, null),
-                Triple("no point: a decimal field cannot take one", noDot, "."),
-                Triple("neither: no minus either", noMinus, "- ."),
-            ),
-            { it.first },
-        ) { (_, board, lacks) ->
-            val r = check(board)
-            assertEquals(emptyList(), r.errors)
-            assertEquals(listOfNotNull(lacks?.let { LayoutCheck.Finding(0, "pad-lacks", listOf("full", it)) }), r.warnings.filter { it.key == "pad-lacks" })
-        }
-        assertEquals(listOf("full"), check(replaceKey(number, "back", "<gap width=\"14\"/>")).errors.mapNotNull(LayoutCheck::padLacking))
-        assertEquals(null, LayoutCheck.padLacking(LayoutCheck.Finding(0, "lacks", listOf("panel-back"))))
-        // digits held by what they type, not by the app's ids
-        val renamed = (0..9).fold(number) { t, d -> t.replaceFirst("<key id=\"$d\"", "<key id=\"d$d\"") }
-        assertEquals(emptyList(), check(renamed).errors)
-        assertEquals(listOf("base"), check(renamed, strict = false).errors.map { it.key }, "a theme's board of the list: held as 0.6.0 held it")
-        assertEquals(listOf("lacks"), errors(Regex("<key id=\"d5\"[^>]*/>").replace(renamed, "<gap width=\"22\"/>")))
-        val phone = Regex("<key id=\"#\"[^>]*/>").replace(number.replaceFirst("family=\"number\"", "family=\"number\" pads=\"phone\""), "<gap width=\"16\"/>")
-        val r = check(phone)
-        assertEquals(emptyList(), r.errors)
-        assertTrue(LayoutCheck.Finding(0, "pad-lacks", listOf("phone", "#")) in r.warnings, r.warnings.toString())
-    }
-
-    @Test
     fun everySceneItIsShownInIsMadeWithoutAProblem() {
         val wide = qwerty.replace("width=\"1.4\" label=\".com\"", "width=\"5\" label=\".com\"")
         val r = check(wide)
@@ -270,7 +225,11 @@ class LayoutCheckTest {
         assertTrue(found.all { "reaches into" in it.args[1] }, found.toString())
         val over = check(tall.replace("<key id=\"g\" label", "<key id=\"g\" width=\"1.5\" label")).errors
         assertTrue(over.isNotEmpty() && over.all { "over the 9 it has" in it.args[1] }, over.toString())
-        assertEquals(listOf("blank"), errors(qwerty.replace("label=\"拼\" text-size=\"18\" text-style=\"bold\"\n         send=\"code:U+F0104\" when=\"table !looking-up\"", "send=\"code:U+F0104\" when=\"table !looking-up\"")))
+        // drawn, only unseen: told, as a theme's blank key is
+        val blank = check(qwerty.replace("label=\"拼\" text-size=\"18\" text-style=\"bold\"\n         send=\"code:U+F0104\" when=\"table !looking-up\"", "send=\"code:U+F0104\" when=\"table !looking-up\""))
+        assertEquals(emptyList(), blank.errors)
+        assertEquals(listOf("blank"), blank.warnings.map { it.key }.filter { it == "blank" })
+        assertEquals("0.6.3", blank.minApp, "the old app refused it")
     }
 
     @Test
@@ -308,7 +267,7 @@ class LayoutCheckTest {
         assertEquals(emptyList(), r.errors)
         assertEquals(listOf("id-built-in", "based-on"), r.warnings.map { it.key }.filter { it == "id-built-in" || it == "based-on" })
         assertTrue(r.warnings.none { it.key == "gap-look" })
-        assertEquals(listOf("base"), check(replaceKey(pack, "backspace", ""), strict = false).errors.map { it.key })
+        assertEquals(listOf(listOf("backspace")), check(replaceKey(pack, "backspace", ""), strict = false).warnings.filter { it.key == "lacks" }.map { it.args })
         val number = own("number").replace("<key id=\"symbols\" role=\"symbols\"", "<key id=\"symbols\" role=\"lock\"")
         assertTrue(check(number, strict = false).warnings.none { it.key == "bottom-left" })
         val wide = qwerty.replace("width=\"1.4\" label=\".com\"", "width=\"5\" label=\".com\"")
@@ -337,7 +296,8 @@ class LayoutCheckTest {
             "row-when gap" to qwerty.replace("</keyboard>", "<row when=\"field=url\"><gap id=\"g1\" width=\"1\"/><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><gap id=\"g1\" width=\"1\"/></row>\n</keyboard>"),
             "row-when" to qwerty.replace("</keyboard>", "<row when=\"field=url\"><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><key id=\"zz\" label=\"y\"/></row>\n</keyboard>"),
         )
-        assertEquals(LayoutCheck.FEATURES.keys, samples.keys.map { it.substringBefore(' ') }.toSet())
+        // lacks is the check's (whatABoardLacksIsToldOnceAndTaken), not the reader's
+        assertEquals(LayoutCheck.FEATURES.keys - "lacks", samples.keys.map { it.substringBefore(' ') }.toSet())
         for ((sample, text) in samples) {
             val feature = sample.substringBefore(' ')
             val layout = LayoutReader.layout(text).ok()
@@ -657,7 +617,8 @@ class LayoutCheckTest {
     @Test
     fun aLayoutReadToBeDrawnIsHeldToWhatNeedsNoScene() {
         for (id in listOf("qwerty", "k14", "k18", "nine", "number", "symbols")) assertEquals(emptyList(), loaded(own(id)), id)
-        assertEquals(listOf("base"), loaded(qwerty.replace("role=\"backspace\" ", "")).filter { it == "base" })
+        assertEquals(emptyList(), loaded(qwerty.replace("role=\"backspace\" ", "")), "lacking ⌫: drawn")
+        assertEquals(listOf("groups"), loaded(withRow(THIRTEEN_GROUPS, own("k18"))))
         assertEquals(listOf("name-no-slash"), loaded(qwerty.replace("shortcut=\"full/q\"", "shortcut=\"mine\"")))
         assertEquals(listOf("hidden-chars"), loaded(qwerty.replace("send=\"commit:/\"", "send=\"commit:&#x202E;\"")))
         assertEquals(listOf("layout-target"), loaded(qwerty.replace("send=\"commit:/\"", "send=\"layout:Emoji\"")))
@@ -675,10 +636,12 @@ class LayoutCheckTest {
             "symbols" to own("symbols"), "k17" to testData("k17.xml").replaceFirst("id=\"k17\"", "id=\"my-k17\" based-on=\"k18\"")
                 .replace("</keyboard>", "  <include src=\"grouped-bottom\"/>\n</keyboard>"),
             "the-app-qwerty" to testData("qwerty.xml"),
+            "nine-big-enter" to testData("layout-check/nine-big-enter.layout"),
             "pack-qwerty" to testData("qwerty.xml"),
         )
         val text = cases.joinToString("\n") { (name, t) ->
-            val r = check(t, strict = name != "pack-qwerty")
+            // the app the sample asks (min-app="0.6.3")
+            val r = check(t, strict = name != "pack-qwerty", app = "0.6.3")
             "# $name\nfamily ${r.family} ims ${r.ims} pads ${r.pads} min-app ${r.minApp} commits ${r.commits}\n" +
                 r.errors.joinToString("") { "E $it\n" } + r.warnings.joinToString("") { "W $it\n" }
         }

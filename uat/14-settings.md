@@ -989,6 +989,19 @@
 - **预期**：确认框写「删除「UAT 数字」吗？数字键盘正在用它，删掉后换回内置的。」。删后卡片不见，自带的「数字」卡片下写「用在：数字键盘」；123 的 1 键写 1。（文件读不出时选择留着，先画自带的，卡片下写「用在：数字键盘（读不出，暂用内置的）」；选的文件不见了，自带的卡片下写「用在：数字键盘（选的布局不见了，暂用内置的）」：JVM 测。）
 - **JVM**：`CustomPanelTest.oneRefusedAsItIsReadDrawsTheAppsTheChoiceKept`、`PanelLayoutsTest.thePanelsUsingALayoutGoBackOnTheAppsAsItIsDeleted`、`PanelLayoutsTest.aChoiceNotReadIsListedUnderItsPanelOneGoneOnTheAppsCard`、`CustomLayoutFilesTest.aBackupsFileIsRestoredOnlyAsTheLayoutItsNameSays`。
 
+### ST-197 [P1] 导入缺键的布局：照样导入，要注意的地方写清楚
+<!-- 063-layout-relax §2、§4 -->
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-nine-big-enter.layout`（设计里的样例「九键大回车」，只改了 id 和名字：右列没有 0，回车占右下两行）、`uat-k17-no-m.layout`（`uat-k17-1.0` 去掉 M 键）、`uat-symbols-no-grid.layout`（`uat-symbols-1.0` 去掉符号格子的槽）。
+- **操作**：
+  1. 导入 `uat-nine-big-enter.layout`，看确认框，点 **导入**，问用在哪时只勾 **拼音**；到测试页点「普通文本」框，按 64426，点「你好」；点大回车的下半；点 **123** 打 0。
+  2. 导入 `uat-k17-no-m.layout`，看确认框，用在 **拼音**；到测试页看键盘，按 BN IO HJK A IO 打。
+  3. 导入 `uat-symbols-no-grid.layout`，问「现在就用作符号面板吗？」时点 **用**；到测试页打几个字，点 **符**，点 ⌫，再点「回去」。
+- **预期**：
+  1. 确认框只有一条提醒「没有数字键 0」，没有错误；导入后键盘就是这块：右列没有 0，回车占两行。64426 的候选第一个是「你好」，点了上屏；点回车下半换行；123 的数字键盘有 0，打得出 0。
+  2. 确认框只提醒「没有字母 m（密码框里也用这块键盘）」；键盘画的是这块 17 键（第 3 行 M 的地方空着），不是自带的 18 键；「你好」在前三个候选里。
+  3. 确认框只提醒「没有符号格子的位置：没有符号可选」；面板上分类栏在，格子那块空着，什么都不盖在键上；⌫ 删掉一个字，「回去」回到字母键盘。
+- **JVM**：`LayoutImportTest.theUatsLayoutsLackingKeysAreTakenAndTold`（三个文件导入、各只提醒少了什么）、`LayoutLacksTest.theNineKeysWithNoZeroAreTakenWithOneWarning`、`LayoutLacksTest.whatABoardLacksIsToldOnceAndTaken`、`CustomKeyboardTest.oneLackingKeysIsDrawnAsItIs`、`GroupedKeyboardOwnGroupsTest.theSampleLackingALetterIsDrawnAsItIs`、`CustomPanelTest.aPanelWithoutTheGridHidesItAndItsKeysAreTapped`、`EnginesOwnKeysTest.theKeysOfALayoutLackingALetterTypePinyin`。
+
 ### ST-175 [P1] 升级到 0.6.1：正在用的主题带的 18 键放进 外观 → 布局，拼音换成它，看到的不变，提示一次
 - **前提**：B0-设置，模拟器、debug 包，**跟随系统深色模式** 关；「下载」里有 0.6.0 的示例主题包「薄荷 17 键」（同 ST-74，脚本用 `lib/keyboard-scene/src/commonTest/data/mint-k17` 打包成 `uat-mint.theme`）；**输入法 → 拼音** 的 **键盘** 选「18 键」。
 - **操作**：导入它（**一起导入** 去掉勾）并选用；`adb shell run-as <包名> rm no_backup/theme-layouts-listed`、`am force-stop <包名>`（等于从 0.6.0 升级后第一次启动）；看 **外观 → 布局**、**输入法 → 拼音 → 键盘**；到测试页点「普通文本」框看键盘上方；用拼音按 17 键的分组打 n i h a o。再 `am force-stop` 一次，回测试页。
@@ -1065,7 +1078,7 @@
 ### ST-190 [P2] 键盘布局网页：有错不让存、有警告先问、草稿找回、打开 .theme；主题制作网页打开 .layout
 - **前提**：电脑浏览器打开键盘布局页（同 ST-189）和主题制作页（同 ST-56）；`uat/fixtures/layouts/uat-names.layout`、`uat/fixtures/layouts/uat-old-group.layout`（UAT 17 键照 L8 之前的布局页写法，HJK 键显示的字写成 `{group:hjk}`，App 读不了）；示例主题「薄荷（动效）」的 `.theme`（主题制作页 **文件 › 新建…** 从示例里选它，再 **文件 › 保存 .theme**）；ST-72 的 `uat-layouts.theme`（带 `qwerty.xml`、`k18.xml` 两块 App 读得出的键盘和读不出的 `k14.xml`）。
 - **操作**：
-  1. 布局页从 26 键新建；在 **源码** 里删掉 `a` 键那一行，点 **文件 › 保存 .layout**；把它加回来，再把一个键的宽度改得很窄，再保存。
+  1. 布局页从 26 键新建；把一个键显示的字改成 17 个字，点 **文件 › 保存 .layout**；把它改回来，在 **源码** 里删掉 `a` 键那一行，再把一个键的宽度改得很窄，再保存。
   2. 改一处后不保存，重新载入页面。
   3. **文件 › 打开 .layout 或 .theme…** 选薄荷的 `.theme`。
   4. 主题制作页 **环境 › 键盘** 选 **打开 .layout…**，选 `uat-names.layout`；再把 `uat-names.layout` 的 id 改成 `qwerty` 另存，用同样的办法打开。
@@ -1073,7 +1086,7 @@
   6. 两个页面的 **设备** 都选「平板 10"」，不转横（布局页 **方向** 选竖，主题制作页不勾 **横屏**），看预览。
   7. 主题制作页 **文件 › 打开** `uat-layouts.theme`，**键盘** 先后选 26 键、18 键，看预览和 **问题**；布局页打开同一个 `.theme`，看列出的键盘。
 - **预期**：
-  1. 缺 `a` 时不保存，**问题** 里有这条错误；只有警告时列出警告，点 **仍然保存** 才保存。
+  1. 键上的字超过 16 个时不保存，**问题** 里有这条错误；改回后只有警告，列出「没有字母 a（密码框里也用这块键盘）」和键很窄的那条，点 **仍然保存** 才保存，存下的文件 `min-app` 是 0.6.3。
   2. 重新载入后问要不要 **恢复** 草稿，恢复后是改过的样子。
   3. 预览改按薄荷画，顶栏 **主题** 多一项「薄荷（动效）（打开的 .theme）」；主题包里带了自己的键盘布局的，同时列出那几块，可以从它开始（`layout-maker.test.mjs` 查）。
   4. `uat-names.layout` 打开后键盘一栏是「UAT 键名（uat-names.layout）」，预览画在这块 18 键分组键盘上；id 是 `qwerty` 的那份打不开，提示「id「qwerty」和 App 自带的键盘重名，App 不会导入它：换一个 id」。

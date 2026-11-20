@@ -898,8 +898,9 @@ replaces 注音's, the emoji panel's…, never adds one; since 0.6.1 its `qwerty
 `KeyData.LISTED`, are layouts of the user's instead, below), and refuses (`LayoutSource.refuses`, logged once,
 the app's drawn) one that is not as typable as the app's of that id (`ThemePackLayouts.judge`: its `id` and `family`,
 and every slot kind, function key of role backspace/enter/lang and digit key the app's has, its includes in place:
-`LayoutCheck.kept`, which the custom layouts' whole check `LayoutCheck.check` asks too, the maker's page through the JS
-`checkLayout`; its `Report.commits`, what the import's confirmation lists, are only the `commit:` texts the base does not
+`LayoutCheck.kept`, and a `letters` board's a–z by id, `LayoutCheck.lettersLacking`; the custom layouts' whole check
+`LayoutCheck.check`, the maker's page through the JS `checkLayout`, only warns of what a board lacks (`lacks`, told once
+each by `LayoutLacks`, a number board's digits by what they type; such a file is `min-app` 0.6.3); its `Report.commits`, what the import's confirmation lists, are only the `commit:` texts the base does not
 type: a key of a base key's id typing a text that key types is left out, another text or a key of its own listed; `LayoutWriter` writes a layout back as canonical text, `writeLayout` on the page); a
 fragment it includes that the pack has not is the app's, a fragment of the pack's is read only by the pack's own
 keyboards. Block by block: a bad `zhuyin-nine.xml` falls back alone (`ThemePackLayoutsTest`).
@@ -1259,7 +1260,9 @@ Layouts of the user's as keyboards (061-custom-layout §5, L3). `ImKeyboard.CUST
 keyboard: the tables' only choice); `PinyinKeyboard`/`ShuangpinKeyboard`/`EnglishKeyboard` gained `Custom`. The app's
 `data/layout/CustomKeyboards.choice(id)` reads a file once a stamp (`"$mtime-$size"`) into a `CustomChoice` through
 ime-core's `CustomLayoutChoices.of`, which holds it again to `LayoutCheck.loaded` (what needs no scene: version,
-identity, limits, includes, targets, held keys, names, family, `hidden-chars`, `command`); one that fails is
+identity, limits, includes, targets, its base board exists, names, the groups' shape, `hidden-chars`, `command`; a
+board lacking keys is drawn as it is, a grouped one lacking letters on its own groups, `Groups.shape` alone asked by
+`NineKeyLetters.problem` and `SceneGroups.letters`); one that fails is
 `drawn = false`. `ImKeyboards.usable` is §5.1's table (a table only where the layout has `table-extra=semicolon` and
 `=star` keys, `tableExtras`); `effective(…, custom)` draws a layout not usable, not read or refused as its base
 (`baseOf`: `based-on` k18/k14/nine, else the full keyboard), the pref left as it is; `shown` gives the built-in
@@ -1299,7 +1302,8 @@ to ime-core) where it draws it, the plain name else: one maker per pad (`NumberP
 older stamp's dropped, `KeyboardNames.stale`; the other pads' of the same stamp kept). The
 pref is in `remakeKeyboardsPrefs`. The symbol panel is made once per input view: `PickerWindow` asks the choice as it
 is made and at each `onAttached`, `PickerLayout.drawKeys(id@stamp)` putting a new board in place of the one drawn when
-it changed (its `categories` and `grid` slots placed as the app's). The layout's own pad checks (`pads=`, each pad's
+it changed (its `symbol-categories` and `symbol-grid` slots placed as the app's; slots, the nine keys' `nine-side`
+too, are found by `kind=`, the id the layout's own, and a view whose slot the board has not is hidden). The layout's own pad checks (`pads=`, each pad's
 scene, `pad-lacks`, `bottom-left`) are `LayoutCheck`'s at import (L1), as is `split-scaled` (L8: an `on-split="split"`
 board's `split="halves"` row with other than 9 or 10 keys to halve in a scene, scaled when split, `ScaledRows`) and the held warnings (`held`, `held-letters`, `held-popups`, below); the layout page shows the same findings, LayoutCheck run in JS (its 分组字母 box naming a key whose letters leave the app key's `<layout id>/<letters>`, `LayoutEdit.setLetters`, as `merge` and `PackLayouts` do); as it is read only `LayoutCheck.loaded`. 外观 →
 布局: a number or symbols card, the app's too, tapped offers 数字键盘用这个 / 符号面板用这个 (one refused under this

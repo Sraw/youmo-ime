@@ -108,12 +108,12 @@ class CustomLayoutFilesTest {
         assertFalse("a family the list has no section for", restorable("my-zhuyin.xml", boards.getValue("zhuyin").replaceFirst("id=\"zhuyin\"", "id=\"my-zhuyin\" based-on=\"qwerty\"")))
         assertFalse("an app's board's id", restorable("k18.xml", boards.getValue("k18").replaceFirst("id=\"k18\"", "id=\"k18\" based-on=\"k18\"")))
         assertFalse("a key name's prefix", restorable("g18.xml", own("g18")))
-        assertFalse("what its base must be typed on gone", restorable("mine.xml", own("mine").replace("role=\"backspace\" ", "")))
+        assertTrue("a board lacking what its base has, taken as at import", restorable("mine.xml", own("mine").replace("role=\"backspace\" ", "")))
         assertFalse("for a newer app", restorable("mine.xml", own("mine").replaceFirst("<defaults", "<meta min-app=\"9.0.0\"/>\n  <defaults")))
-        // a number board whose pad lacks what a field of it types: not drawn, whatever the backup says
+        // a number board whose pad lacks a digit: told at import, taken there and here alike
         val numbers = boards.getValue("number").replaceFirst("id=\"number\"", "id=\"my-num\" based-on=\"number\" pads=\"phone\"")
         assertTrue("a number board", restorable("my-num.xml", numbers))
-        assertFalse("its phone pad without 5", restorable("my-num.xml", numbers.replace("send=\"sym:KP_5\"", "send=\"commit:x\"")))
+        assertTrue("its phone pad without 5", restorable("my-num.xml", numbers.replace("send=\"sym:KP_5\"", "send=\"commit:x\"")))
         val names = (1..150).map { "l$it.xml" } + listOf(".converted", "x.xml.saving", "Bad.xml")
         val taken = CustomLayoutFiles.restoredNames(names)
         assertEquals(CustomLayoutFiles.MAX_LAYOUTS, taken.size)

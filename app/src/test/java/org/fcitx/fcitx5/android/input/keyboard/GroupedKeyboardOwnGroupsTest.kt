@@ -158,6 +158,23 @@ class GroupedKeyboardOwnGroupsTest {
         assertEquals(written, EngineState.ownKeys)
     }
 
+    // a layout lacking a letter (the sample without M): its own keys drawn and told, never the app's in its place
+    @Test
+    fun theSampleLackingALetterIsDrawnAsItIs() {
+        k14Text = k17.replace(Regex("<key id=\"r3c2\"[^>]*/>"), "<gap width=\"20\"/>")
+        check(k14Text != k17)
+        val grouping = GroupedKeyboard.grouping(context, NineKeyLetters.G14, own = true, log = false)
+        assertEquals(written - "m", grouping.own)
+        val keyboard = grouped()
+        val labels = keyboard.shownKeys().map { it.label }
+        assertTrue(labels.toString(), labels.containsAll(listOf("PQRS", "ABC", "BN")) && "M" !in labels)
+        keyboard.onAttach()
+        assertEquals(written - "m", EngineState.ownKeys)
+        keyboard.touch(keyboard.shownKey("PQRS"), 0.75f, 0.25f)
+        val noM = NineKeyLetters.custom(written - "m")
+        assertEquals(listOf<KeyAction>(tap(noM.codes[(written - "m").indexOf("pq rs")], 0.75f, 0.25f)), sent)
+    }
+
     @Test
     fun eachKeyboardShownTellsItsOwnGroupsAgain() {
         k18Text = twice

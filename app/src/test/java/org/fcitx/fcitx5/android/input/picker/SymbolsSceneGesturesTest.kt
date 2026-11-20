@@ -116,7 +116,7 @@ class SymbolsSceneGesturesTest {
         val kb = layout.embeddedKeyboard
         val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
         return Rect().apply {
-            set(canvas.scene!!.slots.single { it.id == slot }.bounds)
+            set(canvas.scene!!.slots.single { it.kind == slot }.bounds)
             offset(kb.left + canvas.left, kb.top + canvas.top)
         }
     }

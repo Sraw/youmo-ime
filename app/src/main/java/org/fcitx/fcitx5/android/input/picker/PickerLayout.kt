@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.isInvisible
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
@@ -59,9 +60,9 @@ class PickerLayout(
         }
 
         /** False with no scene. */
-        fun slot(id: String, out: Rect): Boolean {
+        fun slot(kind: String, out: Rect): Boolean {
             val c = canvas ?: return false
-            if (!c.slot(id, out)) return false
+            if (!c.slot(kind, out)) return false
             out.offset(left + c.left, top + c.top)
             return true
         }
@@ -147,8 +148,15 @@ class PickerLayout(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (!panel) return
-        side?.let { if (embeddedKeyboard.slot(CATEGORIES_SLOT, slotCell)) it.layoutIn(slotCell) }
-        if (embeddedKeyboard.slot(GRID_SLOT, slotCell)) grid.layoutIn(slotCell)
+        side?.placeIn(CATEGORIES_SLOT)
+        grid.placeIn(GRID_SLOT)
+    }
+
+    // a layout without the slot: the view hidden, never left over the keys drawn there
+    private fun View.placeIn(kind: String) {
+        val found = embeddedKeyboard.slot(kind, slotCell)
+        isInvisible = !found
+        if (found) layoutIn(slotCell)
     }
 
     // absolute: not mirrored right to left, as the scene's cells are not. Laid out at once, so a size changed moves
@@ -206,7 +214,7 @@ class PickerLayout(
     companion object {
         private const val SIDE_WIDTH = 0.18f
 
-        internal const val CATEGORIES_SLOT = "categories"
-        internal const val GRID_SLOT = "grid"
+        internal const val CATEGORIES_SLOT = "symbol-categories"
+        internal const val GRID_SLOT = "symbol-grid"
     }
 }

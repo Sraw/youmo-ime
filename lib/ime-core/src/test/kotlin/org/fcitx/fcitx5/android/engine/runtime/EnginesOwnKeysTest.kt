@@ -64,6 +64,29 @@ class EnginesOwnKeysTest : EnginesFixture() {
         assertEquals(InputMethodCatalog.PINYIN_KEYS18, KeyboardPair.pinyinKeyed(Keyboard.pinyin18Key(NineKeyLetters.G18.key('n'))))
     }
 
+    // a layout lacking a letter (k17 without m) is its own keyboard still: the others type as before; a word with the
+    // missing letter is not typed on it, the letter (from a popup) kept as typed, never a key's code nor a crash
+    @Test
+    fun theKeysOfALayoutLackingALetterTypePinyin() {
+        val noM = written.filter { it != "m" }
+        val keys = NineKeyLetters.custom(noM)
+        val engines = engines(noM)
+        val typed = engines.typeCodes(nihao.map { code(it, keys).code })
+        assertTrue(typed.candidates.toString(), "你好" in typed.candidates.take(3))
+        engines.afresh()
+        // the letters typed as themselves: n i are on keys and read, m a are not
+        assertEquals("你", engines.typeCodes(listOf('n'.code, 'i'.code)).candidates.first())
+        engines.afresh()
+        val mama = engines.typeCodes("mama".map { it.code })
+        assertEquals("mama", mama.preedit)
+        assertEquals(listOf("mama"), mama.candidates)
+        assertEquals("mama", engines.onEvent(PINYIN, EngineEvent.PICK, 0).commit)
+        // nothing of it learned under the keyboard's kind, and a code with the letter in it shown as that letter
+        assertEquals(emptyList<String>(), keys.typings("mama"))
+        assertEquals("m as", Kinds.keysOf(Kinds.keys(keys.tag()))!!.shown("m" + code("as", keys)))
+        engines.close()
+    }
+
     @Test
     fun theSeventeenKeysTypePinyinByCodeAndByTap() {
         val engines = engines()

@@ -17,8 +17,8 @@ family number ims [] pads [full] min-app 0.6.1 commits []
 family symbols ims [] pads [] min-app 0.6.1 commits []
 
 # k17
-family grouped ims [pinyin] pads [] min-app 0.6.1 commits []
-E base [it has no key [backspace]]
+family grouped ims [pinyin] pads [] min-app 0.6.3 commits []
+W lacks [backspace]
 W line 10: unnamed [r1c1]
 W line 11: unnamed [r1c2]
 W line 12: unnamed [r1c3]
@@ -41,6 +41,10 @@ W line 30: unnamed [r3c5]
 family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []
 E id-built-in [qwerty]
 E based-on []
+
+# nine-big-enter
+family nine ims [pinyin, shuangpin, english] pads [] min-app 0.6.3 commits []
+W lacks [digits] [0]
 
 # pack-qwerty
 family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []

@@ -81,9 +81,14 @@ class KeyboardCustomTest {
         // the other built-in keyboard's groups in its place: refused, never its codes
         assertTrue(SceneGroups.taken(k18, NineKeyLetters.G14, own = true, frags()) is SceneGroups.Taken.Refused)
         assertTrue(SceneGroups.taken(k14, NineKeyLetters.G18, own = true, frags()) is SceneGroups.Taken.Refused)
-        // groups that make no keyboard: a letter on none (k17 without its key of z), refused
+        // a letter on none (k17 without its keys of z): its own keyboard all the same, z typed around
         val noZ = LayoutReader.layout(SceneData.read("k17.xml").replace("letters=\"zx\"", "letters=\"x\"").replace("letters=\"xyz\"", "letters=\"xy\"")) as Parsed.Ok
-        val bad = SceneGroups.taken(noZ.value, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Refused
+        val taken = SceneGroups.taken(noZ.value, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Own
+        assertEquals(SceneGroups.written(noZ.value), taken.written)
+        // groups that make no keyboard: past the keys a keyboard of its own has, refused
+        val past = (1..NineKeyLetters.CUSTOM_MAX - 16).joinToString("") { "<key id=\"x$it\" label=\"A\" letters=\"a\"/>" }
+        val many = LayoutReader.layout(SceneData.read("k17.xml").replaceFirst("<row>", "<row>$past</row>\n  <row>")) as Parsed.Ok
+        val bad = SceneGroups.taken(many.value, NineKeyLetters.G14, own = true) as SceneGroups.Taken.Refused
         assertTrue(bad.why, "make no keyboard" in bad.why)
     }
 

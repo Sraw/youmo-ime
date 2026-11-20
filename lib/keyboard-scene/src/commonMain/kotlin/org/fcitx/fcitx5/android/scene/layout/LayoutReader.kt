@@ -74,11 +74,6 @@ object LayoutReader {
         if (parts.isEmpty()) p.add(root.line, "<keyboard> has no rows")
         checkKeys(parts.filterIsInstance<Row>(), p)
         if (onSplit == OnSplit.Split) splitSides(parts.filterIsInstance<Row>(), p)
-        if (family == "letters") {
-            val ids = parts.filterIsInstance<Row>().flatMap { r -> r.cells.mapNotNull { it.id } }.toSet()
-            KeyNames.LETTERS.filter { it !in ids }.takeIf { it.isNotEmpty() }
-                ?.let { p.add(root.line, "a letters board lacks the keys ${it.joinToString(" ")}") }
-        }
         val named = composedNamed(family, parts, p)
         return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups, basedOn, meta, pads) }
     }

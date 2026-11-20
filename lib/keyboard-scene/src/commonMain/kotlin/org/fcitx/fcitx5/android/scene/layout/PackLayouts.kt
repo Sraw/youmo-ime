@@ -29,6 +29,7 @@ object PackLayouts {
         if (layout.id != id) return "its id is ${layout.id}"
         app ?: return "the app's $id does not read"
         if (layout.family != app.family) return "its family is ${layout.family}, the app's ${app.family}"
+        if (layout.family == "letters") LayoutCheck.lettersLacking(layout, fragments).takeIf { it.isNotEmpty() }?.let { return "it has no key [${it.sorted().joinToString(", ")}]" }
         return LayoutCheck.kept(layout, fragments, app, appFragments)
     }
 
@@ -103,7 +104,7 @@ object PackLayouts {
     private fun forPads(family: String, declared: List<String>?, made: (List<String>?) -> Made): ForPads {
         if (family != NUMBER) return ForPads(made(declared), null)
         val all = made(declared ?: LayoutReader.PADS)
-        val lacking = padsLacking(all.report)
+        val lacking = all.report.padsLacking
         return when {
             lacking.isEmpty() -> ForPads(all, null)
             declared != null -> ForPads(null, "its pads lack keys: ${lacking.joinToString(" ")}")
@@ -115,9 +116,6 @@ object PackLayouts {
     fun idOf(theme: String, id: String): String = "t" + hash(theme) + "-" + id
 
     private const val NUMBER = "number"
-
-    private fun padsLacking(report: LayoutCheck.Report): List<String> =
-        (report.errors + report.warnings).mapNotNull(LayoutCheck::padLacking).distinct()
 
     private fun renameKeys(defaults: KeyAttrs, parts: List<Part>, newId: String, sources: LayoutCheck.Sources, app: (String) -> NodeFacts?): Renamed {
         val renames = LinkedHashMap<String, String>()

@@ -5,10 +5,12 @@
 package org.fcitx.fcitx5.android.input.layout
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
+import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,6 +59,34 @@ class CustomLayoutChoicesTest {
         assertEquals(listOf("hidden-chars"), r.problems.map { it.key })
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.baseOf(r.choice))
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.effective(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, ShuangpinScheme.ZIRANMA, r.choice))
+    }
+
+    // only boards lacking keys: the import's strict check, the drawing, a restore and the grouped letters take them alike
+    @Test
+    fun aBoardLackingKeysIsTakenAlikeOnTheFourPaths() {
+        class Row(val why: String, val id: String, val text: String)
+        assertRows(
+            listOf(
+                Row("letters without ⌫", "qwerty", own("qwerty").replace(Regex("<key id=\"backspace\"[^>]*?/>"), "")),
+                Row("letters without q", "qwerty", own("qwerty").replace(Regex("<key id=\"q\"[^>]*>[\\s\\S]*?</key>"), "")),
+                Row("nine without 0", "nine", own("nine").replace(Regex("<key id=\"0\"[^>]*/>"), "<gap width=\"18\"/>")),
+                Row("grouped without w and e", "k18", own("k18").replace(Regex("<key id=\"r1c2\"[^>]*/>"), "<gap/>")),
+                Row("the phone pad without 5", "number", own("number").replaceFirst("based-on=\"number\"", "based-on=\"number\" pads=\"phone\"").replace("send=\"sym:KP_5\"", "send=\"commit:x\"")),
+                Row("symbols without the grid", "symbols", own("symbols").replace(Regex("<slot id=\"grid\"[^>]*/>"), "<gap width=\"82\"/>")),
+            ),
+            { it.why },
+        ) { row ->
+            check(row.text != own(row.id))
+            val r = LayoutCheck.check(row.text, sources, "0.6.3")
+            assertTrue(r.errors.toString(), r.ok)
+            assertTrue(r.warnings.toString(), r.warnings.any { it.key == "lacks" })
+            assertTrue(read(row.text).choice.drawn)
+            assertTrue(CustomLayoutFiles.restorable("my-${row.id}.xml", row.text.toByteArray(), sources, "0.6.3"))
+            if (row.id == "k18") {
+                val layout = LayoutImport.layout(row.text)!!
+                assertTrue(SceneGroups.taken(layout, NineKeyLetters.G18, own = true) is SceneGroups.Taken.Own)
+            }
+        }
     }
 
     @Test

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.MotionEvent
 import android.view.View
+import android.widget.ScrollView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -26,7 +27,9 @@ import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.SceneShownKey
+import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
@@ -118,6 +121,28 @@ class CustomKeyboardTest {
         assertEquals(TextKeyboard.Name, KeyboardNames.base(name))
         assertEquals("${mine.id}@${mine.stamp}", KeyboardNames.custom(name))
         assertTrue(KeyboardNames.sameLayout(name, "${mine.id}@other"))
+    }
+
+    // a board lacking keys is drawn as it is, never its base in its place
+    @Test
+    fun oneLackingKeysIsDrawnAsItIs() {
+        val noBackspace = own("my-qwerty") { swapped(it).replace(Regex("<key id=\"backspace\"[^>]*?/>"), "") }!!
+        assertTrue(noBackspace.drawn)
+        val drawn = TextKeyboard(context, TestThemes.PixelDark, custom = "${noBackspace.id}@${noBackspace.stamp}").wired()
+        assertEquals(labelOf(TextKeyboard(context, TestThemes.PixelDark).wired(), "q"), labelOf(drawn, "w"))
+        assertTrue(drawn.shownKeys().none { it.id == "backspace" })
+        // the nine keys without 0, their side slot under another id: the column in the slot of its kind
+        val nine = own("my-nine", base = "nine") {
+            it.replace(Regex("<key id=\"0\"[^>]*/>"), "<gap width=\"18\"/>").replace("<slot id=\"side\"", "<slot id=\"syllables\"")
+        }!!
+        assertTrue(nine.drawn)
+        val t9 = T9Keyboard(context, TestThemes.PixelDark, semicolon = false, custom = "${nine.id}@${nine.stamp}").laidOut()
+        assertTrue(t9.shownKeys().none { it.id == "0" })
+        val slot = KeyboardHarness.all(t9).filterIsInstance<KeyboardCanvasView>().single().scene!!.slots.single { it.kind == "nine-side" }
+        assertEquals("syllables", slot.id)
+        val column = (0 until t9.childCount).map { t9.getChildAt(it) }.filterIsInstance<ScrollView>().single()
+        assertEquals(View.VISIBLE, column.visibility)
+        assertEquals(slot.bounds.width.roundToInt(), column.width)
     }
 
     @Test

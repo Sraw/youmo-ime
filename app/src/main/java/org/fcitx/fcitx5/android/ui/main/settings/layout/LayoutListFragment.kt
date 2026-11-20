@@ -48,6 +48,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardLabels
 import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
@@ -280,17 +281,21 @@ class LayoutListFragment : Fragment() {
                         val preview = withContext(Dispatchers.IO) {
                             runCatching { CustomLayouts.fragments(layout, ctx)?.let { scene(ctx, layout.id, layout, it) } }.getOrNull()
                         }
-                        confirm(ctx, opened.text, v, preview)
+                        // input methods on the one it replaces that cannot type on it: said here, sent back once saved
+                        val back = if (v.replaces == null) emptyMap() else withContext(Dispatchers.IO) {
+                            ImKeyboards.afterReplace(AppPrefs.getInstance().keyboard.imKeyboards(), layout.id, CustomKeyboards.choiceOf(layout), EngineState.shuangpinScheme)
+                        }
+                        confirm(ctx, opened.text, v, preview, back)
                     }
                 }
             }
         }
     }
 
-    private fun confirm(ctx: Context, text: String, ok: LayoutImport.Verdict.Ok, preview: SceneLayout?) {
+    private fun confirm(ctx: Context, text: String, ok: LayoutImport.Verdict.Ok, preview: SceneLayout?, back: Map<String, ImKeyboard>) {
         val layout = ok.layout
         val name = LayoutTexts.shown(layout.name, layout.id)
-        dialog(ctx, ctx.getString(R.string.layout_import_title, name), LayoutTexts.confirm(ctx, ok), preview)
+        dialog(ctx, ctx.getString(R.string.layout_import_title, name), LayoutTexts.confirm(ctx, ok, goesBack(ctx, back)), preview)
             .setPositiveButton(R.string.theme_pack_import) { _, _ ->
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
@@ -299,6 +304,7 @@ class LayoutListFragment : Fragment() {
                             CustomKeyboards.choice(layout.id)
                         }
                         ctx.toast(ctx.getString(R.string.layout_imported, name))
+                        read?.let { sendBack(it) }
                         reload()
                         // one: asked of it; more: ticked
                         read?.let { askUse(ctx, it, ask = true) }
@@ -309,6 +315,24 @@ class LayoutListFragment : Fragment() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    // asked again once saved: a keyboard chosen meanwhile kept, as a delete does
+    internal fun sendBack(read: CustomChoice) {
+        val prefs = AppPrefs.getInstance().keyboard
+        ImKeyboards.afterReplace(prefs.imKeyboards(), read.id, read, EngineState.shuangpinScheme).forEach { (slot, k) ->
+            prefs.setImKeyboard(ImKeyboards.imOf(slot), k)
+        }
+    }
+
+    // 「双拼换回 18 键」, as a delete says it; null for none
+    private fun goesBack(ctx: Context, back: Map<String, ImKeyboard>): String? = back.takeIf { it.isNotEmpty() }?.let {
+        val separator = ctx.getString(R.string.layout_list_separator)
+        ctx.getString(
+            R.string.layout_import_goes_back,
+            it.keys.joinToString(separator) { slot -> imName(ctx, slot) },
+            it.entries.joinToString(separator) { (slot, k) -> ctx.getString(R.string.layout_goes_back, imName(ctx, slot), KeyboardLabels.builtInName(ctx, ImKeyboards.imOf(slot), k)) },
+        )
     }
 
     private fun select(card: Item.Card) {

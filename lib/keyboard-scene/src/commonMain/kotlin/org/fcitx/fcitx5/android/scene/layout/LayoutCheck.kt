@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.NodeFacts
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
@@ -40,6 +41,8 @@ object LayoutCheck {
         val pads: List<String>,
         val commits: List<String>,
         val minApp: String,
+        /** The pads its number board lacks a digit, ⌫, Return or 返回 on. */
+        val padsLacking: List<String> = emptyList(),
     ) {
         val ok: Boolean get() = errors.isEmpty()
     }
@@ -79,6 +82,8 @@ object LayoutCheck {
         "pads" to "0.6.1",
         "rows-middle" to "0.6.1",
         "row-when" to "0.6.1",
+        // not read but checked: a board lacking keys ([check] gives it only where `lacks` or `blank` is told)
+        "lacks" to "0.6.3",
     )
 
     /** Every [Finding] key: the app's strings and the page's table must word each (LayoutCheckTest enforces it). */
@@ -86,9 +91,9 @@ object LayoutCheck {
         // errors
         "read", "newer", "id-length", "id-built-in", "id-prefix", "name-length", "family", "based-on", "too-big",
         "too-many-keys", "commit-long", "too-many-commits", "label-long", "include", "layout-target", "base", "scene",
-        "blank", "name-no-slash", "name-prefix", "lacks", "groups", "hidden-chars", "command",
+        "name-no-slash", "name-prefix", "groups", "hidden-chars", "command",
         // warnings
-        "no-way", "narrow", "commits", "theme-blank", "unnamed", "held", "held-letters", "held-popups", "gap-look", "pad-lacks", "bottom-left",
+        "lacks", "blank", "pad-letters", "no-way", "narrow", "commits", "theme-blank", "unnamed", "held", "held-letters", "held-popups", "gap-look", "pad-lacks", "bottom-left",
         "split-scaled",
     )
 
@@ -114,15 +119,18 @@ object LayoutCheck {
         val fragments = includes(layout, sources, errors)
         if (errors.any { it.key in STOPS }) return Report(errors, warnings, layout.family, emptyList(), pads, emptyList(), minApp)
         targets(layout).forEach(newRule)
-        val base = held(layout, fragments, sources, strict, errors)
+        val base = held(layout, sources, strict, errors)
         names(layout, sources).forEach(newRule)
         hiddenNames(layout).forEach(newRule)
-        family(layout, fragments).forEach(newRule)
+        groupShape(layout, fragments).forEach(newRule)
         typedHidden(layout).forEach(newRule)
         base?.let { b -> commands(layout, b, baseFragments(b, sources), sources).forEach(newRule) }
         val ims = ims(layout, sources)
         val shown = scenes(layout, fragments, ims, pads)
         shown.errors.forEach(newRule)
+        base?.let { b -> warnings += LayoutLacks.lacks(layout, fragments, b, baseFragments(b, sources), pads, shown.padNeeds) }
+        warnings += shown.blank
+        warnings += LayoutLacks.padLetters(layout, fragments)
         val commits = newCommits(layout, base, base?.let { baseFragments(it, sources) }.orEmpty(), sources.names)
         warnings += told(layout, fragments, commits, theme)
         base?.let { b -> unnamed(layout, b, baseFragments(b, sources)).forEach { warnings += it } }
@@ -134,8 +142,13 @@ object LayoutCheck {
             gapLooks(source).forEach { warnings += it }
             shown.bottomLeft?.let { warnings += it }
         }
-        return Report(errors, warnings, layout.family, ims, pads, commits, minApp)
+        val padsLacking = pads.filter { !shown.padNeeds[it].isNullOrEmpty() }
+        return Report(errors, warnings, layout.family, ims, pads, commits, relaxed(minApp, warnings), padsLacking)
     }
+
+    // a board lacking keys, or one blank somewhere, an older app refuses: the file says so
+    private fun relaxed(minApp: String, warnings: List<Finding>): String =
+        FEATURES.getValue("lacks").takeIf { v -> warnings.any { it.key == "lacks" || it.key == "blank" } && ThemeReader.newer(v, minApp) } ?: minApp
 
     private fun includes(layout: Layout, sources: Sources, errors: MutableList<Finding>): Map<String, Fragment> {
         val fragments = HashMap<String, Fragment>()
@@ -170,7 +183,7 @@ object LayoutCheck {
         return out
     }
 
-    /** Why [layout] drops something of [base] that must stay typeable; [digitsById] false: digits held by what they type. */
+    /** Why a theme pack's [layout] drops something of [base] that must stay typeable; [digitsById] false: digits held by what they type. */
     fun kept(
         layout: Layout,
         fragments: Map<String, Fragment>,
@@ -212,9 +225,8 @@ object LayoutCheck {
     }
 
     private const val BOM = "\uFEFF"
-    private const val PAD_LACKING = "pad="
-    private val ROLES = setOf("backspace", "enter", "lang")
-    private val DIGIT = Regex("[0-9]")
+    internal val ROLES = setOf("backspace", "enter", "lang")
+    internal val DIGIT = Regex("[0-9]")
     private const val BLANK_LIMIT = 5
 
     private fun identity(layout: Layout, sources: Sources): List<Finding> = buildList {
@@ -310,11 +322,6 @@ object LayoutCheck {
         }
     }
 
-    /** The pad a `lacks` finding names: a restore refuses such a board, and a pack's is made only for the pads it does not lack. */
-    fun padLacking(finding: Finding): String? =
-        finding.takeIf { it.key == "lacks" }?.args?.firstOrNull()?.takeIf { it.startsWith(PAD_LACKING) }
-            ?.removePrefix(PAD_LACKING)?.substringBefore(':')
-
     internal fun nameProblem(name: String, sources: Sources): String? {
         if (name in sources.names) return null
         val id = KeyId(name)
@@ -346,9 +353,9 @@ object LayoutCheck {
         val fragments = includes(layout, sources, errors)
         if (errors.any { it.key in STOPS }) return errors
         errors += targets(layout)
-        val base = held(layout, fragments, sources, true, errors)
+        val base = held(layout, sources, true, errors)
         errors += names(layout, sources)
-        errors += family(layout, fragments)
+        errors += groupShape(layout, fragments)
         errors += typedHidden(layout)
         base?.let { b -> errors += commands(layout, b, baseFragments(b, sources), sources) }
         return errors
@@ -424,7 +431,7 @@ object LayoutCheck {
         } + defaultsActions(layout).filter { isCommand(it.first) }.map { Finding(it.second, "command", listOf("defaults", it.first)) }
     }
 
-    private fun keysOf(layout: Layout, fragments: Map<String, Fragment>): List<Pair<Key, KeyAttrs>> = layout.parts.flatMap { part ->
+    internal fun keysOf(layout: Layout, fragments: Map<String, Fragment>): List<Pair<Key, KeyAttrs>> = layout.parts.flatMap { part ->
         val rows = when (part) {
             is Row -> listOf(part to layout.defaults)
             is Include -> fragments[part.src]?.let { f -> f.rows.map { it to f.defaults.over(layout.defaults) } }.orEmpty()
@@ -440,7 +447,7 @@ object LayoutCheck {
         }
     }.groupBy({ it.first }, { it.second })
 
-    private fun states(k: Key, a: KeyAttrs): List<KeyAttrs> = listOf(a) + k.variants.map { it.attrs.over(a) }
+    internal fun states(k: Key, a: KeyAttrs): List<KeyAttrs> = listOf(a) + k.variants.map { it.attrs.over(a) }
 
     private fun typing(k: Key, a: KeyAttrs): Boolean = k.letters != null || states(k, a).any { types(it.actions["send"]) || showsLetter(it.label) }
 
@@ -464,16 +471,12 @@ object LayoutCheck {
     // the rest is told once the app can read, build or look through it
     private val STOPS = setOf("newer", "include", "too-many-keys")
 
-    private fun held(layout: Layout, fragments: Map<String, Fragment>, sources: Sources, strict: Boolean, errors: MutableList<Finding>): Layout? {
+    // a board missing keys is drawn as it is (lacks warns); only one with no app board to fall back to is not
+    private fun held(layout: Layout, sources: Sources, strict: Boolean, errors: MutableList<Finding>): Layout? {
         val baseId = baseId(layout, sources)
         val base = baseId?.let(sources::layout)
-        when {
-            strict && layout.family !in FAMILIES -> Unit
-            base == null -> errors += Finding(0, "base", listOf("the app has no ${baseId ?: layout.family} to hold it to"))
-            else -> {
-                val digitsById = !(strict && layout.family == "number")
-                kept(layout, fragments, base, baseFragments(base, sources), digitsById)?.let { errors += Finding(0, "base", listOf(it)) }
-            }
+        if (base == null && !(strict && layout.family !in FAMILIES)) {
+            errors += Finding(0, "base", listOf(baseId ?: layout.family))
         }
         return base
     }
@@ -486,32 +489,14 @@ object LayoutCheck {
         }
     }
 
-    private fun family(layout: Layout, fragments: Map<String, Fragment>): List<Finding> {
-        val cells = cells(layout, fragments)
-        val keys = cells.filterIsInstance<Key>()
-        fun lacks(what: String) = Finding(0, "lacks", listOf(what))
-        val roles = keys.mapNotNull { it.attrs.role }.toSet()
-        return when (layout.family) {
-            "letters" -> listOfNotNull(lacks("space").takeIf { "space" !in roles }, lacks("shift").takeIf { "shift" !in roles })
-            "grouped" -> listOfNotNull(
-                Groups.problem(groups(layout, fragments))?.let { Finding(0, "groups", listOf(it)) },
-                lacks("space").takeIf { "space" !in roles },
-            )
-            "nine" -> listOfNotNull(
-                (2..9).map { it.toString() }.filter { d -> keys.none { it.id == d } }.takeIf { it.isNotEmpty() }?.let { lacks(it.joinToString(" ")) },
-                lacks("nine-side").takeIf { cells.filterIsInstance<Slot>().none { it.kind == "nine-side" } },
-            )
-            "symbols" -> listOfNotNull(
-                listOf("symbol-categories", "symbol-grid").filter { s -> cells.filterIsInstance<Slot>().none { it.kind == s } }
-                    .takeIf { it.isNotEmpty() }?.let { lacks(it.joinToString(" ")) },
-                lacks("panel-back").takeIf { keys.none { it.attrs.actions["send"] == "panel-back" } },
-                lacks("backspace").takeIf { "backspace" !in roles },
-            )
-            else -> emptyList()
-        }
-    }
+    private fun groupShape(layout: Layout, fragments: Map<String, Fragment>): List<Finding> =
+        if (layout.family != "grouped") emptyList() else listOfNotNull(Groups.shape(groups(layout, fragments))?.let { Finding(0, "groups", listOf(it)) })
 
-    private fun groups(layout: Layout, fragments: Map<String, Fragment>): List<String> =
+    /** The letters a to z no key of a `letters` board has by id (a theme pack's such board is not drawn). */
+    fun lettersLacking(layout: Layout, fragments: Map<String, Fragment>): Set<String> =
+        KeyNames.LETTERS.toSet() - cells(layout, fragments).mapNotNull { it.id }.toSet()
+
+    internal fun groups(layout: Layout, fragments: Map<String, Fragment>): List<String> =
         cells(layout, fragments).filterIsInstance<Key>().mapNotNull { k -> k.letters?.rows?.joinToString(" ") }
 
     // 双拼 on a grouped board only with 14 or 18 key groups, each once, as NineKeyLetters.custom takes them
@@ -527,7 +512,13 @@ object LayoutCheck {
         else -> emptyList()
     }
 
-    private class Shown(val errors: List<Finding>, val padLacks: List<Finding>, val bottomLeft: Finding?)
+    private class Shown(
+        val errors: List<Finding>,
+        val padNeeds: Map<String, List<String>>,
+        val padLacks: List<Finding>,
+        val blank: List<Finding>,
+        val bottomLeft: Finding?,
+    )
 
     data class Screen(val widthDp: Int, val turned: Boolean, val tallDp: Int) {
         val large: Boolean get() = minOf(widthDp, tallDp) >= LARGE_SHORT_SIDE_DP
@@ -627,9 +618,10 @@ object LayoutCheck {
 
     private fun scenes(layout: Layout, fragments: Map<String, Fragment>, ims: List<String>, pads: List<String>): Shown {
         val errors = LinkedHashMap<Pair<Int, String>, Finding>()
+        val blank = LinkedHashMap<Int, Finding>()
+        val padNeeds = LinkedHashMap<String, List<String>>()
         val padLacks = ArrayList<Finding>()
         var bottomLeft: Finding? = null
-        val padsChecked = HashSet<String>()
         for (scene in scenes(layout, ims, pads)) {
             val built = SceneBuilder(PLAIN, scene.env, FixedMeasurer).build(layout, fragments)
             built.problems().forEach { errors.getOrPut(it.line to it.message) { Finding(it.line, "scene", listOf(scene.name, it.message)) } }
@@ -637,35 +629,38 @@ object LayoutCheck {
             val keys = rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()
             // the space bar is its face (the symbols' is blank)
             keys.filter { it.label.isNullOrBlank() && it.icon == null && it.key.letters == null && it.attrs.kind != "space" }.forEach {
-                errors.getOrPut(it.key.line to "blank") { Finding(it.key.line, "blank", listOf(it.key.id, scene.name)) }
+                blank.getOrPut(it.key.line) { Finding(it.key.line, "blank", listOf(it.key.id, scene.name)) }
             }
             val pad = scene.env.input.pad
-            if (pad != null && padsChecked.add(pad)) padLacks(pad, keys).forEach { (error, f) -> if (error) errors[f.line to f.toString()] = f else padLacks += f }
+            if (pad != null && pad !in padNeeds) {
+                padNeeds[pad] = padNeeds(keys)
+                padLacks(pad, keys)?.let { padLacks += it }
+            }
             if (bottomLeft == null && (layout.family == "number" || layout.family == "symbols")) bottomLeft = bottomLeft(layout.family, rows.lastOrNull()?.items.orEmpty())
         }
-        return Shown(errors.values.toList(), padLacks, bottomLeft)
+        return Shown(errors.values.toList(), padNeeds, padLacks, blank.values.toList(), bottomLeft)
     }
 
-    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it (warnings)
-    private fun padLacks(pad: String, keys: List<ExpandedKey>): List<Pair<Boolean, Finding>> {
+    // what every number field needs of its pad: the digits by what they type, ⌫, Return, 返回
+    private fun padNeeds(keys: List<ExpandedKey>): List<String> {
         val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
         val roles = keys.mapNotNull { it.attrs.role }.toSet()
-        val need = ArrayList<String>()
-        need += (0..9).map { it.toString() }.filter { it !in types }
-        listOf("backspace", "enter", "back").filter { it !in roles }.forEach { need += it }
+        return (0..9).map { it.toString() }.filter { it !in types } + listOf("backspace", "enter", "back").filter { it !in roles }
+    }
+
+    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it
+    private fun padLacks(pad: String, keys: List<ExpandedKey>): Finding? {
+        val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
         val told = when (pad) {
             "phone" -> listOf("+", "*", "#")
             "datetime" -> listOf("-", "/", ":")
             "full" -> listOf("-", ".")
             else -> emptyList()
         }.filter { it !in types }
-        return listOfNotNull(
-            need.takeIf { it.isNotEmpty() }?.let { true to Finding(0, "lacks", listOf("$PAD_LACKING$pad: " + it.joinToString(" "))) },
-            told.takeIf { it.isNotEmpty() }?.let { false to Finding(0, "pad-lacks", listOf(pad, it.joinToString(" "))) },
-        )
+        return told.takeIf { it.isNotEmpty() }?.let { Finding(0, "pad-lacks", listOf(pad, it.joinToString(" "))) }
     }
 
-    private fun typed(send: String?): String? = when {
+    internal fun typed(send: String?): String? = when {
         send == null -> null
         send.startsWith("sym:KP_") -> KEYPAD[send.removePrefix("sym:KP_")]
         send == "sym:space" -> " "
@@ -734,7 +729,7 @@ object LayoutCheck {
     internal fun baseFragments(base: Layout, sources: Sources): Map<String, Fragment> =
         base.parts.filterIsInstance<Include>().mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }.toMap()
 
-    private fun cells(layout: Layout, fragments: Map<String, Fragment>): List<Cell> = layout.parts.flatMap { part ->
+    internal fun cells(layout: Layout, fragments: Map<String, Fragment>): List<Cell> = layout.parts.flatMap { part ->
         when (part) {
             is Row -> part.cells
             is Include -> fragments[part.src]?.rows.orEmpty().flatMap { it.cells }

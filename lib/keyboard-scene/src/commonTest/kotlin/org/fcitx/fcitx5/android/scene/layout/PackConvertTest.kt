@@ -226,11 +226,20 @@ class PackConvertTest {
 
     @Test
     fun oneThe060CheckTakesIsMadeOneWithoutTheStrictChecksWords() {
-        val text = k17.replace(Regex("<key id=\"r3c1\"[^>]*/>"), "<gap/>")
+        val text = k17.replace("label=\"{group:q}\"", "label=\"${"q".repeat(LayoutCheck.MAX_LABEL + 1)}\"")
         val c = done(convert(text))
         assertFalse(LayoutCheck.check(c.text, sources, "0.6.1", strict = true).ok)
         assertTrue(c.problems.isNotEmpty())
         assertTrue(c.problems.none { it.key == "gap-look" || it.key == "bottom-left" }, c.problems.toString())
+    }
+
+    // a user's letters board may lack letters (a warning); a theme pack's is not converted, as before
+    @Test
+    fun aPacksLettersBoardLackingALetterIsStillNotTaken() {
+        val app = testData("qwerty.xml")
+        done(convert(app, id = "qwerty"))
+        val noQ = app.replace(Regex("<key id=\"q\"[^>]*>[\\s\\S]*?</key>"), "")
+        assertEquals("it has no key [q]", assertIs<PackLayouts.Converted.Not>(convert(noQ, id = "qwerty")).why)
     }
 
     @Test

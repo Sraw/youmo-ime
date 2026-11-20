@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  九键（大回车）：改自 App 的九键（nine），去掉右列的 0，回车从第 3 行起占两行（rows="2"）。
+  其余的键、长按、上滑和 App 的九键一样（按键名 t9/N 照旧，长按和 App 的九键共用）。0 用 123 数字键盘或数字键的长按打。
+-->
+<keyboard xmlns="https://youmo-ime/layout/1" id="nine-big-enter" name="九键大回车" family="nine" based-on="nine" columns="100">
+  <meta author="幽默输入法" version="1.0" license="CC0-1.0" min-app="0.6.3" description="九键去掉 0，回车占右下两行"/>
+  <defaults kind="letter" text-size="20" width="22"/>
+  <row>
+    <slot id="side" kind="nine-side" width="16" rows="3" look="function" face="keep"/>
+    <key id="1" label="{punct:,.?!}" text-size="16" preview="off" send="1" shortcut="t9/1">
+      <!-- 1 键随输入中变（T9Keyboard.kt:672,683-687）：第一个成立的 variant 盖上去 -->
+      <variant when="ime=english composing" label="'"/>
+      <!-- 微软双拼：输入中 1 打 ;（声母后是 ing，别处分词，T9Keyboard.resolveShuangpin），键面写出来（060-s6-review L3） -->
+      <variant when="scheme-types=semicolon composing" label="分词;"/>
+      <variant when="composing" label="分词"/>
+      <popup from="nine"/>
+    </key>
+    <key id="2" label="{nine-letters:2}" send="2" shortcut="t9/2">
+      <popup from="nine"/>
+    </key>
+    <key id="3" label="{nine-letters:3}" send="3" shortcut="t9/3">
+      <popup from="nine"/>
+    </key>
+    <key id="backspace" role="backspace" kind="function" width="18" icon="backspace" a11y="a11y_key_backspace"
+         sound="delete" send="sym:BackSpace" repeat="true" swipe-axis="both" shortcut="backspace"/>
+  </row>
+  <row>
+    <key id="4" label="{nine-letters:4}" send="4" shortcut="t9/4">
+      <popup from="nine"/>
+    </key>
+    <key id="5" label="{nine-letters:5}" send="5" shortcut="t9/5">
+      <popup from="nine"/>
+    </key>
+    <key id="6" label="{nine-letters:6}" send="6" shortcut="t9/6">
+      <popup from="nine"/>
+    </key>
+    <key id="reset" role="reset" kind="function" width="18" label="重输" text-size="16" send="sym:Escape" shortcut="retype"
+         when="!ime=english"/>
+    <key id="shift" role="shift" kind="function" width="18" icon="{shift-icon}" a11y="a11y_key_shift" shortcut="shift"
+         send="caps" double-tap="caps:lock" when="ime=english"/>
+  </row>
+  <row>
+    <key id="7" label="{nine-letters:7}" send="7" shortcut="t9/7">
+      <popup from="nine"/>
+    </key>
+    <key id="8" label="{nine-letters:8}" send="8" shortcut="t9/8">
+      <popup from="nine"/>
+    </key>
+    <key id="9" label="{nine-letters:9}" send="9" shortcut="t9/9">
+      <popup from="nine"/>
+    </key>
+    <key id="enter" role="enter" kind="enter" face="special" width="18" rows="2" icon="{return-icon}" a11y="{return}"
+         sound="return" send="sym:Return" shortcut="return">
+      <menu>
+        <item label="Emoji" icon="emoji" do="picker:"/>
+      </menu>
+    </key>
+  </row>
+  <row>
+    <key id="symbols" role="symbols" kind="function" width="16" label="符" text-size="16" text-style="bold"
+         send="layout:Symbol" shortcut="symbols"/>
+    <key id="numbers" role="numbers" kind="function" width="14" label="123" text-size="16" text-style="bold"
+         send="layout:Number" shortcut="numbers"/>
+    <key id="space" role="space" kind="space" face="special" width="fill" label="{ime-name}" text-size="13"
+         badge="{hold-badge}" sound="space" send="sym:space" swipe-axis="both" shortcut="space"/>
+    <key id="lang" role="lang" kind="letter" class="alt-text" width="10" icon="language" a11y="a11y_key_switch_language"
+         shortcut="lang" send="lang" when="lang-key"/>
+  </row>
+</keyboard>

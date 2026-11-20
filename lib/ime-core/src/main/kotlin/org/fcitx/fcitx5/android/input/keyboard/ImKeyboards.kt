@@ -160,6 +160,10 @@ object ImKeyboards {
     fun afterDelete(chosen: Chosen, id: String, layout: CustomChoice?, scheme: ShuangpinScheme): Map<String, ImKeyboard> =
         usedBy(chosen, id).associateWith { effective(imOf(it), baseOf(layout), scheme) }
 
+    /** Each slot that chose layout [id] and cannot type on [layout] replacing it (a letter fewer, say): back as after a delete. */
+    fun afterReplace(chosen: Chosen, id: String, layout: CustomChoice, scheme: ShuangpinScheme): Map<String, ImKeyboard> =
+        afterDelete(chosen, id, layout, scheme).filterKeys { !usable(imOf(it), layout, scheme) }
+
     /** The tables choose alike: any one stands for them. */
     fun imOf(slot: String): String = if (slot == TABLE) InputMethodCatalog.TABLES.keys.first() else slot
 

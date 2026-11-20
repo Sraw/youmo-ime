@@ -124,6 +124,17 @@ class LayoutImportTest {
         assertEquals(emptyList<LayoutCheck.Finding>(), symbols.report.warnings)
     }
 
+    // boards lacking keys: taken, each told once what it lacks
+    @Test
+    @Uat("ST-197")
+    fun theUatsLayoutsLackingKeysAreTakenAndTold() {
+        fun lacks(name: String) = (judge(File("../../uat/fixtures/layouts/$name.layout").readText(), app = "0.6.3") as Verdict.Ok).report.warnings
+            .filter { it.key == "lacks" }.map { it.args }
+        assertEquals(listOf(listOf("digits", "0")), lacks("uat-nine-big-enter"))
+        assertEquals(listOf(listOf("letters", "m")), lacks("uat-k17-no-m"))
+        assertEquals(listOf(listOf("symbol-grid")), lacks("uat-symbols-no-grid"))
+    }
+
     // the UAT's uat-names.layout: taken, its WE's 下滑 told (the 18 keys' is used) and not among what it types
     @Test
     @Uat("ST-188")

@@ -98,8 +98,7 @@ object CustomLayoutFiles {
 
     /**
      * Whether a restore puts a backup's [fileName] in: a layout of the id its name says, of a listed family, an id no
-     * built-in board or key name prefix has, passing the non-strict check; a number board lacking a key its pad's
-     * fields type is refused, since the pad would be drawn without it.
+     * built-in board or key name prefix has, passing the non-strict check (a board lacking keys is restored, as imported).
      */
     fun restorable(fileName: String, bytes: ByteArray, sources: LayoutCheck.Sources, appVersion: String): Boolean {
         val id = idOf(fileName) ?: return false
@@ -109,7 +108,7 @@ object CustomLayoutFiles {
         val layout = runCatching { LayoutImport.layout(text) }.getOrNull() ?: return false
         if (layout.id != id || layout.family !in LayoutCheck.FAMILIES) return false
         val report = runCatching { LayoutCheck.check(text, sources, appVersion, strict = false) }.getOrNull() ?: return false
-        return report.ok && report.warnings.none { it.key in NOT_RESTORED || LayoutCheck.padLacking(it) != null }
+        return report.ok && report.warnings.none { it.key in NOT_RESTORED }
     }
 
     // what the check not strict only tells of, a restore refuses (the family's is above)

@@ -285,7 +285,7 @@ class SceneBehaviorTest {
         // the 14 keys' groups on the 18 keys' keyboard, or groups the engine has none of
         assertTrue(SceneGroups.mismatch(k14, NineKeyLetters.G18)!!.contains(NineKeyLetters.G14.tag()))
         val own = listOf("pqrs", "abc")
-        assertNull(SceneGroups.letters(own))
+        assertEquals(NineKeyLetters.custom(own), SceneGroups.letters(own))
         assertTrue(SceneGroups.mismatch(own, NineKeyLetters.G14)!!.contains("pqrs,abc"))
         assertNull(SceneGroups.letters(emptyList()))
         assertEquals(emptyList<String>(), SceneGroups.of(SceneData.qwerty))

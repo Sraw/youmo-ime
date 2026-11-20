@@ -198,8 +198,8 @@ class NineKeyLetters private constructor(
         @Volatile
         private var current: NineKeyLetters? = null
 
-        /** [Groups.problem], which the layout check also asks; null if fine. */
-        fun problem(groups: List<String>): String? = Groups.problem(groups)
+        /** [Groups.shape], which the layout check also asks; null if fine. Letters on no key are typed around ([missing]). */
+        fun problem(groups: List<String>): String? = Groups.shape(groups)
 
         /**
          * The grouped keyboard of [groups] (a layout's `letters=`; must pass [problem]): [G14] or [G18] when the

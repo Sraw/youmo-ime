@@ -55,7 +55,7 @@ test('the page is made of src/layout/ and the shared scripts, runs only its own 
 });
 
 test("the engine says what the page offers: the app's version, families, bases, pads, prefixes, limits, every finding", () => {
-  assert.equal(FORMAT.version, '0.6.1');
+  assert.equal(FORMAT.version, '0.6.3');
   assert.deepEqual([...FORMAT.families], ['letters', 'grouped', 'nine', 'number', 'symbols']);
   assert.deepEqual([...FORMAT.bases], ['qwerty', 'k14', 'k18', 'nine', 'number', 'symbols']);
   assert.deepEqual([...FORMAT.pads], ['full', 'phone', 'datetime']);
@@ -90,6 +90,31 @@ test('each finding is said in Chinese with what it names; one the table lacks as
   assert.equal(LM.words({ key: 'held-popups', args: ['mine'] }), '这里写的 popups= 不起作用，跟 mine 一样');
   assert.equal(LM.words({ key: 'held-popups', args: ['number-row'] }), '这里写的 popups= 不起作用，跟数字行一样');
   assert.equal(LM.words({ key: 'later', args: ['a'] }), 'later：a');
+  assert.equal(LM.words({ key: 'pad-letters', args: ['k1'] }), '键「k1」打出的是字母：数字输入框多半不收字母');
+  assert.equal(LM.words({ key: 'base', args: ['nine'] }), 'App 没有这块底稿：九键');
+});
+
+// as the app's LayoutTextsTest: the same words for what a board lacks
+test('what a board lacks is said with what it costs; a pad named only where the others have it', () => {
+  const lacks = (...args) => LM.words({ key: 'lacks', args });
+  assert.equal(lacks('backspace'), '没有 ⌫：删不了字，打拼音时打错的字母去不掉（不在打字时可以用工具栏的文本编辑面板删）');
+  assert.equal(lacks('lang-no-space'), '没有地球键：换输入法要把空格键长按行为设成切换输入法；也没有空格，空格长按也用不了');
+  assert.equal(lacks('digits', '0'), '没有数字键 0');
+  assert.equal(lacks('pad-digits', '0'), '数字输入框里键盘直接是这块，打不出 0');
+  assert.equal(lacks('pad-digits', '5', 'phone'), '数字键盘「电话」打不出 5：这种输入框里键盘直接是这块');
+  assert.equal(lacks('back', '', 'phone datetime'), '没有返回键：回字母键盘要收起键盘再点输入框；数字输入框里一直是这块（数字键盘「电话、日期时间」）');
+  assert.equal(lacks('letters', 'q x'), '没有字母 q x（密码框里也用这块键盘）');
+  assert.equal(lacks('hyper'), '少了键：hyper');
+});
+
+// the nine keys with no 0 and a Return two rows tall: saved with the one warning, for the app that takes it
+test('保存 the nine keys lacking 0: no errors, one warning, min-app 0.6.3', () => {
+  const xml = readFileSync(join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'layout-check', 'nine-big-enter.layout'), 'utf8');
+  const r = LM.saveCheck(E, xml, FORMAT.version, material);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings.map((p) => p.message), ['没有数字键 0']);
+  assert.equal(LM.info(r.xml).meta['min-app'], '0.6.3');
+  assert.ok(E.checkLayout(r.xml, FORMAT.version, null).ok);
 });
 
 test('a new layout from each of the app boards is the board as written, under its own id, name and based-on: clean, and drawn', () => {

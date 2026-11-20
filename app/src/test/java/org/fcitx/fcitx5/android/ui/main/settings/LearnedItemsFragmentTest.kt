@@ -60,8 +60,8 @@ class LearnedItemsFragmentTest {
         assertEquals("64", LearnedItemsFragment.keys(Code(Kinds.nineKeys("pinyin"), "64")))
         // a letter on two keys is each its own
         assertEquals("bn ui as abc", LearnedItemsFragment.keys(Code(Kinds.keys(OWN.tag()), listOf("bn", "ui", "as", "abc").joinToString("") { OWN.codes[OWN_GROUPS.indexOf(it)].toString() })))
-        // an unknown tag: as stored, not misread through another's letters
-        assertEquals(g14("bn ui"), LearnedItemsFragment.keys(Code(Kinds.keys("ab,cd"), g14("bn ui"))))
+        // a tag that is no keyboard (a group not letters): as stored, not misread through another's letters
+        assertEquals(g14("bn ui"), LearnedItemsFragment.keys(Code(Kinds.keys("ab,c1"), g14("bn ui"))))
         val g18 = NineKeyLetters.G18
         assertEquals("bn io", LearnedItemsFragment.keys(Code(Kinds.shuangpinKeys("Ziranma", g18.tag()), "${g18.key('n')}${g18.key('o')}")))
         assertEquals("mno ghi", LearnedItemsFragment.keys(Code(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.NINE_SP.tag()), nineSp("64"))))

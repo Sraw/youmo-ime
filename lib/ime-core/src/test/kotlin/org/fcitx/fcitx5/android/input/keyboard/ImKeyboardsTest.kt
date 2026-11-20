@@ -214,6 +214,17 @@ class ImKeyboardsTest {
         assertEquals(emptyMap<String, ImKeyboard>(), ImKeyboards.afterDelete(Chosen(layouts = mapOf(PINYIN to "my-k18")), "my-k18", k18, ziranma))
     }
 
+    // replaced by a version of it 双拼 cannot type on (a letter fewer): 双拼 back as after a delete, pinyin kept on it
+    @Test
+    fun aReplacementTheInputMethodCannotTypeOnSendsItBack() {
+        val chosen = Chosen(pinyin = CUSTOM, shuangpin = CUSTOM, layouts = mapOf(PINYIN to "my-k18", SHUANGPIN to "my-k18"))
+        val fewer = k18.copy(groups = k18.groups.map { it.replace("q", "") }.filter { it.isNotEmpty() })
+        assertEquals(mapOf(SHUANGPIN to KEYS18), ImKeyboards.afterReplace(chosen, "my-k18", fewer, ziranma))
+        assertEquals(emptyMap<String, ImKeyboard>(), ImKeyboards.afterReplace(chosen, "my-k18", k18, ziranma))
+        // one not drawn at all: every input method using it back
+        assertEquals(mapOf(PINYIN to KEYS18, SHUANGPIN to KEYS18), ImKeyboards.afterReplace(chosen, "my-k18", k18.copy(drawn = false), ziranma))
+    }
+
     // 按键字符和快捷键's tabs of the user's layouts: each drawn once, in the slots' order
     @Test
     fun theLayoutsInUseAreThoseDrawn() {

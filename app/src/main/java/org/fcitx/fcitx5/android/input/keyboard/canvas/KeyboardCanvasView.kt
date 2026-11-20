@@ -584,9 +584,9 @@ class KeyboardCanvasView(
         return true
     }
 
-    /** As the scene at the view's size now has it (remade if the size changed). */
-    fun slot(id: String, out: Rect): Boolean {
-        val s = scene?.slots?.firstOrNull { it.id == id } ?: return false
+    /** The first slot of [kind] (a layout's id= is its own), as the scene at the view's size now has it (remade if the size changed). */
+    fun slot(kind: String, out: Rect): Boolean {
+        val s = scene?.slots?.firstOrNull { it.kind == kind } ?: return false
         out.set(s.bounds)
         return true
     }

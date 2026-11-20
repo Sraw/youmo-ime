@@ -51,6 +51,9 @@ object CustomKeyboards {
     /** Its `min-app=`s (a dev build: any). */
     private val appVersion: String get() = LayoutImport.appVersion(ThemePackFiles.minAppVersion(BuildConfig.VERSION_NAME))
 
+    /** [layout] as it would be chosen once saved: an import asks it before the file is there. */
+    fun choiceOf(layout: Layout): CustomChoice = CustomLayoutChoices.of(layout, CustomLayouts.sources, appVersion, "").choice
+
     /** [CustomChoice.drawn] false where refused; null where there is no such file or it does not read. */
     @Synchronized
     fun choice(id: String): CustomChoice? {

@@ -33,6 +33,29 @@
     const n = APP_BOARD_LABEL[board] || board;
     return (/^[0-9A-Za-z]/.test(n) ? ' ' : '') + n + (/[0-9A-Za-z]$/.test(n) ? ' ' : '');
   };
+  // as the app's LayoutTexts.lacks: [what, items, pads], what the board does without it; pads named only where the others have it
+  const LACKS = {
+    backspace: '没有 ⌫：删不了字，打拼音时打错的字母去不掉（不在打字时可以用工具栏的文本编辑面板删）',
+    enter: '没有回车：换不了行，也按不了发送、搜索',
+    back: '没有返回键：回字母键盘要收起键盘再点输入框；数字输入框里一直是这块',
+    'panel-back': '没有返回键：回字母键盘要收起键盘再点输入框',
+    lang: '没有地球键：换输入法要把空格键长按行为设成切换输入法',
+    'lang-no-space': '没有地球键：换输入法要把空格键长按行为设成切换输入法；也没有空格，空格长按也用不了',
+    space: '没有空格键：打不出空格',
+    shift: '没有 Shift：打不出大写',
+    'nine-side': '没有九键左列的位置：左列不显示',
+    'symbol-categories': '没有符号分类的位置：分类不显示',
+    'symbol-grid': '没有符号格子的位置：没有符号可选',
+  };
+  function lacks([what, items = '', pads = '']) {
+    const on = pads.split(' ').filter(Boolean).map((p) => PAD_LABEL[p] || p).join('、');
+    if (what === 'pad-digits') return on ? '数字键盘「' + on + '」打不出 ' + items + '：这种输入框里键盘直接是这块' : '数字输入框里键盘直接是这块，打不出 ' + items;
+    const said = what === 'digits' ? '没有数字键 ' + items
+      : what === 'letters' ? '没有字母 ' + items + '（密码框里也用这块键盘）'
+        : LACKS[what] || '少了键：' + [what, items, pads].filter(Boolean).join(' ');
+    return on ? said + '（数字键盘「' + on + '」）' : said;
+  }
+
   const WORDS = {
     read: ([msg]) => '读不进来：' + msg,
     newer: ([v]) => '需要幽默输入法 ' + v + ' 或更新（min-app）',
@@ -49,12 +72,12 @@
     'label-long': ([key, max]) => '键' + q(key) + '显示的字太长：最多 ' + max + ' 个字符',
     include: ([src]) => 'App 没有叫' + q(src) + '的片段（include 只能引用 App 自带的）',
     'layout-target': ([action]) => q(action) + '切换到的面板 App 没有',
-    base: ([why]) => '和底稿（based-on）对不上：' + why,
+    base: ([board]) => 'App 没有这块底稿：' + (APP_BOARD_LABEL[board] || board),
     scene: ([where, msg]) => '在「' + where + '」排不出来：' + msg,
     blank: ([key, where]) => '键' + q(key) + '在「' + where + '」什么都不显示（没有字也没有图标）',
     'name-no-slash': ([name]) => '按键名' + q(name) + '不是 App 的：新键的名字写成「布局 id/键 id」',
     'name-prefix': ([name]) => '按键名' + q(name) + '用了 App 的前缀，App 却没有这个键',
-    lacks: ([what]) => '少了必需的键：' + what,
+    lacks: (args) => lacks(args),
     groups: ([why]) => '字母分组不对：' + why,
     'hidden-chars': ([field]) => field + '里有看不见的字符（控制字符、方向字符、零宽字符或换行）',
     command: ([key, action]) => '键' + q(key) + '的 ' + action + ' 是命令：字母键和空格只能用底稿同一个键上有的命令',
@@ -71,6 +94,7 @@
     'pad-lacks': ([pad, keys]) => (pad === 'full'
       ? '数字键盘缺 ' + keys + '：数字框里打不出来（比如金额的负号、小数点）'
       : '数字键盘「' + (PAD_LABEL[pad] || pad) + '」缺 ' + keys + '：这种输入框里打不出来'),
+    'pad-letters': ([key]) => '键' + q(key) + '打出的是字母：数字输入框多半不收字母',
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',
     'split-scaled': ([n, where]) => '分体时这一行在「' + where + '」有 ' + n + ' 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小',
   };

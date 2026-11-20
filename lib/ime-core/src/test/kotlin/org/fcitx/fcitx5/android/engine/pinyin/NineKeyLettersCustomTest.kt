@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.scene.layout.Groups
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -101,9 +102,9 @@ class NineKeyLettersCustomTest {
         assertEquals(NineKeyLetters.G14, stacked)
         assertEquals(listOf("q", "w"), stacked.rowsOf(NineKeyLetters.G14.key('q')))
         assertEquals(listOf("b", "n"), stacked.rowsOf(NineKeyLetters.G14.key('n')))
-        // a group twice (another left out by a key of its own letters): not the built-in keyboard
+        // a group twice (another left out by a key of its own letters): a keyboard of its own, not the built-in one
         val twice = g18.dropLast(1) + g18[0]
-        assertNotNull(NineKeyLetters.problem(twice))
+        assertTrue(NineKeyLetters.custom(twice).codes.all { it.code in NineKeyLetters.CUSTOM_BLOCK })
         val moved = listOf(g18[0] + g18[1].first(), g18[1].drop(1)) + g18.drop(2)
         assertTrue(NineKeyLetters.custom(moved).codes[0].code in NineKeyLetters.CUSTOM_BLOCK)
     }
@@ -128,7 +129,8 @@ class NineKeyLettersCustomTest {
         assertNull(NineKeyLetters.ownOf(g18))
         assertNull(NineKeyLetters.ownOf(g18.reversed()))
         assertNull(NineKeyLetters.ownOf(NineKeyLetters.G14.tag().split(',')))
-        assertNull(NineKeyLetters.ownOf(k17.filter { it != "m" }))
+        // a letter on no key: still its own keyboard, the letter typed around
+        assertEquals(NineKeyLetters.custom(k17.filter { it != "m" }), NineKeyLetters.ownOf(k17.filter { it != "m" }))
         assertEquals(NineKeyLetters.custom(k17), NineKeyLetters.ownOf(k17))
     }
 
@@ -176,7 +178,9 @@ class NineKeyLettersCustomTest {
         // reading a record does not change which keyboard a code is read as
         assertSame(made, NineKeyLetters.ofCode(made.codes[0].code))
         assertSame(NineKeyLetters.G14, NineKeyLetters.filedAs(NineKeyLetters.G14.tag()))
-        assertNull(NineKeyLetters.filedAs("ab,cd"))
+        // a keyboard lacking letters files its words too; groups of no shape are none
+        assertEquals("ab,cd", NineKeyLetters.filedAs("ab,cd")?.tag())
+        assertNull(NineKeyLetters.filedAs("ab,c1"))
         // a record of many tags (damaged, say) keeps no keyboard of each: past the few kept, read anew alike
         repeat(100) { NineKeyLetters.filedAs("bad$it") }
         assertEquals(made.codes, NineKeyLetters.filedAs(made.tag())?.codes)
@@ -188,11 +192,15 @@ class NineKeyLettersCustomTest {
     }
 
     @Test
-    fun groupsMissingALetterOrTooLongOrTooManyAreRefused() {
+    fun groupsTooLongOrTooManyAreRefusedALetterMissingIsNot() {
         val missing = k17.filter { it != "m" }
-        assertNotNull(NineKeyLetters.problem(missing))
-        assertTrue(NineKeyLetters.problem(missing)!!.contains("m"))
-        assertThrows(IllegalArgumentException::class.java) { NineKeyLetters.custom(missing) }
+        assertNull(NineKeyLetters.problem(missing))
+        val made = NineKeyLetters.custom(missing)
+        assertEquals("m", Groups.missing(missing))
+        // the missing letter stands for itself: no key's code
+        assertEquals('m', made.key('m'))
+        assertEquals("", made.keysOf('m'))
+        assertThrows(IllegalArgumentException::class.java) { NineKeyLetters.custom(k17 + "aa") }
         assertNotNull(NineKeyLetters.problem(k17 + "abcdef"))
         assertNotNull(NineKeyLetters.problem(k17 + "aa"))
         assertNotNull(NineKeyLetters.problem(k17 + "a1"))

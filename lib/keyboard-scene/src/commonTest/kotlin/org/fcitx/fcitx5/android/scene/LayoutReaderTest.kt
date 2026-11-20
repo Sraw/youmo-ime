@@ -98,9 +98,9 @@ class LayoutReaderTest {
     }
 
     @Test
-    fun aLettersBoardHasAllTwentySixLetters() {
+    fun aLettersBoardLackingLettersReads() {
         val src = "<keyboard xmlns=\"$ns\" id=\"qwerty\" name=\"t\" family=\"letters\" columns=\"10\"><row><key id=\"q\" label=\"q\"/></row></keyboard>"
-        assertTrue(problems(src).single().contains("lacks the keys a b c"), "${problems(src)}")
+        assertEquals(emptyList(), problems(src), "the check tells what it lacks (LayoutCheck's lacks)")
     }
 
     @Test

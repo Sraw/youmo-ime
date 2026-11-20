@@ -8,7 +8,7 @@ import tempfile
 import time
 import zipfile
 
-from uat import (PKG, Blocked, Fail, case, check, choose, gear, home, in_picker, pinyin_keyboard, script, to_downloads)
+from uat import (PKG, Blocked, Fail, case, check, choose, gear, grouped_keys, home, in_picker, pinyin_keyboard, script, to_downloads)
 
 
 def debuggable(d, what):
@@ -2345,6 +2345,87 @@ def st172(d):
     d.tap(s.find(text="回去", where="ime").c, 1.0)
     check("q" in d.keys(refresh=True), "点「回去」没回到字母键盘")
     return "先开过自带的面板；导入后卡片写用在：符号面板；面板返回键写回去，分类栏换到右边的槽，回去回到字母键盘"
+
+
+def import_told(d, name, title, use):
+    """uat/fixtures/layouts/<name>.layout imported, used on [use] (an input method; None: a panel's 用); the confirm dialog's
+    lines under 注意："""
+    push_layout(d, name)
+    import_layout(d, name)
+    check(d.wait_text(f"导入布局 {title}？", timeout=8, where="all"), f"没出导入确认框：{d.screen().texts('all')[:10]}")
+    # under 注意： one line a finding, each after a ·
+    told = [ln[2:] for t in d.screen().texts("all") for ln in t.split("\n") if ln.startswith("· ")]
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    if use:
+        d.wait_text("现在就用在", timeout=6, where="all", contains=True)
+        # one input method it can be used on: asked as a yes or no
+        if d.screen().find(text=f"现在就用在 {use} 上吗？", where="all"):
+            d.tap_text("用", where="all", scroll=False, after=2.0)
+        else:
+            d.tap_text(use, where="all", scroll=False, after=0.5)
+            d.tap_text("确定", where="all", scroll=False, after=2.0)
+    else:
+        d.wait_text("现在就用作", timeout=6, where="all", contains=True)
+        d.tap_text("用", where="all", scroll=False, after=2.0)
+    return told
+
+
+@case("ST-197", base="B0-设置", mutates=True, visual=True)
+def st197(d):
+    d.step("九键大回车：没有 0")
+    told = import_told(d, "uat-nine-big-enter", "UAT 九键大回车", "拼音")
+    check(told == ["没有数字键 0"], f"确认框的提醒不是只有「没有数字键 0」：{told}")
+    d.open_page("sentence")   # an empty textarea: Return is 换行
+    k = d.keys(refresh=True)
+    check("0" not in k and all(c in k for c in "123456789"), f"键盘不是九键大回车（1–9 有、0 没有）：{sorted(k)}")
+    enter = next((n for n in d.need_keyboard().walk() if n.key == "enter"), None)
+    bksp = next((n for n in d.need_keyboard().walk() if n.key == "backspace"), None)
+    check(enter and bksp and enter.b[3] - enter.b[1] > 1.5 * (bksp.b[3] - bksp.b[1]), "回车不是占两行")
+    d.shot("ime", "拼音用导入的九键大回车：右列没有 0，回车占两行")
+    script("03-t9").t9(d, "64426")
+    c = d.cands()
+    check(c[:1] == ["你好"], f"64426 的候选 {c[:6]}")
+    d.pick("你好")
+    d.tap((enter.c[0], enter.b[1] + (enter.b[3] - enter.b[1]) * 3 // 4), 1.0)
+    text = d.field_text() or ""
+    check(text == "你好\n", f"框里是 {text!r}，预编辑 {d.preedit()!r}（点回车下半没换行？）")
+    d.clear()
+    d.open_page("text")
+    d.tap(d.keys(refresh=True)["123"], 1.0)
+    d.tap(d.keys(refresh=True)["0"], 1.0)
+    zero = d.field_text() or ""
+    d.clear()
+    check(zero == "0", f"123 里点 0 打出 {zero!r}")
+    d.step("17 键缺 M")
+    told = import_told(d, "uat-k17-no-m", "UAT 17 键缺 M", "拼音")
+    check(told == ["没有字母 m（密码框里也用这块键盘）"], f"确认框的提醒不是只有缺 m：{told}")
+    d.open_page("text")
+    k = d.keys(refresh=True)
+    check("hjk" in k and "m" not in k, f"键盘不是缺 M 的 17 键（有 HJK，没有 M）：{sorted(k)}")
+    d.shot("ime", "拼音用缺 M 的 17 键：照它画，第 3 行 M 的地方空着")
+    grouped_keys(d, "bn io hjk a io", at=[0.75, 0.25, 1 / 6, 0.5, 0.75])
+    c = d.cands()
+    check("你好" in c[:3], f"BN IO HJK A IO 的候选 {c[:6]}")
+    d.pick("你好")
+    d.step("符号面板没有格子")
+    told = import_told(d, "uat-symbols-no-grid", "UAT 符号无格子", None)
+    check(told == ["没有符号格子的位置：没有符号可选"], f"确认框的提醒不是只有没有格子：{told}")
+    d.open_page("text")
+    grouped_keys(d, "bn io hjk a io", at=[0.75, 0.25, 1 / 6, 0.5, 0.75])
+    d.pick("你好")
+    d.tap(d.keys(refresh=True)["符"], 1.5)
+    s = d.screen()
+    check(s.find(text="常用", where="ime"), f"符号面板没有分类：{s.texts('ime')[:20]}")
+    d.shot("ime", "符号面板没有格子：格子那块空着，回去和 ⌫ 露在外面")
+    bk = s.find(desc="退格", where="ime")
+    check(bk, "符号面板上没有 ⌫")
+    d.tap(bk.c, 1.0)
+    left = d.field_text() or ""
+    check(left == "你", f"点 ⌫ 后框里是 {left!r}")
+    d.tap(d.screen().find(text="回去", where="ime").c, 1.0)
+    check("hjk" in d.keys(refresh=True), "点「回去」没回到字母键盘")
+    d.clear()
+    return f"九键大回车只提醒没有 0、64426 → 你好、回车下半换行、123 打 0；缺 M 的 17 键照画、候选 {c[:3]}；没格子的面板 ⌫ 和回去都点得到"
 
 
 @case("ST-173", base="B0-设置", mutates=True)

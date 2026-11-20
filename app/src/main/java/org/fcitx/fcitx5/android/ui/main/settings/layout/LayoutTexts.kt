@@ -57,6 +57,7 @@ object LayoutTexts {
         "held-popups" to R.string.layout_finding_held_popups,
         "gap-look" to R.string.layout_finding_gap_look,
         "pad-lacks" to R.string.layout_finding_pad_lacks,
+        "pad-letters" to R.string.layout_finding_pad_letters,
         "bottom-left" to R.string.layout_finding_bottom_left,
         "split-scaled" to R.string.layout_finding_split_scaled,
     )
@@ -71,14 +72,46 @@ object LayoutTexts {
             // an app key and its board by the name its key page has
             "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
             "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
-            // the full pad is every number field's, not one kind of field
-            "pad-lacks" -> if (a.getOrNull(0) == "full") ctx.getString(R.string.layout_finding_full_lacks, a.getOrElse(1) { "" })
-            else ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", a.getOrElse(1) { "" })
+            "pad-lacks", "lacks" -> lacks(ctx, f.key, a)
+            "base" -> ctx.getString(R.string.layout_finding_base, appBoard(ctx, a.getOrElse(0) { "" }))
             "bottom-left" -> ctx.getString(R.string.layout_finding_bottom_left, a.getOrElse(0) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(sep) { role(ctx, it) })
             else -> string(f.key)?.let { ctx.getString(it, *Array(ARGS) { i -> a.getOrElse(i) { "" } }) }
                 ?: (f.key + a.joinToString("") { " $it" })
         }
     }
+
+    // pad-lacks [pad, digits]; lacks [what, items, pads]: what the board does without it, pads named only where the others have it
+    private fun lacks(ctx: Context, key: String, a: List<String>): String {
+        val items = a.getOrElse(1) { "" }
+        if (key == "pad-lacks") {
+            // the full pad is every number field's, not one kind of field
+            return if (a.getOrNull(0) == "full") ctx.getString(R.string.layout_finding_full_lacks, items)
+            else ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", items)
+        }
+        val pads = a.getOrElse(2) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(ctx.getString(R.string.list_separator)) { pad(ctx, it) }
+        if (a.getOrNull(0) == "pad-digits") {
+            return if (pads.isEmpty()) ctx.getString(R.string.layout_lacks_pad_digits, items) else ctx.getString(R.string.layout_lacks_pad_digits_on, items, pads)
+        }
+        val said = LACKS[a.getOrNull(0)]?.let { ctx.getString(it, items) } ?: ctx.getString(R.string.layout_finding_lacks, a.joinToString(" "))
+        return if (pads.isEmpty()) said else ctx.getString(R.string.layout_lacks_on_pads, said, pads)
+    }
+
+    // the items (digits, letters) where the text names them
+    private val LACKS = mapOf(
+        "backspace" to R.string.layout_lacks_backspace,
+        "enter" to R.string.layout_lacks_enter,
+        "back" to R.string.layout_lacks_back,
+        "panel-back" to R.string.layout_lacks_panel_back,
+        "lang" to R.string.layout_lacks_lang,
+        "lang-no-space" to R.string.layout_lacks_lang_no_space,
+        "space" to R.string.layout_lacks_space,
+        "shift" to R.string.layout_lacks_shift,
+        "digits" to R.string.layout_lacks_digits,
+        "letters" to R.string.layout_lacks_letters,
+        "nine-side" to R.string.layout_lacks_nine_side,
+        "symbol-categories" to R.string.layout_lacks_symbol_categories,
+        "symbol-grid" to R.string.layout_lacks_symbol_grid,
+    )
 
     private fun board(ctx: Context, b: String): String = when (b) {
         "Number" -> ctx.getString(R.string.layout_section_number)
@@ -164,7 +197,8 @@ object LayoutTexts {
         return if (more > 0) ctx.getString(R.string.layout_import_commits_more, listed, more) else listed
     }
 
-    fun confirm(ctx: Context, ok: LayoutImport.Verdict.Ok): String {
+    /** [goesBack]: what the input methods on the one replaced that cannot type on this go back to. */
+    fun confirm(ctx: Context, ok: LayoutImport.Verdict.Ok, goesBack: String? = null): String {
         val out = ArrayList<String>()
         ok.replaces?.let { old ->
             val new = ok.layout.meta?.version
@@ -174,6 +208,7 @@ object LayoutTexts {
                 ctx.getString(R.string.layout_import_replaces_plain, old.name)
             }
         }
+        goesBack?.let { out += it }
         out += meta(ctx, ok.layout)
         out += usedFor(ctx, ok.report)
         if (ok.commits.isNotEmpty()) {

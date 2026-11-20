@@ -93,7 +93,7 @@ class T9Keyboard(
 
         const val ShuangpinPlainName = "T9ShuangpinPlain"
 
-        private const val SIDE_KEY = "side"
+        private const val SIDE_KIND = "nine-side"
 
         internal const val ITEM_TEXT_DP = 16f
 
@@ -622,13 +622,13 @@ class T9Keyboard(
 
     private val columnSlot = Rect()
 
-    // the column where the scene has its slot `side`, in the same pass as the canvas: never a frame elsewhere
+    // the column where the scene has its slot of nine-side, in the same pass as the canvas: never a frame elsewhere
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
         placing = true
         val placed = try {
-            c.slot(SIDE_KEY, columnSlot)
+            c.slot(SIDE_KIND, columnSlot)
         } finally {
             placing = false
         }
@@ -657,7 +657,7 @@ class T9Keyboard(
     override fun onSceneBuilt(scene: Scene?) {
         if (placing) return
         // a scene remade for Shift or Return alone lays nothing out
-        val slot = scene?.slots?.firstOrNull { it.id == SIDE_KEY }
+        val slot = scene?.slots?.firstOrNull { it.kind == SIDE_KIND }
         val c = canvas ?: return
         if (slot == null) {
             if (column.isVisible) requestLayout()

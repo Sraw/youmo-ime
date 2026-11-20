@@ -14,8 +14,12 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
+import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.uat.SettingsHarness
 import org.fcitx.fcitx5.android.utils.appContext
@@ -71,6 +75,27 @@ class LayoutListFragmentTest {
         ThemeLayoutsToList.background = realBackground
         LayoutListFragment.Hooks.cardsRead = realCardsRead
         CustomLayouts.forgetAll()
+    }
+
+    // a newer version 双拼 cannot type on (no Q): 双拼 back on the 18 keys as after a delete, pinyin kept on it
+    @Test
+    fun anImportReplacingOneInUseSendsBackTheInputMethodsThatCannotTypeOnIt() {
+        val keyboard = AppPrefs.getInstance().keyboard
+        try {
+            keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "mine")
+            keyboard.setImKeyboard(InputMethodCatalog.SHUANGPIN, ImKeyboard.CUSTOM, "mine")
+            val noQ = CustomLayouts.text(File(layouts, CustomLayoutFiles.fileName("mine")))!!
+                .replace("<key id=\"r1c1\" label=\"{group:q}\" letters=\"q\" shortcut=\"g18/q\"/>", "<gap/>")
+            CustomLayouts.save("mine", noQ, layouts)
+            val read = CustomKeyboards.choice("mine")!!
+            assertTrue("drawn", read.drawn)
+            LayoutListFragment().sendBack(read)
+            assertEquals(ImKeyboard.KEYS18, keyboard.imKeyboards().shuangpin)
+            assertEquals(ImKeyboard.CUSTOM, keyboard.imKeyboards().pinyin)
+        } finally {
+            keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.FULL)
+            keyboard.setImKeyboard(InputMethodCatalog.SHUANGPIN, ImKeyboard.FULL)
+        }
     }
 
     // the page left while its cards are read on IO (held by the start's listing): cards made without a fragment, no crash.

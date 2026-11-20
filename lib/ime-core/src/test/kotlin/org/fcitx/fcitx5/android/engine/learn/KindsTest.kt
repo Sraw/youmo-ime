@@ -62,7 +62,9 @@ class KindsTest {
         assertNull(Kinds.keysOf(Kinds.shuangpinKeys("MS", own.tag())))
         // 双拼's nine keys' groups under qk: a layout's own (NineKeyLetters.filedAs); no keyboard at all: none, the keys shown as stored
         assertNotEquals(nine, Kinds.keysOf(Kinds.keys(nine.tag())))
-        assertNull(Kinds.keysOf(Kinds.keys("q,q")))
+        assertNull(Kinds.keysOf(Kinds.keys("q,1")))
+        // a keyboard lacking letters (q on two keys, the rest on none) is one all the same
+        assertEquals("q,q", Kinds.keysOf(Kinds.keys("q,q"))?.tag())
         assertNull(Kinds.keysOf(Kinds.FULL))
         assertNull(Kinds.keysOf(Kinds.nineKeys(NineKeyLetters.STANDARD.tag())))
     }
