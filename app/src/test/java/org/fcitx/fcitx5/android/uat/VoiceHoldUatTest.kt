@@ -62,7 +62,7 @@ class VoiceHoldUatTest {
     private var cues = 0
 
     private val h = KeyboardHarness().also {
-        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
+        VoiceSession.listening = { events, _ -> voice.also { v -> v.events = events } }
         val was = VoiceStyle.haptics
         VoiceStyle.haptics = { _, cue -> if (cue) cues++ }
         restore += { VoiceStyle.haptics = was }

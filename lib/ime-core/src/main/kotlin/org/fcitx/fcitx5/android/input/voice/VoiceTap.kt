@@ -27,6 +27,9 @@ class VoiceTap {
 
         /** Or the keyboard's view made anew. */
         INPUT_ENDED,
+
+        /** Another app took the sound (a call ringing, an alarm): what comes next is not speech. */
+        INTERRUPTED,
     }
 
     enum class Act {
@@ -37,6 +40,9 @@ class VoiceTap {
 
         /** Stopping already: the tail ends now. */
         CUT,
+
+        /** Stopped with no tail; what was said typed once recognized. */
+        STOP_NOW,
 
         /** Stopped if not yet, what is left typed straight into the field, not through the engine. */
         HIDE,
@@ -56,6 +62,7 @@ class VoiceTap {
             State.LISTENING -> when (press) {
                 Press.INPUT_ENDED -> Act.TYPE_NOW
                 Press.HIDDEN -> Act.HIDE
+                Press.INTERRUPTED -> Act.STOP_NOW
                 else -> Act.STOP
             }
             State.STOPPING -> when (press) {
@@ -66,7 +73,7 @@ class VoiceTap {
             }
         }
         when (act) {
-            Act.STOP, Act.HIDE -> state = State.STOPPING
+            Act.STOP, Act.STOP_NOW, Act.HIDE -> state = State.STOPPING
             Act.TYPE_NOW -> state = State.OVER
             Act.NONE, Act.CUT -> {}
         }

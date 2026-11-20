@@ -2110,6 +2110,29 @@ resets it and ends the engine's window.
 - Debug line at the recognizer's end: `voice segments: speechStart=` (the first token's frame, from the opening)
   `segments=` (closed with something in them), for the UAT's lift offset (VO-23/24).
 
+### Voice: other apps' playback paused
+
+- 语音输入时暂停播放 (`keyboard.voicePausePlayback`, on): music playing was heard as speech (GitHub #7). `VoiceSession.begin`
+  hands `VoiceListener` the AudioManager, or null with the switch off; `VoiceFocus` takes `AUDIOFOCUS_GAIN_TRANSIENT`
+  (`USAGE_ASSISTANT`, speech) in `VoiceOpening`'s `start`, just before `startRecording`, and gives it back in its `stop`
+  (the tail recorded, a read error) and in `close()` (cancelled, dropped, the field left, a read blocked in the HAL):
+  the focus lasts as long as the microphone, not until the text is in. Not `_MAY_DUCK`: ducked music is still heard.
+  A `VoiceFocus` is one talk's: a `take` after its `giveBack` does nothing, so a capture starting after a close never
+  holds the focus for good. Refused (during a call; or where the system counts a keyboard as background, the
+  focus-request hardening of Android 15+ apps), the talk records as if the switch were off.
+- Lost while held (`AUDIOFOCUS_LOSS`, `_LOSS_TRANSIENT`: a call ringing, an alarm, another app playing; told once):
+  `Events.interrupted` → `Ui.interrupted`, which each talk hands its own state machine: held, `VoiceHold.release`
+  as a lift would (in the cancel zone dropped, as `fieldLeft` drops it; else released, so a slide up, a lift or the
+  call screen taking the touch while it is recognized drops nothing); tapped, `VoiceTap.Press.INTERRUPTED` (`STOP_NOW`;
+  stopping already, `CUT`; then a tap is the tail's press). Typed, it is `VoiceSession.stopNow`: stopped with no tail,
+  the ring is not speech.
+  `_CAN_DUCK` (a notification, a navigation prompt) is ignored: we play nothing to duck, and stopping on every
+  notification would cut talks short.
+- Tests: `VoiceFocusTest` (the request, refusal, losses), `VoiceListenerMicrophoneTest` (held from the record's start,
+  given back however it ends; a loss told), `VoiceFocusUatTest` (the switch, a loss stopping a held and a tapped talk with no tail, the finger or a tap while it is
+  recognized), `VoiceTapTest` (the interruption in each state).
+  Whether players pause and resume is a device's (VO-57).
+
 ### Voice: the tail after the lift and the gain
 
 - **Tail**: lifting to type keeps the microphone on for `VoiceCaptureEnd.tail` (0.3 s, counted in

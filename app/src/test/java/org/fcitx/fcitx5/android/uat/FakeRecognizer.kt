@@ -83,6 +83,8 @@ class FakeRecognizer : VoiceSession.Listening {
 
     fun fail(why: VoiceListener.Failure) = events.failed(why)
 
+    fun interrupted() = events.interrupted()
+
     fun heard(raw: String) = events.heard(live().closed(raw))
 
     fun hearing(raw: String) = events.heard(live().heard(raw))

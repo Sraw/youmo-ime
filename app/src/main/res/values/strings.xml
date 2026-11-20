@@ -346,6 +346,8 @@
     <string name="voice_end_mark_auto">By the field: none in chats, search boxes and one-line fields</string>
     <string name="voice_end_mark_keep">As spoken (one-line fields still none)</string>
     <string name="voice_end_mark_drop">Never</string>
+    <string name="voice_pause_playback">Pause playback during voice input</string>
+    <string name="voice_pause_playback_summary">Music and videos in other apps pause while you speak and go on afterwards</string>
     <string name="voice_input">Voice input</string>
     <string name="a11y_candidates_prev_page">Previous candidates</string>
     <string name="a11y_candidates_next_page">More candidates</string>

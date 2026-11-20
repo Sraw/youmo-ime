@@ -10,6 +10,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ## 0.6.3（未发布）
 
+### 主要变化
+
+- 语音输入时暂停别的应用在放的音乐、视频，免得被当成说的话听进去：麦克风一开就暂停，说完交还，它们通常自己接着放。说着时来电话、响闹钟就当作说完，已经说的照常上屏。**按键 → 语音输入时暂停播放** 可以关掉。
+
 ### 小改动
 
 - 0.4 及更早的版本不能再直接升级到这一版：先覆盖安装 0.6.2，弹出键盘打几个字、停一下，再装这一版。直接升级的话，码表里存的词等会丢掉，也没有提示。
@@ -21,6 +25,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 修复
 
 - 手动加了叠字的词（「方方」），语音会把「芳芳」听成「方方方方」：叠字的热词接着自己又算了一次。现在只打一遍。
+
+### Main changes
+
+- Voice input pauses music and videos playing in other apps, so they are not heard as speech: paused as the microphone opens and handed back once you finish, the apps usually going on by themselves. A call or an alarm while you speak ends the talk as if you had finished, what you said typed. **按键 → 语音输入时暂停播放** turns it off.
 
 ### Smaller changes
 

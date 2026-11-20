@@ -270,6 +270,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         )
         // what voice types
         val voiceEndMark = enumList(R.string.voice_end_mark, "voice_end_mark", VoiceEndMark.Auto)
+        val voicePausePlayback = switch(R.string.voice_pause_playback, "voice_pause_playback", true, R.string.voice_pause_playback_summary)
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
         // set on an input method's page or the shared one, with no UI here

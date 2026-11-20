@@ -55,7 +55,7 @@ class VoiceFailureUatTest {
     ) { row ->
         // a talk failed leaves its card and its session behind: a keyboard and recognizer each row
         val voice = FakeRecognizer()
-        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
+        VoiceSession.listening = { events, _ -> voice.also { v -> v.events = events } }
         KeyboardHarness().use { h ->
             fun shown(): List<String> = KeyboardHarness.all(h.service.window.window!!.decorView)
                 .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()

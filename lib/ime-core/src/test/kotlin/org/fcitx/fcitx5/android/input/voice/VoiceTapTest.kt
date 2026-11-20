@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.voice.VoiceTap.Act
 import org.fcitx.fcitx5.android.input.voice.VoiceTap.Press
 import org.fcitx.fcitx5.android.input.voice.VoiceTap.State
@@ -60,4 +61,20 @@ class VoiceTapTest {
     fun overNothingActs() {
         for (press in Press.entries) assertEquals(press.name, Act.NONE to State.OVER, on(State.OVER, press))
     }
+
+    // a call ringing, an alarm: what comes next is not speech
+    @Test
+    fun anInterruptionStopsWithNoTail() = assertRows(
+        "listening: stopped now, the ring not recorded" to {
+            assertEquals(Act.STOP_NOW to State.STOPPING, on(State.LISTENING, Press.INTERRUPTED))
+        },
+        "stopping already: the tail ends now" to {
+            assertEquals(Act.CUT to State.STOPPING, on(State.STOPPING, Press.INTERRUPTED))
+        },
+        "a tap after it ends what is left at once, not a stop the second tap would" to {
+            val tap = VoiceTap()
+            tap.press(Press.INTERRUPTED)
+            assertEquals(Act.CUT, tap.press(Press.MIC))
+        },
+    )
 }

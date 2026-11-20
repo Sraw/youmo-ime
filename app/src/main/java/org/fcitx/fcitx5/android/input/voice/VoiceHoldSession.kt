@@ -48,6 +48,12 @@ class VoiceHoldSession(
 
     fun hidden(at: Long) = session.hidden(at)
 
+    /** Another app took the sound: as a lift, with no tail; the finger's moves after it drop nothing. */
+    fun interrupted(at: Long) {
+        if (session.over) return
+        if (hold.release()) session.stopNow(at) else session.drop()
+    }
+
     /** The touch taken away. */
     fun drop() = session.drop()
 

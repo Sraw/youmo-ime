@@ -73,7 +73,7 @@ class LowLandscapeScreenshotTest {
     private fun shown(level: Int, name: String, inputType: Int = InputType.TYPE_CLASS_TEXT, keyboards: ImKeyboards.Chosen? = null, open: KeyboardHarness.() -> Unit = {}): Int {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, level)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
-        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
+        VoiceSession.listening = { events, _ -> voice.also { v -> v.events = events } }
         VoiceStyle.haptics = { _, _ -> }
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.RECORD_AUDIO)
         return KeyboardHarness(keyboards = keyboards).use { h ->

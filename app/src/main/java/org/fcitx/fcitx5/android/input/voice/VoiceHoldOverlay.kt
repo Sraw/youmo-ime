@@ -188,6 +188,8 @@ class VoiceHoldOverlay(
 
     override fun recognizing() = VoiceCard.recognizing(status, hint, wave)
 
+    override fun interrupted() = session.interrupted(SystemClock.uptimeMillis())
+
     override fun ended(message: Int?) {
         if (inputView.hold === this) inputView.hold = null
         if (gone) return

@@ -60,6 +60,8 @@ class VoiceTapOverlay(
         }
 
         override fun ended(message: Int?) = this@VoiceTapOverlay.ended(message)
+
+        override fun interrupted() = press(Press.INTERRUPTED)
     }
 
     private val session: VoiceSession = VoiceSession(service, inputView.fcitx, ui, asItGoes = true, commit)
@@ -156,6 +158,7 @@ class VoiceTapOverlay(
         when (tap.press(press)) {
             Act.NONE -> {}
             Act.STOP -> session.finish(SystemClock.uptimeMillis())
+            Act.STOP_NOW -> session.stopNow(SystemClock.uptimeMillis())
             Act.CUT -> session.cut()
             Act.HIDE -> session.hidden(SystemClock.uptimeMillis())
             Act.TYPE_NOW -> session.typeNow()

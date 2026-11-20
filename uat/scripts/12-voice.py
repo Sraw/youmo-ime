@@ -774,4 +774,29 @@ case("VO-40", needs="manual:系统的麦克风使用指示要在 Android 12 起�
      "关麦克风本身由 JVM 的 VoiceListenerMicrophoneTest.closedWhileTheModelsLoadTheMicrophoneIsStopped 断言")(lambda d: None)
 
 
+def focus_ours(d):
+    """this app's entries in the system's audio focus stack (dumpsys audio): who holds the focus, and how"""
+    out = d.sh("dumpsys audio")
+    stack = out.split("Audio Focus stack entries", 1)[1].split("\n\n", 1)[0] if "Audio Focus stack entries" in out else ""
+    return [ln.strip() for ln in stack.splitlines() if f"pack: {PKG}" in ln]
+
+
+# also on the JVM; here that the system really gives the keyboard the focus (Android 15+ may refuse a background app) and takes it back
+@case("VO-57", base="B0-语音", mutates="learn", needs=EV)
+def vo57(d):
+    tap_mic(d)
+    d.wait(lambda s: anywhere(s, LISTEN), 30, step=0.3, what=LISTEN)
+    held = focus_ours(d)
+    voice = d.screen().find(desc="语音输入", where="ime")
+    check(voice, "说着时工具栏上没有麦克风")
+    d.tap(voice.c, 0.1)
+    mask_gone(d)
+    after = focus_ours(d)
+    check(held and all("GAIN_TRANSIENT" in ln and "MAY_DUCK" not in ln for ln in held),
+          f"说话时本应用没有短暂获得音频焦点：{held or '焦点栈里没有本应用'}")
+    check(not after, f"结束后本应用还占着音频焦点：{after}")
+    return f"说话时焦点：{held[0].split(' -- gain: ')[-1].split(' --')[0] if ' -- gain: ' in held[0] else held[0][:60]}；结束后已交还"
+
+
+case("VO-58", needs="manual:真机放着音乐说话，听音乐停和接着放、来电打断；音乐应用怎么响应焦点只能在真机上看")(lambda d: None)
 case("VO-53", needs="manual:语音待定文字在框里时打拼音：说话和点键要同时，手工看")(lambda d: None)

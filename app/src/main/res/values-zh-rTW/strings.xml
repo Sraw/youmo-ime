@@ -337,6 +337,8 @@
     <string name="voice_end_mark_auto">按輸入框：聊天、搜尋框和單行輸入框裡不加</string>
     <string name="voice_end_mark_keep">照說的保留（單行框仍不加）</string>
     <string name="voice_end_mark_drop">都不加</string>
+    <string name="voice_pause_playback">語音輸入時暫停播放</string>
+    <string name="voice_pause_playback_summary">說話時其他應用程式的音樂、影片暫停，說完繼續</string>
     <string name="voice_input">語音輸入</string>
     <string name="a11y_candidates_prev_page">上一頁候選詞</string>
     <string name="a11y_candidates_next_page">更多候選詞</string>

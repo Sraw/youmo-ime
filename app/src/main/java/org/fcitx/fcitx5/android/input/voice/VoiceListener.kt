@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.voice
 
 import android.annotation.SuppressLint
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTimestamp
 import android.media.MediaRecorder
@@ -45,6 +46,8 @@ class VoiceListener(
     private val events: Events,
     private val hotwords: suspend () -> VoiceHotwords.Words,
     private val language: VoiceChoice.Language,
+    // null: other apps' playback goes on (语音输入时暂停播放 off)
+    audio: AudioManager? = null,
 ) : VoiceSession.Listening {
 
     enum class Failure { NoModel, NoMicrophone, Recognition }
@@ -59,6 +62,9 @@ class VoiceListener(
         fun heard(heard: VoiceLive.Heard)
 
         fun level(level: Float)
+
+        /** another app took the audio focus while recording: a call ringing, an alarm */
+        fun interrupted()
     }
 
     // a native error is the session's to show, not the keyboard's to crash on; microphone and model
@@ -122,6 +128,8 @@ class VoiceListener(
     private var closed = false
     @Volatile
     private var liftAt: Long? = null
+
+    private val focus = audio?.let { VoiceFocus(it) { tell { interrupted() } } }
 
     private val quiet = VoiceQuiet()
     @Volatile
@@ -260,6 +268,7 @@ class VoiceListener(
                 Timber.w(e, "voice record stop on close")
             }
         }
+        focus?.giveBack()
         if (!acquired) return
         acquired = false
         val last = decoding
@@ -392,7 +401,10 @@ class VoiceListener(
         // VAD on the gained samples: silero missed soft speech at -50 to -60 dBFS before the gain. The 2 s buffer
         // holds the first words meanwhile; no model: all kept
         VoiceOpening.run(
-            start = { record.startRecording() },
+            start = {
+                focus?.take()
+                record.startRecording()
+            },
             load = { VoiceEngine.takeVad() },
             use = { listen(record, opening, it) },
             stop = {
@@ -401,6 +413,7 @@ class VoiceListener(
                 } catch (e: IllegalStateException) {
                     Timber.w(e, "voice record stop")
                 } finally {
+                    focus?.giveBack()
                     recording = null
                     record.release()
                     // numbers only: UAT checks the tail's timing and the level

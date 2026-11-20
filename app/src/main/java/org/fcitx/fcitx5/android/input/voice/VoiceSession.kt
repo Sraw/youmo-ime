@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.StringRes
@@ -14,6 +15,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.editing.EditingSession
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
+import org.fcitx.fcitx5.android.utils.audioManager
 import java.util.EnumSet
 
 /**
@@ -47,6 +49,9 @@ class VoiceSession(
 
         /** [message] null: typed or dropped; else shown a moment. */
         fun ended(@StringRes message: Int?)
+
+        /** Another app took the sound (a call ringing, an alarm): [stopNow], or [drop] where a lift would drop it. */
+        fun interrupted()
     }
 
     // the same one after input restarts in it (another EditorInfo, the same app and view id)
@@ -110,6 +115,10 @@ class VoiceSession(
 
         override fun level(level: Float) = ui.level(level)
 
+        override fun interrupted() {
+            if (!over) ui.interrupted()
+        }
+
         override fun failed(why: VoiceListener.Failure) = endTypingWhatWasHeard(
             when (why) {
                 VoiceListener.Failure.NoModel -> R.string.voice_no_model
@@ -123,10 +132,12 @@ class VoiceSession(
     fun begin() {
         service.watchVoice(::taken)
         service.voiceTalkBegan()
-        listener = (listening?.invoke(events) ?: VoiceListener(
+        val audio = service.audioManager.takeIf { AppPrefs.getInstance().keyboard.voicePausePlayback.getValue() }
+        listener = (listening?.invoke(events, audio) ?: VoiceListener(
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
             language = VoiceEngine.language(fcitx),
+            audio = audio,
         )).also {
             it.load()
             it.start()
@@ -179,6 +190,12 @@ class VoiceSession(
         if (composing) service.composeVoice("")
         composing = false
         finish(at)
+    }
+
+    /** What comes next is the ringtone or the call, not speech: no tail, what was said still typed. */
+    fun stopNow(at: Long) {
+        finish(at)
+        cut()
     }
 
     /** A press after the stop: the tail ends now, what was said is still typed. */
@@ -280,9 +297,9 @@ class VoiceSession(
     }
 
     companion object {
-        /** The JVM UAT tests' recognizer: the chain after it is the app's own; sherpa-onnx and the microphone are a device's. */
+        /** The JVM UAT tests' recognizer: the chain after it is the app's own; sherpa-onnx and the microphone are a device's. Given the focus's AudioManager, null with 语音输入时暂停播放 off. */
         @VisibleForTesting
-        internal var listening: ((VoiceListener.Events) -> Listening)? = null
+        internal var listening: ((VoiceListener.Events, AudioManager?) -> Listening)? = null
 
         // main thread
         @VisibleForTesting

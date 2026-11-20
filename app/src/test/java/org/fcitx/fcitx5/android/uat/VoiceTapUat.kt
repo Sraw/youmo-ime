@@ -27,7 +27,7 @@ open class VoiceTapUat {
     protected val restore = mutableListOf<() -> Unit>()
 
     protected val h = KeyboardHarness().also {
-        VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
+        VoiceSession.listening = { events, _ -> voice.also { v -> v.events = events } }
         val was = VoiceStyle.haptics
         VoiceStyle.haptics = { _, _ -> }
         restore += { VoiceStyle.haptics = was }
