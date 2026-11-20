@@ -759,7 +759,7 @@
     <string name="im_typos">Fix typos and slipped keys</string>
     <string name="im_typos_summary">A key tapped at its edge, by the key next to it, is read as that key too (a tap in its middle is left alone); full pinyin also reads slips such as gn for ng, Shuangpin on the full keyboard the u after j, q, x, y typed with ü\'s key</string>
     <string name="im_latin_words">Type English words</string>
-    <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP</string>
+    <string name="im_latin_words_summary">In pinyin, as iphone for iPhone or app for APP; on the 9, 14 and 18 keys too</string>
     <string name="im_shuangpin_keys_shown">Show the keys in the code row</string>
     <string name="im_shuangpin_keys_shown_summary">The code row shows the Shuangpin letters pressed (Xiaohe ni hc), not the full pinyin (ni hao); on the 18, 14 and nine keys, the letter each key was read as</string>
     <string name="engine_data_libime">Pinyin dictionary and language model: libime</string>

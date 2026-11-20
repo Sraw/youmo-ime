@@ -256,3 +256,8 @@ def t969(d):
     check(up.rstrip() == before.rstrip() and not up_typed, f"9264（{before!r}）后在 1 上往上划，编码行「{up}」、框里「{up_typed}」，上滑打出了东西")
     check(sep.replace(" ", "") == "xi'an" and "西安" in cands and not typed, f"94 1 26：编码行「{sep}」、候选 {cands[:6]}、框里「{typed}」，1 不是分词")
     return f"横：「{heng}」；点：「{dian}」；上滑：「{up}」；94 1 26：「{sep}」"
+
+
+@case("T9-70", base="B0-九键", mutates="learn", visual=True)
+def t970(d):
+    return script("06-pinyin").latin_mix(d, t9, "9633474663", "474663", "96636546842678244326")

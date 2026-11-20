@@ -5,9 +5,11 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.input.voice.VoiceHotwords
 import org.junit.Assert.assertEquals
@@ -107,6 +109,32 @@ class EnginesUserTest : EnginesFixture() {
             assertTrue("GitHub" in engines.pinyin("github"))
             engines.settings = EngineSettings(latinWords = false)
             assertFalse("GitHub" in engines.pinyin("github"))
+        }
+    }
+
+    // 全拼's keyboards on screen: the nine keys, 14 and 18 keys' codes
+    private val keyboards = listOf<Pair<String, (String) -> List<Int>>>(
+        "nine keys" to { w -> w.map { Keyboard.pinyinNineKey(NineKeyLetters.STANDARD.key(it)) } },
+        "14 keys" to { w -> w.map { NineKeyLetters.G14.key(it).code } },
+        "18 keys" to { w -> w.map { Keyboard.pinyin18Key(NineKeyLetters.G18.key(it)) } },
+    )
+
+    private fun Engines.pinyinOn(codes: List<Int>): List<String> = codes.map { onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, it) }.last().candidates.also {
+        onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+    }
+
+    @Test
+    fun englishsWordsAreTypedOnEveryPinyinKeyboardWithTheHabitsAndTheSetting() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
+            fun offered(on: Boolean) = assertRows(keyboards, { "${it.first}, offered $on" }) { (_, codes) -> assertEquals(on, "GitHub" in engines.pinyinOn(codes("github"))) }
+            offered(false)
+            engines.inEnglish("GitHub")
+            offered(true)
+            engines.learning(null, LearningOp.UseHabits(false))
+            offered(false)
+            engines.learning(null, LearningOp.UseHabits(true))
+            engines.settings = EngineSettings(latinWords = false)
+            offered(false)
         }
     }
 

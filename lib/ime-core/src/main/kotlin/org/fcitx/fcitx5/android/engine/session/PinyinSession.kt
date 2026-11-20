@@ -901,6 +901,8 @@ class PinyinSession(
 
         private fun shown(graph: SyllableGraph, edge: Int, syllable: Int): String = when {
             keysShown -> keysOf(graph, edge, syllable)
+            // a Latin word's letter in lower case, as typed on the full keyboard: Enter commits it so on keys too
+            graph.kind(edge) == Kind.LETTER -> Syllables.spelling(syllable).lowercase()
             // digits say nothing: the syllable read (fuzzy too), and of one still being typed as many letters as were typed
             keyed != null -> if (graph.kind(edge) == Kind.SYLLABLE) keyed.spelt(syllable) else keyed.started(syllable, graph.text(edge).length)
             spell && graph.kind(edge) == Kind.SYLLABLE -> Syllables.spelling(syllable)

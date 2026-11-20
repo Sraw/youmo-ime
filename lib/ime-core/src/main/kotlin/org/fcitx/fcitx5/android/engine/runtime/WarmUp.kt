@@ -25,6 +25,7 @@ internal class WarmUp(val steps: List<Step>, private val quiet: Boolean) : Runna
 
     companion object {
         const val PINYIN_WORDS = "pinyin's data and word index"
+        const val LATIN_KEYS = "Latin words' keys"
         const val CHAR_SYLLABLES = "characters' readings for 联想"
         const val EMOJI = "emoji"
         const val CHAIZI = "characters by their parts"

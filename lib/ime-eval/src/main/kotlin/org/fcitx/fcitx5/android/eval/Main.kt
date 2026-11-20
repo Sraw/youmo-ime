@@ -64,8 +64,8 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--latin on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "latin", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
     ) { args, _, _ ->
         // --touched needs --touch
         if ("touched" in args.options && "touch" !in args.options) return@Command null
@@ -473,6 +473,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("touch") { "taps" !in options && touchValid(it) },
         valid("hand") { runCatching { TouchSim.hand(it) }.isSuccess },
         valid("typos") { it in ON_OFF && readsTypos(scheme) },
+        // 中英混输 on keys; the full keyboard's off is the scheme no-latin
+        valid("latin") { it in ON_OFF && scheme in T9Set.SCHEMES },
         // 双拼's 简拼 in the middle: off, or a penalty other than the app's
         valid("sp-abbrev") { readsAbbrev(it, scheme) },
     ).all { it }
@@ -541,6 +543,7 @@ private class RunOptions(options: Map<String, String>) {
     private val fuzzy = options["fuzzy"]?.let(::fuzzyPairs).orEmpty()
     private val neighbours = options["neighbours"] == "on"
     private val typos = options["typos"] != "off"
+    private val latin = options["latin"] != "off"
     val half = options["half"]
     val beam = options["beam"]?.toInt() ?: PinyinDecoder.DEFAULT_BEAM
     val sentences = options["sentences"]?.toInt() ?: PinyinDecoder.DEFAULT_SENTENCES
@@ -576,12 +579,15 @@ private class RunOptions(options: Map<String, String>) {
     /** [touch]'s samples with each tap's place across its key where the app sends one (the 14 and 18 keys). */
     fun placed(samples: List<Sample>): List<Sample> = scheme?.takeIf { it in T9Set.SCHEMES }?.let { TouchSim.placed(samples, T9Set.lettersOf(it)) } ?: samples
 
-    /** Full pinyin reads [data]'s Latin words as the app does, unless the scheme is [NO_LATIN]. */
+    /** Full pinyin reads [data]'s Latin words as the app does, on every keyboard, unless the scheme is [NO_LATIN] or `--latin off`. */
     fun segmenter(data: PinyinData): Segmenter = when (scheme) {
         null -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours, latin = LatinWords.of(data.dictionary))
         NO_LATIN -> PinyinSegmenter(fuzzy, typos, neighbours = neighbours)
         in ZhuyinSet.SCHEMES -> T9Segmenter(fuzzy, abbreviations = false, letters = ZhuyinSet.SCHEMES.getValue(scheme), toneAllows = data.tones::allows, neighbours = neighbours)
-        in T9Set.SCHEMES -> T9Segmenter(fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme), neighbours = neighbours)
+        in T9Set.SCHEMES -> T9Segmenter(
+            fuzzy, abbreviations = T9Set.abbreviates(scheme), letters = T9Set.lettersOf(scheme), neighbours = neighbours,
+            latin = if (latin) LatinWords.of(data.dictionary) else null,
+        )
         in ShuangpinSet.GROUPED -> ShuangpinSet.GROUPED.getValue(scheme).let { (s, letters) -> GroupedShuangpinSegmenter(s, letters, fuzzy, neighbours = neighbours, abbreviations = abbreviations) }
         else -> ShuangpinSegmenter(ShuangpinSet.SCHEMES.getValue(scheme), fuzzy, typos, abbreviations = abbreviations, neighbours = neighbours)
     }

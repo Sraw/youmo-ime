@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -54,13 +55,32 @@ class EnginesWarmUpTest : EnginesFixture() {
         engines.context(InputMethodCatalog.WUBI, "")
         assertEquals(
             listOf(
-                listOf(WarmUp.PINYIN_WORDS, WarmUp.CHAR_SYLLABLES, WarmUp.EMOJI),
-                listOf(WarmUp.PINYIN_WORDS, WarmUp.CHAR_SYLLABLES, WarmUp.CHAIZI, WarmUp.CHAR_READINGS),
+                listOf(WarmUp.PINYIN_WORDS, WarmUp.LATIN_KEYS, WarmUp.CHAR_SYLLABLES, WarmUp.EMOJI),
+                listOf(WarmUp.PINYIN_WORDS, WarmUp.LATIN_KEYS, WarmUp.CHAR_SYLLABLES, WarmUp.CHAIZI, WarmUp.CHAR_READINGS),
             ),
             handed(),
         )
         engines.type(InputMethodCatalog.ENGLISH, "y")
         assertEquals(listOf(WarmUp.ENGLISH), handed().last())
+    }
+
+    /** 中英混输's keys found before the first key: the nine keys' as a nine-key field starts, full pinyin's keyed keyboards' with it; once each. */
+    @Test
+    fun latinWordsKeysAreWarmedUpForTheKeyboardsAFieldMayType() {
+        val engines = Engines(::load, null, warmUps = warmUps)
+        engines.context(InputMethodCatalog.T9, "")
+        engines.context(InputMethodCatalog.T9, "")
+        engines.context(InputMethodCatalog.PINYIN, "")
+        assertEquals(listOf(listOf(WarmUp.LATIN_KEYS)), handed().map { names -> names.filter { it == WarmUp.LATIN_KEYS } }.distinct())
+        assertEquals(2, later.size)
+        later.forEach { it.run() }
+        val latin = engines.assets.latinWords
+        for (keys in listOf(NineKeyLetters.STANDARD, NineKeyLetters.G14, NineKeyLetters.G18)) assertTrue(keys.tag(), latin.keyTrieBuilt(keys))
+        // turned off: none
+        later.clear()
+        val off = Engines(::load, null, warmUps = warmUps).apply { settings = EngineSettings(latinWords = false) }
+        off.context(InputMethodCatalog.T9, "")
+        assertFalse(WarmUp.LATIN_KEYS in handed().single())
     }
 
     /** One who types only English neither waits for pinyin's data nor holds its word index; a table reads by them. */

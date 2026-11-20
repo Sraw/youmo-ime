@@ -54,8 +54,8 @@ internal class EngineAssets(
     // signed with the app, so no checksum pass; synchronized lazy because the warm-up thread reads it too
     val pinyinData by lazy { PinyinData.load(blobs.load(PINYIN_DATA), verify = false) }
 
-    // Latin words full pinyin reads as typed in lower case (iphone for iPhone)
-    val latinWords by lazy(LazyThreadSafetyMode.NONE) { LatinWords.of(pinyinData.dictionary) }
+    // Latin words pinyin reads as typed in lower case (iphone for iPhone); warmed up off the fcitx thread too
+    val latinWords by lazy { LatinWords.of(pinyinData.dictionary) }
 
     // none if missing or unreadable (a stale VERSION): English then suggests nothing and [onError] is told
     val englishData: EnglishData? by lazy(LazyThreadSafetyMode.NONE) {

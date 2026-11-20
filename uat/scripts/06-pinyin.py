@@ -538,3 +538,41 @@ def py143(d):
     check(not any(w in mid for w in ya), f"四个键都点在正中的 tama，候选里有 ya ma 的词：{mid[:14]}")
     check(slip[:1] == ["你好"], f"s 靠 a 点的 nihso，首选不是「你好」：{slip[:6]}")
     return f"tama 靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}；nihso 靠边首选 {slip[:1]}"
+
+
+def latin_mix(d, tap, wodeiphone, iphone, sentence):
+    """T9-70, PY-158, PY-159: tap(d, keys) types keys on this keyboard"""
+    tap(d, wodeiphone)
+    c = d.cands(want="我的iPhone")
+    p = d.preedit()
+    d.shot("ime", f"wo de iphone：编码行「{p}」，首选「{first(c)}」")
+    check(first(c) == "我的iPhone", f"首选 {c[:3]}")
+    check("iphone" in p.lower() and "iphone" in p, f"编码行「{p}」里英文那段应是小写 iphone")
+    d.pick("我的iPhone")
+    t = d.field_text()
+    check(t == "我的iPhone", f"框里「{t}」")
+    d.clear()
+    tap(d, iphone)
+    d.cands()
+    p = d.preedit()
+    d.enter()
+    time.sleep(0.6)
+    t2 = d.field_text()
+    check(p == "iphone" and t2 == "iphone", f"编码行「{p}」，回车后框里「{t2}」")
+    d.clear()
+    tap(d, sentence)
+    c3 = d.cands()
+    check(first(c3) == "我们今天去吃饭", f"中文整句首选 {c3[:3]}")
+    return f"首选「{first(c)}」，回车上屏「{t2}」，整句首选「{first(c3)}」"
+
+
+@case("PY-158", base="B0-14键", mutates="learn", visual=True)
+def py158(d):
+    return latin_mix(d, grouped_keys, "qw op df er ui op gh op bn er", "ui op gh op bn er",
+                     "qw op m er bn jk ui bn ty ui as bn qw ui cv gh ui df as bn")
+
+
+@case("PY-159", base="B0-拼音18键", mutates="learn", visual=True)
+def py159(d):
+    return latin_mix(d, grouped_keys, "we io sd we io p h io bn we", "io p h io bn we",
+                     "we io m we bn jk io bn rt io a bn q u xc h io fg a bn")

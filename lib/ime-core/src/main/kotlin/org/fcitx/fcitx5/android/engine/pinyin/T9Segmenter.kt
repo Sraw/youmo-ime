@@ -21,7 +21,8 @@ import java.util.TreeMap
  * keyboards each two-letter key may carry a tap place, weighed per syllable ([SyllableGraph.against]). With
  * [neighbours], whole syllables with one key slipped to a neighbour are read too ([SlipCost]); in zhuyin
  * never onto a tone key. Keys may spell zhuyin instead ([KeySpelling]), a tone after a syllable acting as
- * a separator.
+ * a separator. With [latin] / [userLatin] (pinyin only), keys typing a Latin word (`474663` iphone) also get
+ * [Kind.LETTER] edges, each of the key's letters a match, as [PinyinSegmenter] does.
  */
 class T9Segmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
@@ -29,6 +30,8 @@ class T9Segmenter(
     override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
     override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
     neighbours: Boolean = false,
+    private val latin: LatinWords? = null,
+    private val userLatin: UserLatinWords? = null,
     // slip floors per keyboard: nine-key digits -3 (lower cost too much time on a phone); the rest the loosest
     // floor that turns no on-target sentence wrong (σ 0.15): 注音九键 -2, 大千 -1.75, 14 keys -6, 18 keys -4;
     // custom groups take the 18 keys' -4, unmeasured
@@ -79,6 +82,12 @@ class T9Segmenter(
 
         var letterTies = 0
             private set
+
+        // each key's a–z as letter syllables, for Latin words
+        val keyLetters = letters.codes.associateWith { code ->
+            val ls = letters.letters(code).filter { it in 'a'..'z' }.toSortedSet()
+            SyllableMatches(ls.map(LatinWords::syllable).toIntArray(), IntArray(ls.size))
+        }
 
         init {
             val wholeIds = HashMap<String, TreeMap<Int, Int>>()
@@ -161,15 +170,35 @@ class T9Segmenter(
     override fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph {
         val placed = taps?.takeIf { letters.isGrouped && it.any { at -> !at.isNaN() } }
         val touched = touches?.takeIf { slips }?.let { passing(input, it) }
+        val words = if (latin == null && userLatin == null) null else lettersOfWords(input)
         return GraphEdges.build(input) { at, edges ->
             if (input[at] in 'a'..'z') {
                 chosen(input, at, edges)
             } else {
                 walk(input, at, edges, placed)
                 if (touched != null) slipped(input, at, edges, placed, touched)
+                if (words != null && words[at]) edges.add(at, 1, Kind.LETTER, letterMatches(input[at]))
             }
         }
     }
+
+    // true at each key of a typed Latin word; a bar-chosen syllable (lower case) is no key, so never one
+    private fun lettersOfWords(input: String): BooleanArray? {
+        var marks: BooleanArray? = null
+        val mark = { at: Int, length: Int ->
+            val m = marks ?: BooleanArray(input.length).also { marks = it }
+            for (i in at until at + length) m[i] = true
+        }
+        for (at in input.indices) {
+            latin?.forEachAtKeys(input, at, letters) { mark(at, it) }
+            userLatin?.forEachAtKeys(input, at, letters) { mark(at, it) }
+        }
+        return marks
+    }
+
+    // a key's letters as letter syllables; a letter typed as itself is that one
+    private fun letterMatches(c: Char): SyllableMatches =
+        if (c in FIXED) LatinWords.MATCHES[c - 'A'] else tables.keyLetters.getValue(c)
 
     /** Adds, per key run from [at], whole syllables spelt with one key slipped to a neighbour, those spelt as typed left out, each at its cheapest; not for letters typed as themselves. */
     private fun slipped(input: String, at: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {

@@ -540,6 +540,16 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   points, their refine up to 17 ms once on a long sentence (one desktop core, 2026-11-01).
 - **Latin words** in pinyin (`iphone` → iPhone) come from the `latin` layer, spelt in letter
   syllables; full pinyin only, setting `EngineSettings.LATIN_WORDS` (a toggle on full pinyin's page).
+  The keyed keyboards (nine keys, 14, 18, own groups; not 注音) take them too: `T9Segmenter`'s
+  `latin`/`userLatin` add a `LETTER` edge at each place inside a word the keys could spell
+  (`LatinWords.forEachAtKeys`, a trie over the words' keys per keyboard; a fixed letter, `'A'..'Z'`,
+  only that letter), every letter of the key a match at 0, no penalty beyond the full keyboard's.
+  The preedit and Enter (`PinyinSession.shown`) give such an edge its letter in lower case.
+  The tries are built in the field's warm-up (`WarmUp.LATIN_KEYS`: the nine keys' as a nine-key
+  field starts, 14, 18 and own groups' with full pinyin's, since which one is typed shows only at a key);
+  a few ms each on a desktop core. A keyboard with letters on several keys holds every word by its
+  letters' first keys, its other typings only while the trie is under `LatinWords.MAX_KEY_NODES`
+  (100 000: each letter on three keys, 375 000 unbounded and 100–165 ms to build, 25–75 ms bounded).
 
 ### Long press on a candidate
 
@@ -625,8 +635,8 @@ are offered where nothing is learned (a password field, `Session.learning` false
   and `t9:*` as the nine keys are from full pinyin; the words and their counts are shared. The kind
   and the codes are the record's format: never changed once in a release. 「已学条目」 names `qk:` as
   「14 键」 and shows its keys as letters (`bn ui`, `NineKeyLetters.shown`).
-- **What does not apply**: typos (keys tapped off-centre are read, see Segment above), glide, 拆字, 中英混输 (the hardware keyboard
-  still has the last two). Fuzzy pinyin, u↔v included, does; so do `rq`/`sj`/`xq` and the custom
+- **What does not apply**: typos (keys tapped off-centre are read, see Segment above), glide, 拆字 (the hardware keyboard
+  still has it); 中英混输 does apply. Fuzzy pinyin, u↔v included, does; so do `rq`/`sj`/`xq` and the custom
   phrases' keys, typed as their letters' keys (`PhraseKeys`, A1).
 
 ### 双拼 on 18 keys and on the nine keys

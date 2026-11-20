@@ -343,7 +343,7 @@ class SettingsUatTest {
     }
 
     @Test
-    @Uat("ST-40", "ST-137")
+    @Uat("ST-40", "ST-137", "ST-198")
     fun pinyinsKeyboardOnItsPageAndTheSharedOptionsSayingFourteenKeys() {
         val c = InputMethodCatalog
         val setting = AppPrefs.getInstance().keyboard.pinyinKeyboard
@@ -354,7 +354,9 @@ class SettingsUatTest {
             val keyboard = listed(R.string.pinyin_keyboard)
             assertEquals(s(R.string.pinyin_keyboard_full), keyboard.entry.toString())
             assertTrue(keyboard.summary.toString().contains(s(R.string.pinyin_keyboard_summary)))
-            for (t in listOf(R.string.im_chaizi, R.string.im_latin_words)) assertTrue(summary(t), summary(t).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.ZHUYIN_NINE, c.ZHUYIN)))
+            summary(R.string.im_chaizi).let { assertTrue(it, it.endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.ZHUYIN_NINE, c.ZHUYIN))) }
+            // 中英混输: every 全拼 keyboard, zhuyin alone left out
+            summary(R.string.im_latin_words).let { assertTrue(it, it.endsWith(notFor(c.ZHUYIN_NINE, c.ZHUYIN))) }
             open(SettingsRoute.SharedInput)
             for (k in listOf(c.PINYIN_KEYS, c.SHUANGPIN_KEYS14)) assertFalse(summary(R.string.im_typos), InputMethodNames.of(activity, k, k) in summary(R.string.im_typos))
             im(c.PINYIN)

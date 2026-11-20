@@ -17,6 +17,9 @@ internal class SettingsMemo<K : Any, V : Any>(private val capacity: Int, private
     @Synchronized
     operator fun get(key: K): V = held[key] ?: make(key).also { held[key] = it }
 
+    @Synchronized
+    operator fun contains(key: K): Boolean = held.containsKey(key)
+
     internal val size: Int
         @Synchronized get() = held.size
 }

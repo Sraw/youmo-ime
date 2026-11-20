@@ -139,7 +139,8 @@ class Engines(
         val rareChars: String = "",
     )
 
-    private val assets = EngineAssets(blobs, onError, kernel, emojiShows, textShows)
+    // internal: a test sees what the warm-ups built (EnginesWarmUpTest)
+    internal val assets = EngineAssets(blobs, onError, kernel, emojiShows, textShows)
 
     // counted; by default a fresh thread per compaction, none kept, so logs reopened after close() still have one
     private val compactions = BackgroundWork.counted(background)

@@ -15,6 +15,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 语音输入时暂停别的应用在放的音乐、视频，免得被当成说的话听进去：麦克风一开就暂停，说完交还，它们通常自己接着放。说着时来电话、响闹钟就当作说完，已经说的照常上屏。**按键 → 语音输入时暂停播放** 可以关掉。
 - 双拼可以让编码行显示按下的双拼字母，不显示完整拼音：双拼设置里打开 **编码行显示双拼按键**（默认关），小鹤打 `nihc` 编码行就是 `ni hc`。全键盘、18 键、14 键、九键和每个方案都能用；18 键、14 键、九键显示每个键读出的那个字母（九键 6 4 4 5 显示 `ni hk`），按回车上屏的也是这些字母。
 - 剪贴板加了 **收藏**：面板栏上分「最近」「收藏」两页，在最近里长按一条选 **收藏**，它就一直留着，不算进上限，清空最近也不影响；收藏里能 **取消收藏**（可撤销）、**移到最前**。以前置顶的条目升级后在收藏里。恢复备份时收藏和手机上的合并，手机上的收藏（包括敏感的）都留着。关掉「记录剪贴板历史」后收藏照样能用。
+- 九键、14 键、18 键的拼音也能中英混输了：按英文词每个字母所在的键，比如九键 `474663` 出 iPhone，`9633474663` 出「我的iPhone」，和全键盘一样由 **中英混输** 开关管，也打得出英文里学到的词。编码行上英文那段显示小写字母，按回车上屏的就是它（`iphone`）。
 
 ### 小改动
 
@@ -40,6 +41,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - The clipboard has **Favorites**: its panel has two pages, Recent and Favorites. Long-press an entry in Recent and pick **Favorite** to keep it: it does not count against the limit and clearing Recent leaves it. In Favorites, **Remove from favorites** (undoable) and **Move to top**. Pinned entries are favorites after the upgrade. Restoring a backup merges the favorites with the phone's, every one on the phone kept, sensitive ones too. With clipboard history off the favorites still work.
+
+### Main changes
+
+- 中英混输 on pinyin's nine, 14 and 18 keys: tap the keys of an English word's letters, as `474663` for iPhone or `9633474663` for 我的iPhone on the nine keys, under the same **中英混输** switch as the full keyboard, words learned in English included. The code row shows such a word in lower case, and Enter commits that (`iphone`).
 
 ### Smaller changes
 

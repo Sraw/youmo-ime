@@ -284,7 +284,8 @@ object InputMethodSettings {
 
     val NINE_KEYS: List<Item> = listOf(multiTap, nineKeyLetters)
 
-    private val pinyinKeys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
+    private val zhuyin = listOf(InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
+    private val pinyinKeys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS) + zhuyin
 
     private val pinyin = listOf(
         sharedLink,
@@ -297,7 +298,7 @@ object InputMethodSettings {
             R.string.im_section_typing, listOf(
                 // not hidden on the others: a hardware keyboard still types full pinyin
                 Toggle(EngineSettings.CHAIZI, text(R.string.im_chaizi), R.string.im_chaizi_summary, notFor = pinyinKeys),
-                Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary, notFor = pinyinKeys),
+                Toggle(EngineSettings.LATIN_WORDS, text(R.string.im_latin_words), R.string.im_latin_words_summary, notFor = zhuyin),
             )
         ),
     )

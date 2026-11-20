@@ -193,6 +193,18 @@
 - **预期**：框里是「我的iPhone」。
 - **JVM**：`PinyinUatTest.chineseAndEnglishMixed`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
+### PY-158 [P1] 14 键中英混输
+- **前提**：B0-14键。
+- **操作**：点 `qw op df er ui op gh op bn er`（wo de iphone），看编码行和候选，点「我的iPhone」；清空，点 `ui op gh op bn er`（iphone），点 **回车**；清空，点 `qw op m er bn jk ui bn ty ui as bn qw ui cv gh ui df as bn`（women jintian qu chifan），看首选。
+- **预期**：同 T9-70：首选「我的iPhone」，编码行里英文那段是小写 `iphone`，点了框里是「我的iPhone」；回车上屏 `iphone`；中文整句首选「我们今天去吃饭」，和关掉 **中英混输** 时一样。
+- **JVM**：`LatinOnKeysUatTest.chineseAndEnglishMixedOnEveryKeyboard`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionLatinTest.aLatinWordIsTypedOnEveryPinyinKeyboardAsOnTheFullOne`（ime-core）；设备上留作冒烟。
+
+### PY-159 [P1] 18 键中英混输
+- **前提**：B0-拼音18键。
+- **操作**：点 `we io sd we io p h io bn we`（wo de iphone），看编码行和候选，点「我的iPhone」；清空，点 `io p h io bn we`（iphone），点 **回车**；清空，点 women jintian qu chifan 的键（`we io m we bn jk io bn rt io a bn q u xc h io fg a bn`），看首选。
+- **预期**：同 PY-158。
+- **JVM**：`LatinOnKeysUatTest.chineseAndEnglishMixedOnEveryKeyboard`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionLatinTest.aLatinWordIsTypedOnEveryPinyinKeyboardAsOnTheFullOne`（ime-core）；设备上留作冒烟。
+
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。

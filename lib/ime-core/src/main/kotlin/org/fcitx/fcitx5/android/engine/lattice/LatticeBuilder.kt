@@ -167,9 +167,10 @@ internal class LatticeBuilder(
         crossings.clear()
         val limit = limitFrom(graph, at)
         lastArcs.forEachCrossing(at) { from, edge, match, node, userNode, mergedNode, cost, short, abbreviated ->
-            // one from [changed] or past is of a walk a step before it redoes
+            // one from [changed] or past is of a walk a step before it redoes, and may lie past a shorter input's end
+            if (from >= changed) return@forEachCrossing
             val e = graph.edges(from).first + edge
-            if (from < changed && graph.to(e) >= changed) {
+            if (graph.to(e) >= changed) {
                 read(graph, from, e)
                 path.counted(abbreviated)
                 arcs.mark(path)

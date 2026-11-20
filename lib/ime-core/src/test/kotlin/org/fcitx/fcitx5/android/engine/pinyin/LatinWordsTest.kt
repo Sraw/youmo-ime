@@ -8,8 +8,10 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.syl
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
+import kotlin.random.Random
 
 class LatinWordsTest {
 
@@ -59,5 +61,25 @@ class LatinWordsTest {
         assertEquals(setOf("xy"), user.words)
         assertEquals(emptyList<Int>(), at("abc", 0))
         assertEquals(listOf(2), at("xyz", 0))
+    }
+
+    @Test
+    fun aKeyboardWithLettersOnSeveralKeysTypesEveryWordByItsFirstKeysTheTrieBounded() {
+        val random = Random(1)
+        val words = List(3000) { String(CharArray(8) { 'a' + random.nextInt(26) }) }.distinct()
+        val builder = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
+        words.forEach { builder.entry(it, letters(it)) }
+        val many = LatinWords.of(PinyinData.load(ByteBuffer.wrap(builder.build().toByteArray())).dictionary)
+        // each letter on three keys: 64 typings of each word, millions of nodes unbounded
+        val three = NineKeyLetters.custom(List(26) { k -> String(CharArray(3) { 'a' + (k + it) % 26 }) })
+        fun found(typed: String) = ArrayList<Int>().also { l -> many.forEachAtKeys(typed, 0, three) { l += it } }.contains(typed.length)
+        val size = many.keyTrieSize(three)
+        assertTrue("$size nodes", size in LatinWords.MAX_KEY_NODES..LatinWords.MAX_KEY_NODES + 64 * 8)
+        val byFirstKeys = words.filterNot { w -> found(String(CharArray(w.length) { three.key(w[it]) })) }
+        assertEquals("not typed by their first keys", emptyList<String>(), byFirstKeys)
+        // the other keys still type the words the bound leaves room for
+        assertTrue(found(three.typings(words.sorted().first()).last()))
+        // a keyboard with each letter on one key is far below it
+        assertTrue(many.keyTrieSize(NineKeyLetters.STANDARD) < LatinWords.MAX_KEY_NODES / 2)
     }
 }

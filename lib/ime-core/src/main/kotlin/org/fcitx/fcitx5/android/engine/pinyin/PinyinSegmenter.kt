@@ -41,7 +41,7 @@ class PinyinSegmenter(
         val letters = if (latin == null && userLatin == null) null else lettersOfWords(input)
         return GraphEdges.build(input) { at, edges ->
             walk(input, at, edges, slips, touches)
-            if (letters != null && letters[at]) edges.add(at, 1, Kind.LETTER, LETTERS[input[at] - 'a'])
+            if (letters != null && letters[at]) edges.add(at, 1, Kind.LETTER, LatinWords.MATCHES[input[at] - 'a'])
         }
     }
 
@@ -177,8 +177,6 @@ class PinyinSegmenter(
             }
             return diff
         }
-
-        val LETTERS = Array(26) { SyllableMatches(intArrayOf(LatinWords.syllable('a' + it)), intArrayOf(0)) }
 
         /** What precedes a vowel starts a syllable, not an initial alone. */
         fun startsSyllable(input: String, at: Int) = at < input.length && input[at] in VOWELS

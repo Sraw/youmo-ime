@@ -8,9 +8,11 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAIZI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.READS_PINYIN_DATA
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.T9
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.TABLES
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.session.Session
 import java.util.concurrent.Executor
 
@@ -95,12 +97,15 @@ internal class FieldContext(
         if (settings.emoji) aside += EMOJI_DATA
         if (im == PINYIN && settings.chaizi) aside += CHAIZI_DATA
         if (im == PINYIN) aside += READINGS_ASIDE
+        val latin = latinKeys(im, settings).filter { LATIN_ASIDE + it.tag() !in asideWarmedUp }
+        aside += latin.map { LATIN_ASIDE + it.tag() }
         aside -= asideWarmedUp
         if (pinyinWarmedUp && aside.isEmpty()) return
         pinyinWarmedUp = true
         asideWarmedUp += aside
         val steps = ArrayList<WarmUp.Step>()
         steps += WarmUp.Step(WarmUp.PINYIN_WORDS) { assets.pinyinData.wordIndex }
+        if (latin.isNotEmpty()) steps += WarmUp.Step(WarmUp.LATIN_KEYS) { latin.forEach(assets.latinWords::warmUp) }
         steps += WarmUp.Step(WarmUp.CHAR_SYLLABLES) { assets.charSyllables }
         if (EMOJI_DATA in aside) steps += WarmUp.Step(WarmUp.EMOJI) { assets.warmUpAside(emoji = true, chaizi = false, charReadings = false) }
         if (CHAIZI_DATA in aside) steps += WarmUp.Step(WarmUp.CHAIZI) { assets.warmUpAside(emoji = false, chaizi = true, charReadings = false) }
@@ -108,8 +113,20 @@ internal class FieldContext(
         warmUps.execute(WarmUp(steps, quiet = true))
     }
 
+    // the keys pinyin finds Latin words by (SessionFactory), their tries built here and not at the first key;
+    // full pinyin's keyed keyboards are only known by a key, so all of them
+    private fun latinKeys(im: String, s: EngineSettings): List<NineKeyLetters> = when {
+        !s.latinWords -> emptyList()
+        im == T9 -> listOf(s.nineKeys)
+        im == PINYIN -> listOfNotNull(NineKeyLetters.G14, NineKeyLetters.G18, s.ownKeyboard)
+        else -> emptyList()
+    }
+
     private companion object {
         // an [asideWarmedUp] key beside the data file names, not the step's name (WarmUp.CHAR_READINGS)
         const val READINGS_ASIDE = "char readings"
+
+        // with the keyboard's tag: each keyboard's Latin keys once
+        const val LATIN_ASIDE = "latin keys "
     }
 }

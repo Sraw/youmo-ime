@@ -202,6 +202,7 @@ class InputMethodSettingsTest {
         val rows = InputMethodSettings.of(InputMethodCatalog.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }
         val keys = listOf(InputMethodCatalog.T9, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN)
         assertEquals(keys, rows.getValue(EngineSettings.CHAIZI).notFor)
-        assertEquals(keys, rows.getValue(EngineSettings.LATIN_WORDS).notFor)
+        // Latin words go on the keys too, 注音 alone has no letters to spell them
+        assertEquals(listOf(InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN), rows.getValue(EngineSettings.LATIN_WORDS).notFor)
     }
 }

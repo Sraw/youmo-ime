@@ -1695,7 +1695,7 @@ IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
             "B0-英文": (None, "英文", None),
             "B0-18键": ("双拼", "双拼", "18 键"), "B0-九键双拼": ("双拼", "双拼", "九键")}
 # baselines that are B0 with 拼音's 键盘 set to this; the space key still names 拼音
-PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键", "B0-注音九键": "注音九键", "B0-注音全键盘": "注音全键盘"}
+PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-拼音18键": "18 键", "B0-九键": "九键", "B0-注音九键": "注音九键", "B0-注音全键盘": "注音全键盘"}
 
 
 def block_candidate(d, which, note):
