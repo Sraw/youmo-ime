@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
+import org.fcitx.fcitx5.android.engine.session.WordOffer
 
 /** What the host does for the engine and modules ([HostCore], through the [KeyPipeline]): every commit filtered, every panel update coalesced. */
 interface HostServices {
@@ -42,6 +44,12 @@ interface HostServices {
     fun updateStatusArea(ic: InputContext)
 
     fun punctuationAsTyped(ic: InputContext, marks: Set<String>) {}
+
+    /** A table's words to remember after a pause, or null: the last one withdrawn. */
+    fun wordOffer(ic: InputContext, offer: WordOffer?) {}
+
+    /** An offered word tapped was committed and saved. */
+    fun wordRemembered(ic: InputContext, word: OfferedWord) {}
 
     /** `Instance::outputFilter`, as the frontend shows it. */
     fun filterOutput(ic: InputContext, text: String): String

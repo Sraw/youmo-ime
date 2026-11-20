@@ -11,6 +11,8 @@ data class TableKeyboard(
     val lookingUp: Boolean,
     val labels: KeyLabels,
     val roots: TableRoots?,
+    /** Whether it has a 拼 key; 五笔 and 五笔拼音 have ⇧ there. */
+    val lookUpKey: Boolean = true,
 ) {
     val labelled: Boolean get() = labels != KeyLabels.NONE && roots != null
 

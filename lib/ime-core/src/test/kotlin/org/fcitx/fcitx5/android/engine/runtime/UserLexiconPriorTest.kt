@@ -26,7 +26,7 @@ class UserLexiconPriorTest {
     private fun lexicon() = UserLexicon(
         null, { throw it }, { null },
         EngineAssets({ ByteBuffer.wrap(pinyin) }, { throw it }, null),
-        forgetInTables = {}, dropSessions = {},
+        dropSessions = {},
     )
 
     // the tables once recoded the whole list at each English word learned

@@ -65,7 +65,7 @@ object Shots {
             Shot("qwerty-dark-flat", "qwerty", Forms.env("qwerty", Forms.flat).copy(dark = true), ThemeSource.DARK),
             Shot(
                 "qwerty-table-looking-up", "qwerty",
-                on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
+                on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "erbi", composing = true, lookingUp = true, tableLookUp = true)) },
             ),
             Shot(
                 "qwerty-table-roots", "qwerty",
@@ -80,6 +80,11 @@ object Shots {
                         marks = it.marks.copy(shortcuts = it.marks.shortcuts + Fixtures.qwertyAlts.keys.map { k -> "full/$k:up" to MarkContent.Symbol(k) }),
                     )
                 },
+            ),
+            // 五笔 typing a code: ⇧ in place of 拼, which it has not; shifted, the letters themselves
+            Shot(
+                "qwerty-table-wubi-shifted", "qwerty",
+                on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, roots = true), shift = Shift.Once) },
             ),
             Shot(
                 "qwerty-shuangpin-semicolon", "qwerty",

@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.glide.GlideSession
 import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession
 import org.fcitx.fcitx5.android.engine.handwriting.InkOver
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.learn.backup.AddressData
 import org.fcitx.fcitx5.android.engine.learn.backup.Backups
@@ -151,18 +152,20 @@ class Engines(
     // its lambdas reach parts made below only when called, never during construction
     private val lexicon: UserLexicon = UserLexicon(
         userDir, onError, additions, assets,
-        forgetInTables = { tables.forgetInTables(it) },
         dropSessions = ::invalidate,
         forgotten = { texts -> texts.forEach(learner.habits::forget) },
         attach = { learner.attach(it) },
         blocked = { learner.unpinEverywhere(it) },
         owned = { learner.own(it) },
         imports = { file, words, known -> learner.imports.import(file, words, known) },
+        tableWords = { learner.learnLog().state.tableWords.map { (k, since) -> TableWordRow(k.first, k.second, k.third, since) } },
+        dropTableWords = { learner.learnLog().dropTableWords(it) },
     )
 
     // `this.`: in an initializer the bare name is the constructor's uncounted executor.
     private val tables: TableRegistry = TableRegistry(blobs, onError, this.warmUps, assets, lexicon,
-        knows = { learner.habits.knows(it) }, state = { learner.learnLog().state }, dropSaved = { learner.learnLog().dropTableWords(it) },
+        state = { learner.learnLog().state }, dropSaved = { learner.learnLog().dropTableWords(it) },
+        remember = { im, code, text -> learner.learnLog().rememberTableWord(im, code, text) },
         indexes = lexicon.added::indexes)
 
     private val english: EnglishLexicon = EnglishLexicon { learner.learnLog() }
@@ -614,7 +617,7 @@ class Engines(
         lastTableKeyboard?.takeIf { it.isFor(im, session, settings, on) }?.let { return it.keyboard }
         val options = tableOptions(method, settings)
         val keys = if (session == null) emptySet() else (tables.table(im).dictionary.keys + listOfNotNull(options.matchingKey)).filterTo(HashSet()) { !it.isLetter() }
-        return TableKeyboard(im, keys, on, options.keyLabels, options.roots).also { lastTableKeyboard = LastTableKeyboard(im, session, settings, it) }
+        return TableKeyboard(im, keys, on && options.lookUpKey, options.keyLabels, options.roots, options.lookUpKey).also { lastTableKeyboard = LastTableKeyboard(im, session, settings, it) }
     }
 
     private class LastTableKeyboard(val im: String, val session: Session?, val settings: EngineSettings, val keyboard: TableKeyboard) {

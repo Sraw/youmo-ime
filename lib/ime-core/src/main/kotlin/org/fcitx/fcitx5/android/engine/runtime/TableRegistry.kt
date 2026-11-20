@@ -26,7 +26,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.zip.CRC32
 
-/** The table input methods, each loaded at first need and kept with what the user taught it (older builds' saved phrases from the record, [SavedPhrases]). Shares the user's words coded per table ([shared]) and forgets in every table what is forgotten anywhere ([forgetInTables]). On the fcitx thread. */
+/** The table input methods, each loaded at first need and kept with the words it remembered ([SavedPhrases], in the record). Shares the user's words coded per table ([shared]). On the fcitx thread. */
 internal class TableRegistry(
     private val blobs: Blobs,
     private val onError: (IOException) -> Unit,
@@ -34,12 +34,12 @@ internal class TableRegistry(
     private val coding: Executor,
     private val assets: EngineAssets,
     private val lexicon: UserLexicon,
-    // whether the record has a text used or pinned anywhere: something to forget
-    private val knows: (String) -> Boolean = { false },
-    // the record's state, holding older builds' table phrases (LearnState.tableWords)
+    // the record's state, holding the tables' remembered words (LearnState.tableWords)
     private val state: () -> LearnState = { LearnState() },
-    // removes those phrases from the record (LearnLog.dropTableWords)
+    // removes those words from the record (LearnLog.dropTableWords)
     private val dropSaved: (List<TableWordRow>) -> Unit = {},
+    // writes one (LearnLog.rememberTableWord): im, code, text
+    private val remember: (String, String, String) -> Unit = { _, _, _ -> },
     // where per-table on-disk indexes of merged dictionaries live ([CodedIndex]; objects once exhausted the heap);
     // null keeps none and tables offer none of the file's words
     private val indexes: () -> UserFiles? = { null },
@@ -87,9 +87,6 @@ internal class TableRegistry(
         override fun blocked(text: String) = lexicon.isBlockedWord(text) || lexicon.gate().holds(text)
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
-        // as pinyin offers to forget: what the record has, or an added word
-        override fun learned(text: String) =
-            knows(text) || lexicon.addedOf(text).isNotEmpty() || lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
         override fun prepare() {
             coded()
             mergedNow()
@@ -167,7 +164,6 @@ internal class TableRegistry(
         override fun longer(prefix: String, byLength: Boolean) =
             mergedNow()?.let { (index, file) -> index.longer(prefix, byLength, file) }.orEmpty()
         override fun leadsAnywhere(prefix: String) = mergedNow()?.first?.leadsAnywhere(prefix) == true
-        override fun learned(text: String) = false
         override fun prepare() {
             mergedNow()
         }
@@ -195,30 +191,6 @@ internal class TableRegistry(
     // the whole buffer, position kept: CRC32.update(ByteBuffer) is API 26, minSdk 29
     private fun crc32(buffer: ByteBuffer): Long = CRC32().apply { update(buffer.duplicate().also { (it as Buffer).clear() }) }.value
 
-    /** In every table that saved them, loaded or not, as a saved phrase would be offered again. */
-    fun forgetInTables(texts: Collection<String>) {
-        val forgotten = texts.toSet()
-        val rows = state().tableWords.entries.mapNotNull { (key, since) ->
-            val (im, code, text) = key
-            if (text in forgotten) TableWordRow(im, code, text, since) else null
-        }
-        drop(rows)
-    }
-
-    // out of the record, counted where a table offered it; an unloaded table is not loaded to tell, so its rows
-    // count (no undo is the safe answer)
-    private fun drop(rows: List<TableWordRow>) {
-        if (rows.isEmpty()) return
-        dropSaved(rows)
-        forgets += rows.count { row ->
-            row.im in TABLES && tables[row.im]?.let { it.dictionary.indexOf(row.code, row.text) < 0 } != false
-        }
-    }
-
-    /** Phrases the tables forgot, counted up and never reset: compare before and after a call; such forgets cannot be undone. */
-    var forgets = 0
-        private set
-
     /** Of [texts], those [im] cannot take, with the table word they give way to: their code is a lone, whole, self-committing entry under [options], so the word is never offered. */
     fun sameCode(im: String, options: TableOptions, texts: Collection<String>): Map<String, String> {
         if (!options.autoSelect || options.autoSelectLength == 0) return emptyMap()
@@ -243,7 +215,7 @@ internal class TableRegistry(
     fun table(im: String): Table = tables.getOrPut(im) {
         val data = blobs.load("$TABLE_DIR/${TABLES.getValue(im).file}")
         val dictionary = TableDictionary(CodeTable.load(data.duplicate(), verify = false))
-        Table(dictionary, SavedPhrases(dictionary, im, state, ::drop), data)
+        Table(dictionary, SavedPhrases(dictionary, im, state, dropSaved) { code, text -> remember(im, code, text) }, data)
     }
 
     /** Adds to [into] the beyond-BMP characters of every [TABLES] entry, each table read and let go; unreadable ones told and skipped. */

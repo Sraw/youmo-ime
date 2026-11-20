@@ -456,6 +456,10 @@
         <item quantity="one">Used once under these keys lately</item>
         <item quantity="other">Used %d times under these keys lately</item>
     </plurals>
+    <plurals name="learning_why_remembered">
+        <item quantity="one">A word you had %1$s remember; used here once lately</item>
+        <item quantity="other">A word you had %1$s remember; used here %2$d times lately</item>
+    </plurals>
     <plurals name="learning_why_phrase">
         <item quantity="one">You typed this whole phrase once</item>
         <item quantity="other">You typed this whole phrase %d times</item>
@@ -1583,4 +1587,13 @@
     <string name="layout_finding_full_lacks">The number keyboard lacks %1$s: number fields cannot take it (an amount\'s minus, a decimal point)</string>
     <string name="layout_finding_bottom_left">The bottom left is usually %1$s (as in the app’s)</string>
     <string name="layout_finding_split_scaled">Split, this row has %1$s keys in %2$s, not 9 or 10: it cannot be halved and is scaled instead</string>
+    <string name="word_offer">Remember:</string>
+    <string name="word_offer_said">Can remember: %1$s, %2$s code %3$s</string>
+    <string name="word_remembered">Remembered “%1$s”: %2$s %3$s</string>
+    <string name="im_space_picks_prediction">Space types the suggestion</string>
+    <string name="im_space_picks_prediction_summary">While next words are suggested, Space types the first. A Space right after a table committed by itself, or right after a word went in, is still a space</string>
+    <string name="im_offer_words">Offer words typed a character at a time</string>
+    <string name="im_offer_words_summary">Type 2 to 4 characters one at a time and pause: above the keyboard, the word they make and its code. Saved only when tapped</string>
+    <string name="word_table_code_hint">Tables type it too, under the code their rules give it: no code to fill in</string>
+    <string name="word_table_detail" translatable="false">%1$s · %2$s</string>
 </resources>

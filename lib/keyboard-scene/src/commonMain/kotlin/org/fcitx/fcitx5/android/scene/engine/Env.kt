@@ -83,7 +83,8 @@ data class Env(
     private fun String?.isIn(values: Set<String>?): Boolean = this != null && (values == null || this in values)
 
     private fun flag(name: String): Boolean = when (name) {
-        "roots" -> input.roots
+        // ⇧ on a table types the letter itself: the key shows it, not its roots
+        "roots" -> input.roots && shift == Shift.None
         "compact" -> compact
         "landscape" -> landscape
         "split" -> split
@@ -94,6 +95,7 @@ data class Env(
         "lang-key" -> input.langKey
         "composing" -> input.composing
         "looking-up" -> input.lookingUp
+        "table-lookup" -> input.tableLookUp
         "shifted" -> shift != Shift.None
         "caps-lock" -> shift == Shift.Lock
         else -> false
@@ -113,6 +115,8 @@ data class Input(
     val schemeTypes: Set<String> = emptySet(),
     val table: String? = null,
     val tableExtra: String? = null,
+    /** A table with a 拼 key, which stands in Shift's place. */
+    val tableLookUp: Boolean = false,
     val roots: Boolean = false,
     val field: String? = "text",
     val action: String? = null,

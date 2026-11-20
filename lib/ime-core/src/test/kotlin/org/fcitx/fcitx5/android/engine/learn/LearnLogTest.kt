@@ -592,4 +592,22 @@ class LearnLogTest {
         assertFalse(opened.takesRewrites)
         assertFalse(opened.rewrite(copied))
     }
+
+    // a word forgotten in pinyin under 0.6.2 took the tables' remembered word with it; replayed after the update it
+    // stays gone, while a Forget of now leaves a table's word alone
+    @Test
+    @Uat("TBL-11c")
+    fun anOlderForgetReplayedStillDropsATablesWord() {
+        val log = LearnLog(dir.file(LearnLog.FILE), clock, { throw it }, compactAt = 1L shl 30).also { it.open() }
+        log.rememberTableWord("engine-wubi", "wqvb", "你好")
+        log.rememberTableWord("engine-wubi", "iije", "汪小明")
+        log.forget("汪小明")
+        val older = LearnRecords.FORMAT.record(LearnRecords.FORGET) {
+            writeInt((clock.at / LearnClock.MINUTE).toInt())
+            writeInt(0)
+            writeUTF("你好")
+        }
+        val replayed = LearnLog.replay(dir.file(LearnLog.FILE).read() + older)
+        assertEquals(setOf(Triple("engine-wubi", "iije", "汪小明")), replayed.tableWords.keys)
+    }
 }

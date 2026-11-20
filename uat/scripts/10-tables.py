@@ -3,7 +3,7 @@ follows its case's 前提/操作/预期."""
 import statistics
 import time
 
-from uat import (Blocked, add_im, block_candidate, case, check, script)
+from uat import (PKG, Blocked, add_im, block_candidate, case, check, gear, home, script)
 
 
 def word(c):
@@ -30,6 +30,147 @@ def tbl01(d):
     t = d.field_text()
     check(t == "我人", f"框里「{t}」")
     return f"「{t}」"
+
+
+def offer(d, want, note):
+    """the notice strip's offer after the pause: its words, shot"""
+    s = d.wait(lambda x: x if x.find(text="记住：", where="all") else None, timeout=5, step=0.2,
+               what="提示条「记住：」")
+    d.shot("full", note)
+    offered = [n.text for n in s.nodes if n.pkg == PKG and n.text and n.text != "记住：" and " " in n.text]
+    check(want in offered, f"提示条给出 {offered}，没有「{want}」")
+    return offered
+
+
+def remember(d, text):
+    """tap the offered word: kept, the strip says so with 撤销"""
+    n = d.screen().find(text=text, where="all")
+    if not n:
+        raise Blocked(f"提示条上没有「{text}」")
+    d.tap(n.c, 0.4)
+    return d.wait(lambda x: x if x.find(contains="记住了", where="all") else None, timeout=3, step=0.2,
+                  what="提示条「记住了」")
+
+
+def wang_xiao_ming(d):
+    d.type("ig ih je ")
+    d.expect_field("汪小明")
+
+
+@case("TBL-11", base="B0-五笔", mutates="learn", clean=True)
+def tbl11(d):
+    wang_xiao_ming(d)
+    offered = offer(d, "汪小明 iije", "逐字打出「汪小明」停一下：提示条「记住：汪小明 iije」")
+    check(not any(o.startswith("小明") for o in offered), f"给出了半个词：{offered}")
+    said = [t for t in remember(d, "汪小明 iije").texts(where="all") if "记住了" in t]
+    d.shot("full", "点了以后：记住了『汪小明』，带撤销")
+    check(any("五笔" in t and "iije" in t for t in said), f"记住后的提示 {said}")
+    d.expect_field("汪小明")
+    d.type(",iije")
+    # not first till picked again (TBL-11d): past the bar's few, in the list
+    c = words(d.all_cands())
+    check("汪小明" in c, f"iije 的候选 {c[:12]}")
+    return f"给出 {offered}；{said}；iije 里第 {c.index('汪小明') + 1} 个"
+
+
+@case("TBL-11c", base="B0-五笔", mutates="learn", clean=True)
+def tbl11c(d):
+    wang_xiao_ming(d)
+    offer(d, "汪小明 iije", "给出「汪小明」")
+    s = remember(d, "汪小明 iije")
+    undo = s.find(text="撤销", where="all")
+    check(undo is not None, f"记住后的提示没有撤销：{s.texts(where='all')[:8]}")
+    d.tap(undo.c, 0.8)
+    d.expect_field("汪小明")
+    d.clear()
+    d.type("iije")
+    c = words(d.cands())
+    check("汪小明" not in c, f"撤销后 iije 还有「汪小明」：{c[:6]}")
+    d.clear()
+    d.type("qgyi")
+    d.cands(want="鲸")
+    d.pick("鲸")
+    d.type("lfqv")
+    if d.field_text() != "鲸园":
+        d.space()
+    d.expect_field("鲸园")
+    offer(d, "鲸园 qglf", "给出「鲸园 qglf」")
+    remember(d, "鲸园 qglf")
+    d.clear()
+    d.type("qglf")
+    kept = words(d.cands(want="鲸园"))
+    check("鲸园" in kept, f"记住后 qglf 的候选 {kept[:6]}")
+    menu = d.long_pick("鲸园")
+    d.shot("full", "长按记住的「鲸园」：有删除")
+    check("删除" in menu, f"长按菜单 {[t for t in menu if len(t) < 10][:12]}")
+    d.tap_text("删除", where="all", scroll=False, after=0.3)
+    s = d.wait(lambda x: x if x.find(text="撤销", where="all") else None, timeout=3, step=0.2, what="删除后的撤销")
+    deleted = [t for t in s.texts(where="all") if "删除" in t]
+    d.shot("full", "删除后的提示条，带撤销")
+    d.tap(s.find(text="撤销", where="all").c, 0.8)
+    d.clear()
+    d.type("qglf")
+    again = words(d.cands(want="鲸园"))
+    check("鲸园" in again, f"撤销删除后 qglf 的候选 {again[:6]}")
+    return f"撤销后 iije {c[:3]}；删除提示 {deleted}；撤销后 qglf {again[:4]}"
+
+
+@case("TBL-11d", base="B0-设置", mutates=True)
+def tbl11d(d):
+    add_im(d, "五笔")
+    gear(d, "五笔")
+    d.switch("调频", True)
+    on_page(d, "五笔")
+    wang_xiao_ming(d)
+    offer(d, "汪小明 iije", "给出「汪小明」")
+    remember(d, "汪小明 iije")
+    d.type(",iije")
+    once = words(d.all_cands())
+    check("汪小明" in once and once[0] != "汪小明", f"记住后第一次 iije {once[:6]}")
+    d.pick("汪小明")
+    d.type(",iije")
+    twice = words(d.cands(want="汪小明"))
+    d.shot("kb", "记住后再选一次：iije 第一个是「汪小明」")
+    check(twice[0] == "汪小明", f"再选一次后 iije {twice[:4]}")
+    return f"iije 记住后 {once[:3]}，再选一次后 {twice[:3]}"
+
+
+@case("TBL-11e", base="B0-五笔拼音", mutates="learn", clean=True)
+def tbl11e(d):
+    d.type("qgyi")
+    d.cands(want="鲸")
+    d.pick("鲸")
+    d.type("yuan")
+    d.cands(want="园")
+    d.pick("园")
+    d.expect_field("鲸园")
+    offered = offer(d, "鲸园 qglf", "五笔拼音：拼音打出的「园」也算，提示条「记住：鲸园 qglf」")
+    return f"给出 {offered}"
+
+
+@case("TBL-11f", base="B0-二笔", mutates="learn", clean=True)
+def tbl11f(d):
+    d.type("wch xd ms ")
+    d.expect_field("汪小明")
+    offered = offer(d, "汪小明 wcxm", "二笔：提示条「记住：汪小明 wcxm」")
+    return f"给出 {offered}"
+
+
+@case("TBL-47a", base="B0-五笔", mutates="learn", visual=True)
+def tbl47a(d):
+    k = d.keys(refresh=True)
+    check("shift" in k, f"五笔键盘没有 ⇧：{sorted(k)[:40]}")
+    check("拼" not in k, "五笔键盘上还有「拼」")
+    d.press("shift", after=0.4)
+    d.shot("kb", "五笔点 ⇧：字母键上是大写字母")
+    d.type("a")
+    d.expect_field("A")
+    d.type("ig")
+    check("shift" in d.keys(refresh=True), "打着编码时 ⇧ 不见了")
+    d.press("shift", after=0.4)
+    d.type("a")
+    got = d.expect_field("A汪A")
+    return f"框里「{got}」"
 
 
 @case("TBL-12c", base="B0-设置", mutates=True, heavy=True,

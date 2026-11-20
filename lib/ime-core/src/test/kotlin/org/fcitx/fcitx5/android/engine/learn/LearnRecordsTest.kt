@@ -68,6 +68,7 @@ class LearnRecordsTest {
         LearnRecord.PhraseForget(29_874_003, "你好呀亲爱的"),
         NoPredict(29_874_004, "你", "好", false),
         TableOrderReset(29_874_005, "engine-wbx"),
+        LearnRecord.TableForget(29_874_005, "engine-wbx", "aaaa", "工"),
         TableBlock(29_874_005, "engine-wbx", "aaaa", "工工", on = true),
         TableBlock(29_874_005, "engine-wbx", "aaaa", "工工", on = false),
         EnCommit(8, 29_874_006, 3, 20_746, 0, "the", "cat", "cta", EnCommit.AUTOCORRECTED),
@@ -144,9 +145,22 @@ class LearnRecordsTest {
             writeInt(5)
             writeInt(1)
             writeUTF("拟")
+            writeBoolean(true)
             writeUTF("a field of a later build")
         }
         assertEquals(Forget(5, 1, "拟"), LearnRecords.decode(longer))
+    }
+
+    // 0.6.2's Forget, its three fields, dropped the tables' remembered words too: replayed, it still does
+    @Test
+    fun aForgetOfAnOlderBuildReadsAsOne() {
+        val older = LearnRecords.FORMAT.record(LearnRecords.FORGET) {
+            writeInt(5)
+            writeInt(1)
+            writeUTF("你好")
+        }
+        assertEquals(Forget(5, 1, "你好", older = true), LearnRecords.decode(older))
+        assertEquals(Forget(5, 1, "你好", older = true), LearnRecords.decode(LearnRecords.encode(Forget(5, 1, "你好", older = true))))
     }
 
     @Test

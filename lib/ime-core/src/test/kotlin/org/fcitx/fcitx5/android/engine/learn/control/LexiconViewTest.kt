@@ -68,6 +68,18 @@ class LexiconViewTest {
         assertEquals(UserWord.NEVER, never.lastUsed)
     }
 
+    // a table's remembered word: the day it was remembered, a later use's once typed
+    @Test
+    fun aTablesWordIsDatedFromItsRemembering() {
+        val log = LearnLog(dir.file(LearnLog.FILE), clock).also { it.open() }
+        log.commit(row("ni", "你", "ni"))
+        log.rememberTableWord("engine-wubi", "iije", "汪小明")
+        val word = UserWord("汪小明", "iije", UserWord.Kind.LEARNED, table = "engine-wubi")
+        val dated = LexiconView.dated(log.state, listOf(word)).single()
+        assertEquals(LearnClock.localDay(clock, (FakeClock.START / LearnClock.MINUTE).toInt()), dated.lastUsed)
+        assertEquals(0, dated.idle)
+    }
+
     // by the typing day each became the user's, then by seq; never by two installs' seqs alone
     @Test
     fun theLatestLearnedFirstByTheirTypingDay() {

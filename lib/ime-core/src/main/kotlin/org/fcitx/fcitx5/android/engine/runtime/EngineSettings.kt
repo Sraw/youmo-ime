@@ -21,6 +21,8 @@ data class EngineSettings(
     /** Whether neighbour slips and common misspellings are read as meant. */
     val typos: Boolean = true,
     val prediction: Boolean = true,
+    /** 空格上屏联想词: a space takes the first prediction shown, in pinyin and the tables. */
+    val spacePicksPrediction: Boolean = false,
     val emoji: Boolean = true,
     /** niuniuniu 犇. */
     val chaizi: Boolean = true,
@@ -54,6 +56,7 @@ data class EngineSettings(
         const val SHUANGPIN_KEYS_SHOWN = "ShuangpinKeysShown"
         const val PAGE_SIZE = "PageSize"
         const val PREDICTION = "Prediction"
+        const val SPACE_PICKS_PREDICTION = "SpacePicksPrediction"
         const val EMOJI = "Emoji"
         const val CHAIZI = "Chaizi"
         const val BUILT_IN_PHRASES = "BuiltInPhrases"
@@ -106,6 +109,8 @@ data class TableSettings(
     val hint: Boolean? = null,
     val orderByUse: Boolean? = null,
     val keyLabels: KeyLabels? = null,
+    /** 逐字打出后给出组词. */
+    val offerWords: Boolean? = null,
 ) {
     /** Key labels only where the table has roots. */
     fun applyTo(options: TableOptions) = options.copy(
@@ -113,6 +118,7 @@ data class TableSettings(
         hint = hint ?: options.hint,
         orderByUse = orderByUse ?: options.orderByUse,
         keyLabels = keyLabels?.takeIf { options.roots != null } ?: options.keyLabels,
+        offerWords = offerWords ?: options.offerWords,
     )
 
     companion object {
@@ -121,11 +127,12 @@ data class TableSettings(
         const val ORDER_POLICY = "OrderPolicy"
 
         const val KEY_LABELS = "KeyLabels"
+        const val OFFER_WORDS = "OfferWords"
 
         /** 调频 on (Fast orders by use too). */
         const val ORDER_BY_USE = "Freq"
 
         /** 自动造词's two keys are gone: an older config's are ignored and fcitx drops them at its next save. */
-        val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY)
+        val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY, OFFER_WORDS)
     }
 }

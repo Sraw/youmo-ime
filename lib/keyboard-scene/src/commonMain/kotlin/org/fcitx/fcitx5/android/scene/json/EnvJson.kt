@@ -97,6 +97,7 @@ object EnvJson {
             langKey = m.bool("langKey", d.langKey),
             composing = m.bool("composing", d.composing),
             lookingUp = m.bool("lookingUp", d.lookingUp),
+            tableLookUp = m.bool("tableLookUp", d.tableLookUp),
             pad = m.nullableString("pad", d.pad),
         ).also { m.done() }
     }

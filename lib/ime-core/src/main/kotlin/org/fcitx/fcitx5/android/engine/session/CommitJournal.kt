@@ -125,6 +125,32 @@ internal class CommitJournal {
         while (entries.size > KEPT) trim()
     }
 
+    /**
+     * The texts of the [n] entries right before the cursor, each whole; null if not so. Unverified too: a passed-on
+     * comma leaves the field unseen, and the caller checks the field's text it read instead.
+     */
+    fun lastWhole(n: Int): List<String>? {
+        if (n < 1 || cursor < n || selected) return null
+        val last = entries.subList(cursor - n, cursor)
+        return if (last.all { it.left == it.length }) last.map { it.text } else null
+    }
+
+    /** The [n] entries before the cursor ([lastWhole]) become one of [text] as [commit], the field's text the same; returns their commits. */
+    fun merge(n: Int, text: String, commit: Commit?): List<Commit?> {
+        charge = null
+        val merged = entries.subList(cursor - n, cursor).map { it.commit }
+        repeat(n) { entries.removeAt(--cursor) }
+        deleted.clear()
+        entries.add(cursor++, Entry(text, commit, ++written))
+        return merged
+    }
+
+    /** [commit], taken back elsewhere, is no longer taken back when its text is deleted. */
+    fun forgo(commit: Commit) {
+        for (e in entries) if (e.commit === commit) e.commit = null
+        deleted.removeAll { it.commit === commit }
+    }
+
     // drop the entry farther from the cursor: with the cursor before all of them, dropping the front would lose the new commit
     private fun trim() {
         if (cursor - 1 >= entries.size - cursor) {

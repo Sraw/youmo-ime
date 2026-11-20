@@ -133,6 +133,15 @@ interface TypingApi {
 
     suspend fun inkFinished(piece: Int): Boolean
 
+    /** A table's offered word tapped: word [index] of offer [id], [before] the field's text before the cursor as tapped. */
+    suspend fun rememberWord(id: Int, index: Int, before: String)
+
+    /** The notice's 撤销 of [rememberWord]: [text] unsaved from [code] and its commit taken back. */
+    suspend fun unrememberWord(text: String, code: String)
+
+    /** Offer [id] went up on the notice strip: one never shown is offered again. */
+    suspend fun offerShown(id: Int)
+
     suspend fun tableKeys(im: String): Set<Char>
 }
 

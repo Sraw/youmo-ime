@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.host.KeyRouter
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
@@ -158,23 +159,93 @@ class TablesUatTest {
         } },
     )
 
-    private fun EngineReplay.typeJingYuanThreeTimes() {
-        repeat(3) {
-            type("qgyi")
-            pick("鲸")
-            type("lfqv")
-        }
-        expectText("鲸园鲸园鲸园")
-        focus("")
+    private fun HostReplay.offered() = offer?.words.orEmpty().map { "${it.text} ${it.code}" }
+
+    // 汪 ig, 小 ih, 明 je, each by a space: 汪小明 under its rule code iije, where 水暖 alone committed itself
+    private fun HostReplay.typeWangXiaoMing() {
+        type("ig ih je ")
+        expectText("汪小明")
     }
 
     @Test
     @Uat("TBL-11")
-    fun aCharacterAtATimeMakesNoWord() = with(EngineReplay(im = InputMethodCatalog.WUBI)) {
-        typeJingYuanThreeTimes()
-        type("qglf")
-        expectText("昏天黑地")
-        expectNotAmong("鲸园")
+    fun aCharacterAtATimeIsOfferedAndKeptOnATap() = with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        typeWangXiaoMing()
+        // 小明 is not: the sentence model reads 汪小明 as one word
+        assertEquals(listOf("汪小明 iije"), offered())
+        remember(0)
+        expectText("汪小明")
+        assertEquals(listOf(OfferedWord("汪小明", "iije")), remembered)
+        type(",iije")
+        expectText("汪小明，")
+        // 调频 off: right after the table's own four under iije, before any of pinyin's
+        assertEquals(listOf("潜水电脑", "水暖", "沙明", "游鸿明", "汪小明"), page.take(5))
+    }
+
+    @Test
+    @Uat("TBL-11a")
+    fun untappedNothingIsKept() = with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        typeWangXiaoMing()
+        type(",")
+        assertEquals(null, offer)
+        type("iije")
+        assertTrue(page.toString(), "汪小明" !in page)
+    }
+
+    @Test
+    @Uat("TBL-11c")
+    fun tappedByMistakeUndoneByBackspaceOrUndo() = assertRows(
+        "Backspace the word away: unsaved" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+            typeWangXiaoMing()
+            remember(0)
+            backspace(3)
+            expectText("")
+            type("iije")
+            assertTrue(page.toString(), "汪小明" !in page)
+        } },
+        "the notice's 撤销: unsaved, the text stays" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+            typeWangXiaoMing()
+            remember(0)
+            unremember(OfferedWord("汪小明", "iije"))
+            expectText("汪小明")
+            type(",iije")
+            assertTrue(page.toString(), "汪小明" !in page)
+        } },
+    )
+
+    @Test
+    @Uat("TBL-11d")
+    fun rememberedRanksAsPinyinsWords() = with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        engines.settings = engines.settings.copy(tables = engines.settings.tables + ("Wubi" to TableSettings(orderByUse = true)))
+        typeWangXiaoMing()
+        remember(0)
+        type(",iije")
+        val once = page.indexOf("汪小明")
+        // the tap was a pick: second, ahead of the unused
+        assertEquals(page.take(4).toString(), 1, once)
+        pick("汪小明")
+        type(",iije")
+        // the tap was one pick, this the second running: first
+        assertEquals("$once then ${page.take(4)}", "汪小明", page.first())
+    }
+
+    @Test
+    @Uat("TBL-11e")
+    fun wubiPinyinsPinyinCharactersCountToo() = with(HostReplay(im = InputMethodCatalog.WUBI_PINYIN)) {
+        type("qgyi")
+        pick("鲸")
+        type("yuan")
+        pick("园")
+        expectText("鲸园")
+        assertTrue(offered().toString(), "鲸园 qglf" in offered())
+    }
+
+    @Test
+    @Uat("TBL-11f")
+    fun erbiOffersByItsRules() = with(HostReplay(im = InputMethodCatalog.ERBI)) {
+        type("wch xd ms ")
+        expectText("汪小明")
+        assertTrue(offered().toString(), "汪小明 wcxm" in offered())
     }
 
     @Test
@@ -402,9 +473,9 @@ class TablesUatTest {
 
     // the 拼 key of a table's keyboard: pinyin till it is pressed again
     @Test
-    @Uat("TBL-47")
+    @Uat("TBL-47", "TBL-22")
     fun theLookUpKeyLooksUpByPinyinTillPressedAgain() = assertRows(
-        "五笔: 拼 on, hao is 好 and 拼 stays on; off, wqiy is 你" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        "二笔: 拼 on, hao is 好 and 拼 stays on; off, a code again" to { with(HostReplay(im = InputMethodCatalog.ERBI)) {
             lookUpKey()
             type("hao")
             assertTrue(row, row.startsWith(KeyRouter.LOOKING_UP))
@@ -415,27 +486,27 @@ class TablesUatTest {
             pick("你")
             expectText("好你")
             lookUpKey()
-            type("wqiy")
-            assertEquals("你", candidates.first())
+            type("wch")
+            assertEquals("汪", candidates.first())
             assertTrue(row, !row.startsWith(KeyRouter.LOOKING_UP))
         } },
-        "五笔: 拼 on, switched away and back, still on; 二笔's its own, off" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        "二笔: 拼 on, switched away and back, still on; 仓颉's its own, off" to { with(HostReplay(im = InputMethodCatalog.ERBI)) {
             lookUpKey()
+            ime(InputMethodCatalog.CANGJIE)
+            type("hao")
+            assertTrue(row, !row.startsWith(KeyRouter.LOOKING_UP))
             ime(InputMethodCatalog.ERBI)
             type("hao")
-            assertTrue(row, !row.startsWith(KeyRouter.LOOKING_UP))
-            ime(InputMethodCatalog.WUBI)
-            type("hao")
             assertTrue(row, row.startsWith(KeyRouter.LOOKING_UP))
             assertTrue(candidates.toString(), "好" in candidates)
         } },
-        "五笔: a code typed goes into the lookup as the key is pressed" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        "二笔: a code typed goes into the lookup as the key is pressed" to { with(HostReplay(im = InputMethodCatalog.ERBI)) {
             type("hao")
             lookUpKey()
             assertTrue(row, row.startsWith(KeyRouter.LOOKING_UP))
             assertTrue(candidates.toString(), "好" in candidates)
         } },
-        "五笔: off mid-lookup, a word picked of it is put in, its letters after it a code again" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        "自然码: off mid-lookup, a word picked of it is put in, its letters after it a code again" to { with(HostReplay(im = InputMethodCatalog.ZIRANMA)) {
             lookUpKey()
             type("nihao")
             pick("你")
@@ -445,7 +516,7 @@ class TablesUatTest {
             assertTrue(row, !row.startsWith(KeyRouter.LOOKING_UP))
             assertTrue(row, row.startsWith("hao"))
         } },
-        "五笔: off with nothing picked, nothing put in, the ' dropped" to { with(HostReplay(im = InputMethodCatalog.WUBI)) {
+        "自然码: off with nothing picked, nothing put in, the ' dropped" to { with(HostReplay(im = InputMethodCatalog.ZIRANMA)) {
             lookUpKey()
             type("xi'an")
             lookUpKey()
@@ -460,11 +531,13 @@ class TablesUatTest {
             type("wqiy")
             assertEquals("你", candidates.first())
         } },
-        "二笔: its lookup by the key, marked" to { with(HostReplay(im = InputMethodCatalog.ERBI)) {
-            lookUpKey()
-            type("hao")
-            assertTrue(row, row.startsWith(KeyRouter.LOOKING_UP))
-            assertTrue(candidates.toString(), "好" in candidates)
+        "五笔, 五笔拼音: no 拼 key, its press looks nothing up" to { listOf(InputMethodCatalog.WUBI, InputMethodCatalog.WUBI_PINYIN).forEach { im ->
+            with(HostReplay(im = im)) {
+                lookUpKey()
+                type("wqiy")
+                assertTrue(row, !row.startsWith(KeyRouter.LOOKING_UP))
+                assertEquals("你", candidates.first())
+            }
         } },
         "仓颉: a lookup it had no key for, marked" to { with(HostReplay(im = InputMethodCatalog.CANGJIE)) {
             lookUpKey()

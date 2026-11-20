@@ -69,9 +69,8 @@ internal class LearningFacade(
     // the current user model's counts, kept as the record changes
     private var habitCounts: HabitCounts? = null
 
-    // a long press's forget in handwriting or a table: the tables' and the record's, as the model's
+    // a long press's forget in handwriting: the record's, as the model's; a table's remembered words stay
     fun forgottenEverywhere(text: String) {
-        tables.forgetInTables(listOf(text))
         habits.forget(text)
     }
 
@@ -185,7 +184,7 @@ internal class LearningFacade(
         LearningOps(
             shown, lexicon, ::learnLog, control,
             habits = { useHabits }, useHabits = { useHabits = it }, dropSessions = invalidate,
-            first = first, tableForgets = { tables.forgets },
+            first = first,
             // a clear forgets backups holding what it clears first, and saves one of what is left after
             backups = backups, backup = backups::run, restoreCorrection = { english.restoreCorrection(it) },
             resetTableOrder = ::resetTableOrder,

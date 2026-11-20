@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -82,6 +83,24 @@ class DropPredictionsTest {
                     assertEquals(emptyList<Int>(), host.kinds)
                 }
             },
+        )
+    }
+
+    // 空格上屏联想词: the bar draws the prediction space takes as the first, none when space is a space
+    @Test
+    @Uat("PY-160")
+    fun theBarLeadsWithWhatSpaceTakes() {
+        fun row(why: String, shown: Snapshot, lead: Int) = why to {
+            with(Bar()) {
+                shown(shown)
+                assertEquals(lead, lastCandidates().lead)
+            }
+        }
+        assertRows(
+            row("off: the first, as ever", PREDICTING, lead = 0),
+            row("on: past an emoji, the one space takes", PREDICTING.copy(spacePicks = 1, spaceMarks = true), lead = 1),
+            row("on, space a space: none", PREDICTING.copy(spaceMarks = true), lead = -1),
+            row("typing: the first", COMPOSING, lead = 0),
         )
     }
 

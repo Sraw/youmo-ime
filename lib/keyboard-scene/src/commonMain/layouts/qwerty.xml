@@ -41,16 +41,16 @@
     <key id="star" role="star" label="*" send="*" mark="false" split="after" when="table-extra=star"/>
   </row>
   <row split="halves">
-    <!-- 码表时 ⇧ 让给「拼」键，开/关两态二选一（TextKeyboard.kt:300-306）；拼音、双拼打字时让给「分词」（和 14/18 键的分词键一样，
-         ShiftSeparator：composing 只在码表和这时为真，TextBoardState） -->
+    <!-- 有「拼」键的码表（二笔、仓颉、自然码）⇧ 让给它，开/关两态二选一；五笔、五笔拼音用 z 反查，那里一直是 ⇧；拼音、双拼打字时让给「分词」
+         （和 14/18 键的分词键一样，ShiftSeparator：composing 只在码表和这时为真，TextBoardState） -->
     <key id="shift" role="shift" kind="function" width="1.5" icon="{shift-icon}" a11y="a11y_key_shift" shortcut="shift"
-         send="caps" double-tap="caps:lock" when="!table !composing"/>
+         send="caps" double-tap="caps:lock" when="!table !composing, table !table-lookup"/>
     <key id="apostrophe" role="apostrophe" kind="function" width="1.5" label="分词" text-size="16" a11y="a11y_key_separator"
          send="'" shortcut="separator" when="composing !table"/>
     <key id="lookup" role="lookup" kind="function" width="1.5" label="拼" text-size="18" text-style="bold"
-         send="code:U+F0104" when="table !looking-up"/>
+         send="code:U+F0104" when="table table-lookup !looking-up"/>
     <key id="lookup-on" role="lookup-on" kind="enter" face="keep" width="1.5" label="拼" text-size="18" text-style="bold"
-         send="code:U+F0104" when="table looking-up"/>
+         send="code:U+F0104" when="table table-lookup looking-up"/>
     <key id="z" label="{case:z}" send="z" shortcut="full/z"><variant when="roots" label="{root:z}"/></key>
     <key id="x" label="{case:x}" send="x" shortcut="full/x"><variant when="roots" label="{root:x}"/></key>
     <key id="c" label="{case:c}" send="c" shortcut="full/c"><variant when="roots" label="{root:c}"/></key>

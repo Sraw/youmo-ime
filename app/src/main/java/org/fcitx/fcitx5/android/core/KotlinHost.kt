@@ -282,6 +282,12 @@ class KotlinHost(
 
     override suspend fun inkFinished(piece: Int) = onHost { inkKey(Action.Ink(piece)) }
 
+    override suspend fun rememberWord(id: Int, index: Int, before: String) = onHost { sendVirtual(Keyboard.REMEMBER, Action.Remember(id, index, before)) }
+
+    override suspend fun unrememberWord(text: String, code: String) = onHost { sendVirtual(Keyboard.REMEMBER, Action.Unremember(text, code)) }
+
+    override suspend fun offerShown(id: Int) = onHost { sendVirtual(Keyboard.REMEMBER, Action.OfferShown(id)) }
+
     // the Ink key carries what the keys' ink told, so they cannot come apart
     private fun HostCore.inkKey(piece: Action.Ink) =
         bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }

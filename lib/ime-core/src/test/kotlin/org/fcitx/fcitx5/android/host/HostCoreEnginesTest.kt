@@ -7,20 +7,23 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
-import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
-import org.fcitx.fcitx5.android.engine.runtime.UserWord
-import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
-import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.learn.control.MenuItem
+import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.EnginesFixture
 import org.fcitx.fcitx5.android.engine.runtime.EnginesHost
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.runtime.type
+import org.fcitx.fcitx5.android.engine.runtime.wubiShown
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,6 +57,57 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertTrue("你" in shown)
         assertTrue(core.select(shown.indexOf("你"), "你"))
         assertEquals("你", log.filterIsInstance<HostEvent.Commit>().first().text)
+    }
+
+    // the app puts its notices away as text goes in: an offer, and a word remembered, come after the commit that made them
+    @Test
+    fun `a table's offer and the word remembered are told after the commit`() {
+        val engines = Engines(::load, MemoryFiles(), warmUps = inPlace, clock = clock)
+        engines.settings = wubiShown
+        val core = core(engines)
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.setInputMethods(listOf(InputMethodCatalog.WUBI))
+        core.activate(1)
+        core.focus(true)
+        engines.context(InputMethodCatalog.WUBI, "", started = true, said = true)
+        "vaaa vbgf ".forEach { core.sendKey(Key(it.code), virtual = true) }
+        val offered = log.indexOfLast { it is HostEvent.WordOffer && it.offer != null }
+        assertTrue(offered > log.indexOfLast { it is HostEvent.Commit })
+        val offer = (log[offered] as HostEvent.WordOffer).offer!!
+        assertEquals(listOf(OfferedWord("一妤", "vavb")), offer.words)
+        log.clear()
+        core.sendKey(Key(UNICODE + Keyboard.REMEMBER, KeyStates.VIRTUAL), virtual = true, payload = Action.Remember(offer.id, 0, "一妤"))
+        val commit = log.indexOfFirst { it is HostEvent.Commit && it.text == "一妤" }
+        assertTrue(commit >= 0)
+        assertEquals(listOf(HostEvent.WordRemembered(OfferedWord("一妤", "vavb"))), log.drop(commit).filterIsInstance<HostEvent.WordRemembered>())
+        assertTrue(log.take(commit).none { it is HostEvent.WordRemembered })
+        engines.close()
+    }
+
+    // leaving a field tells the withdrawal there, so the next field's first offer is told as new
+    @Test
+    fun `another field's offer is told afresh`() {
+        val engines = Engines(::load, MemoryFiles(), warmUps = inPlace, clock = clock)
+        engines.settings = wubiShown
+        val core = core(engines)
+        val log = mutableListOf<HostEvent>()
+        core.events += HostEvents { log += it }
+        core.setInputMethods(listOf(InputMethodCatalog.WUBI))
+        core.activate(1)
+        core.focus(true)
+        engines.context(InputMethodCatalog.WUBI, "", started = true, said = true)
+        "vaaa vbgf ".forEach { core.sendKey(Key(it.code), virtual = true) }
+        assertTrue(log.any { it is HostEvent.WordOffer && it.offer != null })
+        core.focus(false)
+        assertEquals(HostEvent.WordOffer(null), log.last { it is HostEvent.WordOffer })
+        log.clear()
+        core.activate(2)
+        core.focus(true)
+        engines.context(InputMethodCatalog.WUBI, "", started = true, said = true)
+        "vaaa vbgf ".forEach { core.sendKey(Key(it.code), virtual = true) }
+        assertEquals(listOf(OfferedWord("一妤", "vavb")), log.filterIsInstance<HostEvent.WordOffer>().last().offer?.words)
+        engines.close()
     }
 
     // 清除 while typing: what is typed goes, nothing committed; 恢复 types it again, the same keys

@@ -27,7 +27,13 @@ internal object TableHabitOrder {
         if (!h.learns) return null
         fun item(at: Int) = text(at).let { t -> HabitRanker.Item(at, Words.of(t), single = t.codePointCount(0, t.length) == 1) }
         val ours = (0 until reach).map { original[it] }.filter(own)
-        val others = HabitRanker.rest((0 until reach).map { original[it] }.filterNot(own).map(::item), here, view(h, mine = true))
+        val outside = (0 until reach).map { original[it] }.filterNot(own).map(::item)
+        val others = if (orderByUse) {
+            HabitRanker.rest(outside, here, view(h, mine = true))
+        } else {
+            // among themselves by the same rules, a word picked twice running first of them: none is the table's V
+            HabitRanker.rank(outside.map { HabitRanker.Item(it.value, it.words, it.single, injected = true) }, here, "", view(h, mine = true))
+        }
         val all = if (orderByUse) {
             // the user's own words from pinyin are not first here for being theirs: by use here alone
             HabitRanker.rank(ours.map(::item) + others.map { it.item }, here, "", view(h, mine = false))
@@ -44,10 +50,11 @@ internal object TableHabitOrder {
         return placed to all.associateBy { it.item.words.text }
     }
 
-    /** What 为什么排在这 says of [text]: the pin first, else its tier; nothing unranked. */
-    fun why(h: Habits, code: Code, text: String, r: HabitRanker.Ranked<Int>?): Why? = when {
-        h.pinned(code)?.text == text -> Why(HabitRanker.Tier.PINNED, r?.uses ?: 0, code)
-        r != null -> Why(r.tier, r.uses, code)
+    /** What 为什么排在这 says of [text]: the pin first, else its tier; nothing unranked unless [remembered] there. */
+    fun why(h: Habits, code: Code, text: String, r: HabitRanker.Ranked<Int>?, remembered: Boolean = false): Why? = when {
+        h.pinned(code)?.text == text -> Why(HabitRanker.Tier.PINNED, r?.uses ?: 0, code, remembered = remembered)
+        r != null -> Why(r.tier, r.uses, code, remembered = remembered)
+        remembered -> Why(null, h.uses(code, Words.of(text)), code, remembered = true)
         else -> null
     }
 

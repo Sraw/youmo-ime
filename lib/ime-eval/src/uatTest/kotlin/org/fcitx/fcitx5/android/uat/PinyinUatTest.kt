@@ -120,6 +120,20 @@ class PinyinUatTest {
     }
 
     @Test
+    @Uat("PY-160")
+    fun aSpaceTakesThePredictionShownThenTypesASpace() = with(HostReplay()) {
+        engines.settings = engines.settings.copy(spacePicksPrediction = true)
+        type("jintian")
+        space()
+        expectText("今天")
+        val first = page.first()
+        space()
+        expectText("今天$first")
+        space()
+        expectText("今天$first ")
+    }
+
+    @Test
     @Uat("PY-26")
     fun wordsThatMayFollowAfterACommit() = with(EngineReplay()) {
         type("jintian")

@@ -7,7 +7,10 @@ package org.fcitx.fcitx5.android.input.learning
 import kotlinx.coroutines.test.runTest
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
+import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
@@ -30,8 +33,8 @@ class CandidateLearningMenuTest {
     // the app's strings are not in a unit test's resources: each answered by its id
     private val context = PlaceholderStrings(RuntimeEnvironment.getApplication())
 
-    private fun menu(kind: WordKind) = LearningResult.Menu(
-        "指导", kind, listOf(MenuItem.DELETE, MenuItem.BLOCK, MenuItem.PIN, MenuItem.WHY), Why(HabitRanker.Tier.USED, 3), BlockScope.EVERYWHERE
+    private fun menu(kind: WordKind, why: Why = Why(HabitRanker.Tier.USED, 3)) = LearningResult.Menu(
+        "指导", kind, listOf(MenuItem.DELETE, MenuItem.BLOCK, MenuItem.PIN, MenuItem.WHY), why, BlockScope.EVERYWHERE
     )
 
     @Test
@@ -59,6 +62,15 @@ class CandidateLearningMenuTest {
         assertEquals(placeholder(R.plurals.learning_why_used), why[0].label)
         assertEquals(placeholder(R.string.learning_copy_report), why[1].label)
         assertEquals(listOf<LearningOp>(LearningOp.Menu(2, "指导")), ops)
+    }
+
+    @Test
+    fun aTablesRememberedWordSaysSo() = runTest {
+        val connection = FakeHostConnection(this)
+        val why = Why(HabitRanker.Tier.USED, 2, Code(Kinds.table(InputMethodCatalog.WUBI), "iije"), remembered = true)
+        connection.api.learned = { menu(WordKind.DICTIONARY, why) }
+        val lines = CandidateLearningMenu(context, connection, this) { _, _ -> error("not shown") }.lines(1, "汪小明", paged = false)!!
+        assertEquals(placeholder(R.plurals.learning_why_remembered), lines.last().pick()!![0].label)
     }
 
     @Test

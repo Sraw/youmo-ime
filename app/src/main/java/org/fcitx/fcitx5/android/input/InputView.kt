@@ -247,6 +247,8 @@ class InputView(
 
     override val undoAnchor: View get() = kawaiiBar.view
 
+    override val lettersShown: Boolean get() = windowManager.isAttached(keyboardWindow) && keyboardWindow.lettersShown
+
     override val undoAbove: View get() = keyboardView
 
     override fun undoStrip(out: Rect): Boolean = codeStripRegion(out)
@@ -468,7 +470,10 @@ class InputView(
 
         SceneTrace.section("updateKeyboardSize") { updateKeyboardSize() }
         scope += DockFollower()
-        keyboardWindow.onLayoutShown = { updateKeyboardSize() }
+        keyboardWindow.onLayoutShown = {
+            updateKeyboardSize()
+            keysChanged()
+        }
 
         add(keyboardView, lParams(if (floating) dp(TextKeyboard.widthDp(context)) else matchParent, wrapContent) {
             centerHorizontally()
@@ -502,7 +507,10 @@ class InputView(
     }
 
     private inner class DockFollower : TypedComponent<DockFollower>(), InputBroadcastReceiver {
-        override fun onWindowAttached(window: InputWindow) = updateKeyboardSize()
+        override fun onWindowAttached(window: InputWindow) {
+            updateKeyboardSize()
+            keysChanged()
+        }
     }
 
     private var placed: List<Int?>? = null

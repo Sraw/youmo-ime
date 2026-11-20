@@ -19,6 +19,8 @@ data class UserWord(
     val order: Long = 0,
     /** An added word voice puts in wherever it reads alike, the word model not asked (「以后总是换」). */
     val voiceAlways: Boolean = false,
+    /** A word a table remembered: that input method, [pinyin] its code there; empty for pinyin's. */
+    val table: String = "",
 ) {
     enum class Kind {
         /** Added by hand in the settings. */

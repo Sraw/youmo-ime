@@ -224,12 +224,16 @@ sealed class LearnRecord {
     ) : LearnRecord()
 
     data class Pin(override val minute: Int, val day: Int, val code: Code, val text: String, val reading: String, val on: Boolean) : LearnRecord()
-    data class Forget(override val minute: Int, val day: Int, val text: String) : LearnRecord()
+    /** [older]: written by a build whose Forget also dropped the tables' remembered words of [text], which replay keeps doing. */
+    data class Forget(override val minute: Int, val day: Int, val text: String, val older: Boolean = false) : LearnRecord()
 
     /** A whole phrase deleted from its long press: its count alone, not words of the same text (added, imported, a table's saved). Type 16. */
     data class PhraseForget(override val minute: Int, val text: String) : LearnRecord()
     data class NoPredict(override val minute: Int, val prev: String, val text: String, val on: Boolean) : LearnRecord()
     data class TableOrderReset(override val minute: Int, val im: String) : LearnRecord()
+
+    /** A table's 忘掉学到的: [text]'s order learned under [code] of table [im] alone. Type 17. */
+    data class TableForget(override val minute: Int, val im: String, val code: String, val text: String) : LearnRecord()
 
     /** [text] blocked under table [im]'s [code] alone ([on]), or unblocked: see [TableBlockRow]. */
     data class TableBlock(override val minute: Int, val im: String, val code: String, val text: String, val on: Boolean) : LearnRecord()

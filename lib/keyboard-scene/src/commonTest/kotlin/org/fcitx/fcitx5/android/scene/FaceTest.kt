@@ -204,7 +204,7 @@ class FaceTest {
 
     @Test
     fun flatKeysAndFaceKeep() {
-        val table = Fixtures.portrait.copy(flat = true, input = Input(ime = "table", table = "wubi", lookingUp = true, composing = true))
+        val table = Fixtures.portrait.copy(flat = true, input = Input(ime = "table", table = "erbi", lookingUp = true, composing = true, tableLookUp = true))
         val s = Fixtures.scene(table)
         val q = s.keys.first { it.id == "q" }
         val normal = q.ops(false)

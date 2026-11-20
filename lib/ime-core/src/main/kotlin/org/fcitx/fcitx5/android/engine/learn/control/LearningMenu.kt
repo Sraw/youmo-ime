@@ -83,6 +83,9 @@ object LearningMenu {
         /** The rest of a whole phrase, committed whole [Why.uses] times. */
         PHRASE,
 
+        /** A table's word the user had it remember, used [Why.uses] times under the code. */
+        REMEMBERED,
+
         UNKNOWN,
     }
 
@@ -91,6 +94,7 @@ object LearningMenu {
         return when {
             why == null -> Reason.UNKNOWN
             why.whole.isNotEmpty() -> Reason.PHRASE
+            why.remembered && why.tier != HabitRanker.Tier.PINNED -> Reason.REMEMBERED
             // a 联想's tier only tells what the user did after that word: the predictor's order is no dictionary's
             why.code?.kind == Kinds.PREDICTION -> reason?.takeIf { it in DONE_AFTER } ?: Reason.PREDICTION
             else -> reason ?: Reason.UNKNOWN

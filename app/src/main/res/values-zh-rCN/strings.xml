@@ -446,6 +446,9 @@
     <plurals name="learning_why_used">
         <item quantity="other">最近在这串键下用过 %d 次</item>
     </plurals>
+    <plurals name="learning_why_remembered">
+        <item quantity="other">你在%1$s里记住的词，最近在这串键下用过 %2$d 次</item>
+    </plurals>
     <plurals name="learning_why_phrase">
         <item quantity="other">这段话你完整打过 %d 次</item>
     </plurals>
@@ -1553,4 +1556,12 @@
     <string name="layout_finding_full_lacks">数字键盘缺 %1$s：数字框里打不出来（比如金额的负号、小数点）</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 自带的一样）</string>
     <string name="layout_finding_split_scaled">分体时这一行在「%2$s」有 %1$s 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小</string>
+    <string name="word_offer">记住：</string>
+    <string name="word_offer_said">可以记住：%1$s，%2$s编码 %3$s</string>
+    <string name="word_remembered">记住了『%1$s』：%2$s %3$s</string>
+    <string name="im_space_picks_prediction">空格上屏联想词</string>
+    <string name="im_space_picks_prediction_summary">联想词显示时，按空格上屏第一个联想词。码表自动上屏后紧接的空格、刚上屏后马上按的空格，仍是空格</string>
+    <string name="im_offer_words">逐字打出后给出组词</string>
+    <string name="im_offer_words_summary">一个字一个字打出 2～4 个字后停一下，键盘上方给出连起来的词和它的编码，点了才记住</string>
+    <string name="word_table_code_hint">码表里也能打这个词，编码按组词规则自动算，不用填</string>
 </resources>

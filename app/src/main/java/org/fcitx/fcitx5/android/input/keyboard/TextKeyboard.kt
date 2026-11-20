@@ -132,6 +132,8 @@ class TextKeyboard(
         val state = TextBoardState(
             semicolonScheme = semicolonKey(imeName, EngineState.shuangpinScheme),
             table = imeName in InputMethodCatalog.TABLES,
+            // the first frame comes before the engine tells the table: its 拼 is the method's own, not a ⇧ flashing
+            tableLookUp = table?.lookUpKey ?: InputMethodCatalog.TABLES[imeName]?.options?.lookUpKey ?: false,
             tableExtra = extraKey,
             lookingUp = table?.lookingUp == true,
             composing = returnAppearance.composing,

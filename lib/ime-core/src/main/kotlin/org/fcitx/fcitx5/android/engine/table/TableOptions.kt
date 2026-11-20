@@ -37,6 +37,12 @@ data class TableOptions(
     val selectionKeys: String = "",
     val roots: TableRoots? = null,
     val keyLabels: KeyLabels = KeyLabels.NONE,
+    /** Whether 拼 ([org.fcitx.fcitx5.android.engine.session.Action.LookUp]) turns pinyin lookup on: the keyboard has the key. */
+    val lookUpKey: Boolean = true,
+    /** 逐字打出后给出组词: characters typed one at a time are offered as a word to remember (TableWordOffers). */
+    val offerWords: Boolean = true,
+    /** 空格上屏联想词, a setting of every Chinese input method. */
+    val spacePicksPrediction: Boolean = false,
 ) {
     init {
         require(pageSize >= 1) { "page size $pageSize" }
@@ -53,9 +59,11 @@ data class TableOptions(
             matchingKey = 'z',
             pinyinKey = 'z',
             roots = TableRoots.WUBI86,
+            // z looks one word up; the key's place is ⇧
+            lookUpKey = false,
         )
 
-        /** fcitx's wbpy.conf: 五笔 with its pinyin entries matched as codes (no lookup key). */
+        /** fcitx's wbpy.conf: 五笔 with its pinyin entries matched as codes (no lookup at all: pinyin mixes in). */
         val WUBI_PINYIN = WUBI.copy(pinyinKey = null)
 
         /** fcitx's cangjie.conf; roots on the keys and in the preedit (日月, not ab). */

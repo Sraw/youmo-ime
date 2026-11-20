@@ -62,19 +62,61 @@
 - **预期**：候选里有「中国」，排在第一位。
 - **JVM**：`OtherInputMethodsUatTest.wubiAWord`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
-### TBL-11 [P1] 一个字一个字打的不自动成词
+### TBL-11 [P0] 逐字打出后停一下，点提示条记住
 <!-- learning: U-28 C46 -->
-- **前提**：B0-五笔。「鲸园」不在码表里；按两字词的组词规则它的编码是 `qglf`（鲸 qgyi，园 lfqv），码表里 qglf 只有「昏天黑地」。
-- **操作**：点 q g y i，在候选里点「鲸」；点 l f q v（「园」直接上屏）。这样连着打三遍；再点 q g l f。
-- **预期**：打满四码直接上屏「昏天黑地」，没有「鲸园」（码表里逐字打的不成词，以前的"自动造词"已去掉）。
-- **JVM**：`TablesUatTest.aCharacterAtATimeMakesNoWord`（:lib:ime-eval:uatTest，真数据）（逐字打三遍鲸园后 qglf 直接上屏「昏天黑地」，没有「鲸园」）；设备上不跑。
+- **前提**：B0-五笔。空框。
+- **操作**：点 i g 空格、i h 空格、j e 空格（汪、小、明），手离开键等 1 秒，看键盘上方（截图）；点提示条上的「汪小明 iije」，看提示条；点 `，`，再点 i i j e，看候选。
+- **预期**：等 1 秒后提示条是「记住：汪小明 iije」（「小明」句子模型看是半个词，不给），候选栏照旧是联想。点了以后框里仍是「汪小明」，提示条变成「记住了『汪小明』：五笔 iije」，带 **撤销**。提示条不按时间收起（停着不动它一直在）。iije 的候选里有「汪小明」。
+- **JVM**：`TablesUatTest.aCharacterAtATimeIsOfferedAndKeptOnATap`（:lib:ime-eval:uatTest，真数据，整个宿主）+ `TableWordOfferUatTest.anOfferGoesUpAfterThePauseAndATapRemembersIt`（0.8 秒前不出、出来是两个按钮、出来后告诉引擎看到了、点了发出记住、记住了的提示条撤销）+ app `UndoChipTest`、`NoticeStateTest`（不按时间收起）+ ime-core `TableWordLearningTest`（`aLoneCodeTakesTheRememberedWordAndNothingElse`：记住的词在 iije 下排第 2）、`WordOfferGateTest`；设备上跑（看提示条和点它）。
+
+### TBL-11a [P1] 不点就什么都不存
+<!-- learning: U-28 -->
+- **前提**：B0-五笔。空框。
+- **操作**：点 i g 空格、i h 空格、j e 空格，马上点 `，`；再点 i i j e。
+- **预期**：没有提示条；iije 的候选里没有「汪小明」。
+- **JVM**：`TablesUatTest.untappedNothingIsKept`（真数据）+ `TableWordOfferUatTest.noOfferWhileAFingerIsDownOverAnotherNoticeOrOnceWithdrawn`（手指按着不给、收回了不给、有别的提示条时不给）+ ime-core `TableWordLearningTest.aFieldThatDoesNotReadIsOfferedNothing`（读不到文字的框不给）；设备上不跑。
+
+### TBL-11b [P1] 不给出的
+<!-- learning: U-28 -->
+- **前提**：B0-五笔。
+- **操作**：分别逐字打：「汪小明」打到「明」后直接打 `，`（顶字）；「我找张伟」；「吃了吗」；「李明」（s b 空格、j e 空格）；码表里已有的词；给出后点提示条空白处收起，再逐字打一遍同样的字停一下。
+- **预期**：都不给出（打 `，`、虚词、码表已有（包括更短编码下已有的）、前缀接不下去、在提示条上看到过没点的同一个输入框里不再给；还没露出来就收掉的下次照样给）。
+- **JVM**：ime-core `TableWordLearningTest`（每种不给的一行，`anOfferNeverShownIsOfferedAgain`、`aWordTheTableHasUnderAShorterCodeIsNotOffered`）+ `TableWordOfferUatTest.noOfferWhileAFingerIsDownOverAnotherNoticeOrOnceWithdrawn`；设备上不跑。
+
+### TBL-11c [P1] 点错了：退格删光、提示条撤销、长按删除
+<!-- learning: U-28 U-03 -->
+- **前提**：B0-五笔。空框。
+- **操作**：照 TBL-11 记住「汪小明」，点提示条的 **撤销**；清空框，点 i i j e 看候选。清空框，点 q g y i 选「鲸」，点 l f q v（「园」），停一下，点提示条上的「鲸园 qglf」；清空框，点 q g l f，长按「鲸园」选 **删除**，看提示条，点 **撤销**，再点 q g l f。
+- **预期**：撤销后框里仍是「汪小明」，iije 的候选里没有它。qglf 里有「鲸园」；长按删除后提示「已删除」带撤销；撤销后 qglf 里又有「鲸园」。紧接着退格把记住的词删光，同样不存（JVM）。同一个输入框里撤销过的「汪小明」不再给出，所以第二个词换成「鲸园」。
+- **JVM**：`TablesUatTest.tappedByMistakeUndoneByBackspaceOrUndo`（真数据：退格删光、撤销都不存）+ ime-core `TableWordLearningTest`、`ClearRecentTableWordsTest.theWordsATableRememberedMeanwhileGoAndOlderOnesStay`（含之后做的备份）、`LearnLogTest.anOlderForgetReplayedStillDropsATablesWord`（0.6.2 的删词记录重放不让删掉的词回来）、`KeyboardTest.aWordRememberedIsToldOnce`、`TableRegistryTest.aRememberedWordIsDeletedNotForgotten`（长按是「删除」不是「忘掉学到的」）；设备上跑（撤销、长按删除）。
+
+### TBL-11d [P1] 记住的词按拼音的学习规则排
+<!-- learning: U-02 U-28 -->
+- **前提**：B0-五笔，码表设置里打开 **调频**。
+- **操作**：照 TBL-11 记住「汪小明」；点 `，`，点 i i j e，在候选里点「汪小明」；点 `，`，再点 i i j e，看候选。
+- **预期**：记住后第一次「汪小明」不在第一；再选一次后排第一（点「记住」算选过一次，连着两次排第一）。
+- **JVM**：`TablesUatTest.rememberedRanksAsPinyinsWords`（真数据）+ ime-core `TableWordLearningTest.withOrderByUseOffTheTablesOwnStaysFirst`（为什么排在这：你在五笔里记住的词）、`SharedWordsTest`、`TableLanguageTest`（忘掉学到的只忘这个编码下的顺序）；设备上跑。
+
+### TBL-11e [P1] 五笔拼音：拼音打出的字也算
+<!-- learning: U-28 -->
+- **前提**：B0-五笔拼音。空框。
+- **操作**：点 q g y i 选「鲸」，点 y u a n 选「园」，手离开键等 1 秒，看提示条（截图）。
+- **预期**：提示条「记住：鲸园 qglf」。
+- **JVM**：`TablesUatTest.wubiPinyinsPinyinCharactersCountToo`（真数据）；设备上跑。
+
+### TBL-11f [P1] 二笔：按二笔的组词规则
+<!-- learning: U-28 -->
+- **前提**：B0-二笔。空框。
+- **操作**：点 w c h 空格、x d 空格、m s 空格（汪、小、明），手离开键等 1 秒，看提示条（截图）。
+- **预期**：提示条「记住：汪小明 wcxm」。
+- **JVM**：`TablesUatTest.erbiOffersByItsRules`（真数据）+ ime-core `TableWordLearningTest.erbisSemicolonInACodeEndsNoRun`（`;` 编码键不打断）、`aTableWithNoRulesOffersNone`（仓颉不给）；设备上跑。
 
 ### TBL-12 [P1] 拼音里的词不进码表的唯一码，自动上屏照旧
 <!-- learning: D8 -->
 <!-- learning: U-28 -->
 - **前提**：B0-设置，**词库与短语 → 用户词库** 里手动加「鲸园」，拼音 `jing yuan`；回测试页切到五笔。
 - **操作**：点 q g l f；然后打开用户词库，看「鲸园」那一行。
-- **预期**：打满四码直接上屏「昏天黑地」，「鲸园」不进这个码；用户词库里「鲸园」那一行写着"五笔：与 昏天黑地 同码"。拼音里打 jingyuan 照样有它。
+- **预期**：打满四码直接上屏「昏天黑地」，「鲸园」不进这个码；用户词库里「鲸园」那一行写着"五笔：与 昏天黑地 同码"。拼音里打 jingyuan 照样有它。码表里点提示条记住的词不受这一条限制，见 TBL-11。
 - **JVM**：`TablesUatTest.aPinyinWordTakesNoTablesOnlyCode`（qglf 上屏昏天黑地、鲸园不进、拼音里有）+ `TablesSettingsUatTest.aPinyinWordOnATablesOnlyCodeSaysWhichWord`（真引擎下用户词库那一行写着同码）；设备上不跑。
 
 ### TBL-12b [P1] 导入用户词库的词，码表里排在码表自己的词后面，不进唯一码
@@ -144,9 +186,9 @@
 
 ### TBL-22 [P0] 五笔拼音混打
 - **前提**：B0-五笔拼音（添加"五笔拼音"并切到它）。
-- **操作**：点 w q i y，看候选；点 ⌫ 清掉；再点 h a o，看候选。
-- **预期**：wqiy 不自动上屏，候选第一个是「你」（五笔）；hao 的候选里既有「好」「号」（拼音），也有「虚」（五笔的 hao），不用切换。
-- **JVM**：`OtherInputMethodsUatTest.wubiAndPinyinMixed`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+- **操作**：点 w q i y，看候选；点 ⌫ 清掉；再点 h a o，看候选。看 Shift 的位置。
+- **预期**：wqiy 不自动上屏，候选第一个是「你」（五笔）；hao 的候选里既有「好」「号」（拼音），也有「虚」（五笔的 hao），不用切换。没有拼音反查：Shift 的位置是 ⇧，不是「拼」。
+- **JVM**：`OtherInputMethodsUatTest.wubiAndPinyinMixed`（:lib:ime-eval:uatTest，真数据）+ `TablesUatTest.theLookUpKeyLooksUpByPinyinTillPressedAgain`（五笔拼音按反查键不反查）；设备上不跑。
 
 ### TBL-24 [P1] 点编码那一行，改中间打错的一码
 - **前提**：B0-五笔。
@@ -185,11 +227,17 @@
 - **预期**：默认字母键上大字是字根（A 日、B 月、C 金……X 難、Z 重），字母小字在角上；L 右边有 * 键（仓颉的万能键）；没有 Shift，那里是「拼」键（TBL-47）。onf 编码栏是"人弓火"，候选里有「你」。关掉后键上回到字母，编码栏是"onf"。
 - **JVM**：`TablesUatTest.cangjiesCodeIsShownInItsRoots`（:lib:ime-eval:uatTest，真数据，整个宿主）（onf 编码栏"人弓火"、有「你」，⌫ 后"人弓"；关掉后"onf"）+ `TablesKeysUatTest.cangjieKeysShowItsRoots`（键上字根、角上字母、* 键，Roborazzi 金图）；设备上不跑。
 
-### TBL-47 [P0] 码表的「拼」键：拼音反查一直开着，再按关掉
-- **前提**：B0-五笔；再添加 **二笔**、**仓颉**。
-- **操作**：五笔里点「拼」键（在 Shift 的位置），看键（截图）；点 h a o，看编码栏和候选，点「好」；点 n i，选「你」；再点「拼」，点 w q i y。清空，点 h a o 再点「拼」。清空，点 z h a o，选「好」，再点 w q i y。清空，点「拼」，点 n i h a o，选「你」（只选了前半），再点「拼」。清空，点「拼」，点 x i ' a n，再点「拼」。清空，点 t z 再点「拼」；清空，再点「拼」关掉。切到二笔、仓颉，各点「拼」再点 h a o。
-- **预期**：「拼」打开后键变深色；h a o 编码栏前面有「拼」，候选里有「好」，旁边是它的五笔编码；选完「拼」还开着，n i 照样反查，框里是「好你」。再点「拼」键恢复浅色，wqiy 第一个是「你」，编码栏前面没有「拼」。先打 hao 再点「拼」：这几码转成拼音反查。nihao 选了「你」再关「拼」：「你」上屏，编码栏是五笔编码 hao（不加「拼」），不自动上屏，nihao 不学成全拼。xi'an 再关「拼」：什么也不上屏，编码栏是 xian，`'` 去掉。tz 再点「拼」：编码栏仍是五笔编码 tz（码打到第二键以后的 z 是通配符），前面没有「拼」，不按拼音反查；但「拼」键变深色，下一个码按拼音反查（清空后再点一次「拼」关掉）。z 引导的反查照旧一次一个词，编码栏前面也有「拼」，之后 wqiy 是五笔编码。二笔、仓颉同样能反查出「好」（二笔原来要按触屏键盘上没有的 `[`，仓颉原来没有反查）。切走再切回来，「拼」的开关保持。
-- **JVM**：`TablesUatTest.theLookUpKeyLooksUpByPinyinTillPressedAgain`（:lib:ime-eval:uatTest，真数据，整个宿主）（五笔开着时 hao 有「好」、编码栏以「拼」开头、选后还开着、关后 wqiy 第一个「你」；先打码再开转成反查；nihao 选「你」后关，「你」上屏、编码栏 hao；xi'an 关后不上屏、编码栏 xian；z 反查一次一个词；二笔、仓颉反查出「好」）+ `TablesKeysUatTest.theLookUpKeyIsInShiftsPlaceAndDarkWhileOn`（「拼」代替 Shift，点它发出反查键，开着时是深色，Roborazzi 金图） + `TableLookUpModeTest`（含 `onACodeWithAWildcardPastItsFirstKeyStaysOneUnlessTheTableSpellsPinyin` 的五笔行：tz 开「拼」仍是码）、`PinyinSessionLearnLogTest.keysHandedBackAreNotLearned`/`aPieceHandedBackIsLearnedAsAPick`（关「拼」不上屏拼音字母、不学，选过的前半按选词学）；设备上不跑。
+### TBL-47 [P0] 二笔、仓颉、自然码的「拼」键：拼音反查一直开着，再按关掉
+- **前提**：B0-二笔；再添加 **仓颉**、**自然码**、**五笔**。
+- **操作**：二笔里点「拼」键（在 Shift 的位置），看键（截图）；点 h a o，看编码栏和候选，点「好」；点 n i，选「你」；再点「拼」，点 w c h。清空，点 h a o 再点「拼」。清空，自然码里点「拼」，点 n i h a o，选「你」（只选了前半），再点「拼」。清空，点「拼」，点 x i ' a n，再点「拼」。切到仓颉，点「拼」再点 h a o。切到五笔，看 Shift 的位置，点 z h a o。
+- **预期**：「拼」打开后键变深色；h a o 编码栏前面有「拼」，候选里有「好」，旁边是它的二笔编码；选完「拼」还开着，n i 照样反查，框里是「好你」。再点「拼」键恢复浅色，wch 第一个是「汪」，编码栏前面没有「拼」。先打 hao 再点「拼」：这几码转成拼音反查。nihao 选了「你」再关「拼」：「你」上屏，编码栏是编码 hao（不加「拼」），不自动上屏，nihao 不学成全拼。xi'an 再关「拼」：什么也不上屏，编码栏是 xian，`'` 去掉。仓颉同样能反查出「好」。五笔没有「拼」键，那里是 ⇧（TBL-47a）；z 引导的反查照旧一次一个词，编码栏前面也有「拼」。切走再切回来，「拼」的开关保持。
+- **JVM**：`TablesUatTest.theLookUpKeyLooksUpByPinyinTillPressedAgain`（:lib:ime-eval:uatTest，真数据，整个宿主）（二笔开着时 hao 有「好」、编码栏以「拼」开头、选后还开着、关后 wch 第一个「汪」；先打码再开转成反查；自然码 nihao 选「你」后关，「你」上屏、编码栏 hao；xi'an 关后不上屏、编码栏 xian；五笔 z 反查一次一个词；仓颉反查出「好」；五笔、五笔拼音按反查键不反查）+ `TablesKeysUatTest.theLookUpKeyIsInShiftsPlaceAndDarkWhileOn`（二笔「拼」代替 Shift，点它发出反查键，开着时是深色，Roborazzi 金图） + `TableLookUpModeTest`、`PinyinSessionLearnLogTest.keysHandedBackAreNotLearned`/`aPieceHandedBackIsLearnedAsAPick`（关「拼」不上屏拼音字母、不学，选过的前半按选词学）+ keyboard-scene `ExpandTest`、`SnapshotTest`（`table-lookup` 标记）；设备上不跑。
+
+### TBL-47a [P1] 五笔、五笔拼音的 ⇧
+- **前提**：B0-五笔。空框。
+- **操作**：看 Shift 的位置；点 ⇧，看键（截图），点 a。点 i g，看 ⇧ 还在不在，点 ⇧，点 a。
+- **预期**：那里是 ⇧ 不是「拼」。⇧ 亮着时字母键显示大写字母；点 a 框里进「A」，⇧ 自己熄掉。打着 ig 时 ⇧ 仍在；点 ⇧ 再点 a，先上屏「汪」，再进「A」，框里是「A汪A」。
+- **JVM**：`TablesKeysUatTest.wubiHasShiftWhereTheLookUpKeyWas`（五笔有 ⇧ 没有「拼」，打编码时也在，亮着时键上是大写字母，Roborazzi 金图）+ keyboard-scene `KeyDataTest.anOlderPacksLookUpKeyShowsWhereTheAppsDoes`、`PackSeparatorTest.theFileOf060BecomesTheAppsOwnTwoPlacesChanged`（以前的主题包也是 ⇧，二笔、仓颉是「拼」）+ ime-core `TableWordLearningTest.aCapitalLetterGoesInAsItIsAndEndsTheRun`、`TextBoardSceneTest`；设备上跑。
 
 ### TBL-48 [P1] 码表打字时回车键写「确定」
 - **前提**：B0-五笔。

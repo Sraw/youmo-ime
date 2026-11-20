@@ -164,29 +164,27 @@ internal class SessionFactory(
                     latin = if (s.latinWords) assets.latinWords else null, userLatin = if (s.latinWords) latinWords else null,
                 )
                 val pinyin = pinyinSession(segmenter, spell = false, chaizi = chaizi())
-                val looked = ForgetsInTables(
-                    StrokeLookup(
-                        pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::withheld, follow = pinyin::follow, retype = pinyin::typeAll,
-                        blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) },
-                        blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) },
-                    ),
+                val looked = StrokeLookup(
+                    pinyin, assets::strokes, assets::charReading, s.pageSize, blocked = lexicon::withheld, follow = pinyin::follow, retype = pinyin::typeAll,
+                    blockedUnder = { strokes -> learner.openHabits().blockedUnder(strokeCode(strokes)) },
+                    blockUnder = { strokes, text -> learner.openHabits().blockUnder(strokeCode(strokes), text, on = true) },
                 )
                 GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin), blockOther = ::blockOtherReading) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
             // the 14 keys: no glide nor 笔画查字 (u shares UI, no stroke key); 简拼 only where nothing else reads, as on nine keys
-            PINYIN_KEYS -> ForgetsInTables(pinyinSession(keys(NineKeyLetters.G14), spell = true))
+            PINYIN_KEYS -> pinyinSession(keys(NineKeyLetters.G14), spell = true)
             // the 18 keys: 双拼's G18 groups (; is no pinyin letter); otherwise as the 14 keys, learned under qk:<G18's tag>
-            PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(keys(NineKeyLetters.G18), spell = true))
+            PINYIN_KEYS18 -> pinyinSession(keys(NineKeyLetters.G18), spell = true)
             // a layout's own groups: as the 14 keys, learned under qk:<their tag>, its keyboard the one in use; none told
             // (Engines swallows their codes then): G14's, which reads none of them
             PINYIN_KEYS_OWN -> {
                 val own = s.ownKeyboard?.also(NineKeyLetters::inUse) ?: NineKeyLetters.G14
-                ForgetsInTables(pinyinSession(keys(own), spell = true))
+                pinyinSession(keys(own), spell = true)
             }
             // zhuyin: the nine keys' way with symbols for letters and a tone as separator; learned under zy:nine and
             // zy:dachen, apart from pinyin's keyboards; both read slipped keys
-            ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_NINE))
-            ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_DACHEN))
+            ZHUYIN_NINE -> pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_NINE)
+            ZHUYIN -> pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_DACHEN)
             ENGLISH -> {
                 val data = englishData()
                 EnglishSession(
@@ -199,7 +197,7 @@ internal class SessionFactory(
             T9 -> {
                 val pinyin = pinyinSession(keys(s.nineKeys), spell = true)
                 GlideSession(
-                    ForgetsInTables(pinyin),
+                    pinyin,
                     syllableBoundary,
                     blocked = glideHeldBack(),
                     typed = { c -> if (c == PinyinGlide.SEPARATOR) Action.Key(c, glided = true) else Action.Letter(c, glided = true) },
@@ -211,12 +209,12 @@ internal class SessionFactory(
             // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; slips read by tap, no other typo;
             // learned under spk: (CommitRecorder)
             SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE ->
-                ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, keysShown = s.shuangpinKeysShown, kind = Kinds.shuangpin(s.shuangpin)))
+                pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, keysShown = s.shuangpinKeysShown, kind = Kinds.shuangpin(s.shuangpin))
             SHUANGPIN -> {
                 val spelling = PinyinGlide.Spelling.shuangpin(s.scheme)
                 val pinyin = pinyinSession(ShuangpinSegmenter(s.scheme, s.fuzzy, s.typos, neighbours = s.typos), spell = true, keysShown = s.shuangpinKeysShown, kind = Kinds.shuangpin(s.shuangpin))
                 GlideSession(
-                    ForgetsInTables(pinyin),
+                    pinyin,
                     syllableBoundary,
                     blocked = glideHeldBack(),
                     heldBack = heldBack(pinyin),
@@ -230,7 +228,10 @@ internal class SessionFactory(
     private fun table(im: String, s: EngineSettings): Session {
         val method = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
         val table = tables.table(im)
-        val options = tableOptions(method, s).copy(pageSize = s.pageSize)
+        // nothing offered to remember where nothing is learned
+        val options = tableOptions(method, s).let { o ->
+            o.copy(pageSize = s.pageSize, spacePicksPrediction = s.spacePicksPrediction, offerWords = o.offerWords && learner.useHabits)
+        }
         // pinyin lookup in a table learns as full pinyin does, leaving codes alone; no phrases, emoji or 联想 (the
         // result is to be typed by code); habits off as pinyin's own. Made on first lookup: most tables never do
         val lookUp = {
@@ -257,7 +258,8 @@ internal class SessionFactory(
         // a glide after a typed code picks its first candidate: the next code is the glide's
         return GlideSession(
             TableSession(
-                table.dictionary, options, MadeOnUse { ForgetsInTables(lookUp()) }, if (learner.useHabits) table.saved else SavedPhrases(table.dictionary, im, { null }), sharedWords(table, im), language, uptimeMillis,
+                // 五笔拼音 mixes pinyin in, no lookup
+                table.dictionary, options, if (options.pinyinKey == null && !options.lookUpKey) null else MadeOnUse { lookUp() }, if (learner.useHabits) table.saved else SavedPhrases(table.dictionary, im, { null }), sharedWords(table, im), language, uptimeMillis,
                 phrases = phraseBook(), clock = learnClock::calendar, lookUpMode = lookUpMode(im),
                 // a slip read where the key would lead nowhere (empty code, 顶字 at the key's edge): the shared typo setting
                 slips = if (s.typos) TableSlips.SLIPS else null,
@@ -361,25 +363,13 @@ internal class SessionFactory(
         val user = sessionUser()
         return PinyinSession(
             assets.pinyinData, segmenter, spell = spell, keysShown = keysShown,
-            pageSize = s.pageSize, user = user, prediction = s.prediction, prior = lexicon.prior(), phraseBook = phraseBook(),
+            pageSize = s.pageSize, user = user, prediction = s.prediction, spacePicksPrediction = s.spacePicksPrediction, uptime = uptimeMillis,
+            prior = lexicon.prior(), phraseBook = phraseBook(),
             builtInPhrases = s.builtInPhrases, commonWords = commonWords(kind),
             reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
             charReadings = assets::charSyllables, extensions = { assets.decoderExtensions(user) }, addedWords = ::addedNow, coarse = coarse(),
             learnTo = LearnTo(learner.habitsNow(), kind, simplified::simplify),
         )
-    }
-
-    /** [pinyin] whose long-press forget also forgets in every table ([TableRegistry.shared]) a phrase an older build saved there. Table lookups are wrapped so too. */
-    private inner class ForgetsInTables(private val pinyin: Session) : Session by pinyin {
-        override fun apply(action: Action): Snapshot {
-            // a whole phrase's rest forgets its count alone: a table's word of the text stays
-            val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index) && pinyin.why(action.index)?.whole.isNullOrEmpty()) {
-                pinyin.candidates(action.index, 1).firstOrNull()
-            } else {
-                null
-            }
-            return pinyin.apply(action).also { if (forgotten != null) tables.forgetInTables(listOf(forgotten.text)) }
-        }
     }
 
     /** A session made when first told a key or context (a table's lookup, which most never use); till then it shows nothing and keeps its learning and field flags. */

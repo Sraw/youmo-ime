@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.WUBI
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu
+import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu.Row
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
@@ -26,7 +29,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.util.concurrent.Executor
 
-/** The user's words as [TableRegistry] codes them for a table, and what a table forgets ([TableRegistry.forgetInTables]). */
+/** The user's words as [TableRegistry] codes them for a table, and the words a table remembers. */
 class TableRegistryTest : EnginesFixture() {
 
     // wired as Engines wires it: the merged dictionaries coded from their file, into an index of the table's
@@ -46,7 +49,7 @@ class TableRegistryTest : EnginesFixture() {
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, dropSessions = {})
         val registry = wired(now, assets, lexicon)
         val wubi = WUBI
         val shared = registry.shared(registry.table(wubi), wubi)
@@ -61,7 +64,7 @@ class TableRegistryTest : EnginesFixture() {
     fun anEmojiBlockedInPinyinIsNoWordATableLeavesOut() {
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, dropSessions = {})
         val registry = wired(now, assets, lexicon)
         val shared = registry.shared(registry.table(WUBI), WUBI)
         lexicon.addListed(emptyList(), listOf("👍🏻" to "hao", "你好" to "ni hao", "ao" to "a o"))
@@ -76,7 +79,7 @@ class TableRegistryTest : EnginesFixture() {
     fun aWordWhoseCodeATableCommitsAloneIsToldWithThatWord() {
         val now = Executor { it.run() }
         val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, dropSessions = {})
         val registry = TableRegistry(blobs = ::load, onError = {}, coding = now, assets = assets, lexicon = lexicon)
         val wubi = WUBI
         val words = listOf("一二", "你好", "一")
@@ -91,7 +94,7 @@ class TableRegistryTest : EnginesFixture() {
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()
         val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, dropSessions = {})
         val registry = wired({ queued += it }, assets, lexicon)
         val shared = registry.shared(registry.table(WUBI), WUBI)
         assertEquals(emptyList<Pair<String, String>>(), shared.words("wqvb"))
@@ -110,7 +113,7 @@ class TableRegistryTest : EnginesFixture() {
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()
         val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, forgetInTables = {}, dropSessions = {})
+        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { additions }, assets = assets, dropSessions = {})
         val registry = wired({ queued += it }, assets, lexicon)
         registry.prepare(WUBI)   // no session yet: nothing loaded, nothing coded
         assertTrue(queued.isEmpty())
@@ -129,18 +132,38 @@ class TableRegistryTest : EnginesFixture() {
         return type(WUBI, keys).candidates
     }
 
+    // the user word list holds pinyin's word and 五笔's apart: each deleted alone, the other kept
     @Test
-    fun aPhraseForgottenElsewhereIsForgottenByATableNotTypedWithSinceTheStart() {
+    @Uat("WD-66")
+    fun theWordListDeletesATablesWordOrPinyinsAlone() {
         val dir = savedNihao()
-        Engines(::load, dir).use { assertTrue("你好" in it.wubi("wqvb")) }
         Engines(::load, dir).use { engines ->
-            val learned = engines.userWords().filter { it.text == "你好" }
-            assertEquals(1, learned.size)
-            engines.removeWords(learned)
+            val listed = engines.userWords().filter { it.text == "你好" }
+            assertEquals(listOf("" to "ni hao", WUBI to "wqvb"), listed.map { it.table to it.pinyin }.sortedBy { it.first })
+            engines.removeWords(listed.filter { it.table.isEmpty() })
+        }
+        Engines(::load, dir).use { engines ->
+            assertTrue("你好" in engines.wubi("wqvb"))
+            engines.onEvent(WUBI, EngineEvent.RESET, 0)
+            val left = engines.userWords().filter { it.text == "你好" }
+            assertEquals(listOf(WUBI), left.map { it.table })
+            engines.removeWords(left)
         }
         Engines(::load, dir).use { engines ->
             assertFalse("你好" in engines.wubi("wqvb"))
             assertTrue(engines.userWords().none { it.text == "你好" })
+        }
+    }
+
+    // the long-press reads 删除 (and the notice 已删除) for a word the table remembered, as for pinyin's own; not 忘掉学到的
+    @Test
+    @Uat("TBL-11c")
+    fun aRememberedWordIsDeletedNotForgotten() {
+        val dir = MemoryFiles().apply { olderPhrases(this, "wqvb" to "你好") }
+        Engines(::load, dir).use { engines ->
+            val at = engines.wubi("wqvb").indexOf("你好")
+            val menu = engines.learning(WUBI, LearningOp.Menu(at, "你好")) as LearningResult.Menu
+            assertEquals(listOf(Row.DELETE), LearningMenu.rows(menu).filter { it == Row.DELETE || it == Row.FORGET })
         }
     }
 
@@ -156,7 +179,7 @@ class TableRegistryTest : EnginesFixture() {
     }
 
     @Test
-    fun aPhraseATableSavedForgottenInPinyinIsForgottenByTheTableToo() {
+    fun aWordATableRememberedStaysThereForgottenInPinyin() {
         val dir = savedNihao()
         Engines(::load, dir).use { engines ->
             assertTrue("你好" in engines.wubi("wqvb"))
@@ -165,8 +188,8 @@ class TableRegistryTest : EnginesFixture() {
             assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, at))
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.FORGET, at)
         }
-        // the record kept: the table's own row of it forgotten too, not shown at the next start
-        Engines(::load, dir).use { assertFalse("你好" in it.wubi("wqvb")) }
+        // the table's row is no pinyin word: still there at the next start
+        Engines(::load, dir).use { assertTrue("你好" in it.wubi("wqvb")) }
     }
 
     @Test
@@ -189,23 +212,12 @@ class TableRegistryTest : EnginesFixture() {
     }
 
     @Test
-    fun aWordForgottenElsewhereOpensNoTableWithALogNotOpenYet() {
-        // forgetting a word opens no table: a character, which none saves, nor a phrase one saved
+    fun aWordForgottenElsewhereStaysWhereATableRemembersIt() {
+        // pinyin's delete is pinyin's: a table deletes its own word, undoably, under its code alone
         val dir = savedNihao()
-        val opened = ArrayList<String>()
-        val now = Executor { it.run() }
-        val assets = EngineAssets(::load, {}, null)
-        val lexicon = UserLexicon(userDir = null, onError = {}, additions = { null }, assets = assets, forgetInTables = {}, dropSessions = {})
         val log = LearnLog(dir.file(LearnLog.FILE)).apply { open() }
-        val registry = TableRegistry(blobs = { opened += it; load(it) }, onError = {}, coding = now, assets = assets, lexicon = lexicon, state = { log.state }, dropSaved = log::dropTableWords)
-        registry.forgetInTables(setOf("好"))
-        assertEquals(emptyList<String>(), opened.filter { it.startsWith(InputMethodCatalog.TABLE_DIR) })
-        // the table is not loaded to tell, so the long press answers with no undo
-        val before = registry.forgets
-        registry.forgetInTables(setOf("你好"))
-        assertEquals(emptyList<String>(), opened.filter { it.startsWith(InputMethodCatalog.TABLE_DIR) })
-        assertTrue(registry.forgets > before)
-        assertTrue(log.state.tableWords.keys.none { it.third == "你好" })
+        log.forget("你好")
+        assertTrue(log.state.tableWords.keys.any { it.third == "你好" })
         log.close()
     }
 
@@ -295,5 +307,5 @@ class TableRegistryTest : EnginesFixture() {
     }
 
     private fun mergedLexicon(assets: EngineAssets, file: DictionaryFile) =
-        UserLexicon(userDir = null, onError = {}, additions = { Engines.Additions("", "d", dictionary = { file }) }, assets = assets, forgetInTables = {}, dropSessions = {})
+        UserLexicon(userDir = null, onError = {}, additions = { Engines.Additions("", "d", dictionary = { file }) }, assets = assets, dropSessions = {})
 }

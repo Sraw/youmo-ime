@@ -28,8 +28,10 @@ import java.util.Calendar
 data class TextBoardState(
     /** `ing` on `;` (semicolonKey). */
     val semicolonScheme: Boolean = false,
-    /** Its 拼 key in Shift's place, 确定 in Return's while a code is typed. */
+    /** 确定 in Return's place while a code is typed. */
     val table: Boolean = false,
+    /** TableKeyboard.lookUpKey: its 拼 key in Shift's place. */
+    val tableLookUp: Boolean = false,
     /** TableKeyboard.extraKey: `;` or `*`. */
     val tableExtra: Char? = null,
     val lookingUp: Boolean = false,
@@ -52,6 +54,7 @@ data class TextBoardState(
         schemeTypes = if (semicolonScheme) setOf("semicolon") else emptySet(),
         table = if (table) "table" else null,
         roots = roots,
+        tableLookUp = table && tableLookUp,
         tableExtra = when (tableExtra) {
             ';' -> "semicolon"
             '*' -> "star"

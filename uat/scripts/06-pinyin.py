@@ -576,3 +576,36 @@ def py158(d):
 def py159(d):
     return latin_mix(d, grouped_keys, "we io sd we io p h io bn we", "io p h io bn we",
                      "we io m we bn jk io bn rt io a bn q u xc h io fg a bn")
+
+
+@case("PY-160", base="B0-设置", mutates=True, visual=True)
+def py160(d):
+    d.goto("通用输入")
+    d.switch("空格上屏联想词", True)
+    d.open_page("text")
+    d.type("jintian")
+    d.cands(want="今天")
+    d.space()
+    d.expect_field("今天")
+    time.sleep(1.0)
+    shown = d.cands()
+    d.shot("kb", "开着：联想的第一个词画成首选的样子")
+    check(shown, "「今天」后没有联想")
+    d.space()
+    want = "今天" + first(shown)
+    d.expect_field(want, msg=f"空格后框里「{{got}}」，不是「{want}」（联想 {shown[:3]}）")
+    d.space()
+    d.expect_field(want + " ", msg="取过联想后的下一下空格没打出空格：「{got}」")
+    d.clear()
+    d.open_settings()
+    d.goto("通用输入")
+    d.switch("空格上屏联想词", False)
+    d.open_page("text")
+    d.type("jintian")
+    d.cands(want="今天")
+    d.space()
+    d.expect_field("今天")
+    time.sleep(1.0)
+    d.space()
+    off = d.expect_field("今天 ", msg="关着时空格没打出空格：「{got}」")
+    return f"开着：「{want}」，再一下空格加空格；关着：「{off}」"

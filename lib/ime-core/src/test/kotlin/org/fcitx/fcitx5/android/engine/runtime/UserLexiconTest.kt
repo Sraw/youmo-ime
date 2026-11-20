@@ -203,7 +203,7 @@ class UserLexiconTest : EnginesFixture() {
         var fail = true
         val attached = ArrayList<UserModel>()
         val lexicon = UserLexicon(
-            null, {}, { null }, assets, forgetInTables = {}, dropSessions = {},
+            null, {}, { null }, assets, dropSessions = {},
             attach = { model ->
                 attached += model
                 if (fail) throw IllegalStateException("attach")

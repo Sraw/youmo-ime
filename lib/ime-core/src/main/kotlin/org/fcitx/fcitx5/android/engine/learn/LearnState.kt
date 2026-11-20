@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Restored
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.StatRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlock
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlockRow
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableOrderReset
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Undo
@@ -198,8 +199,7 @@ class LearnState {
             is Pin -> pin(record)
             is Forget, is PhraseForget -> forgotten(record)
             is NoPredict -> if (record.on) noPredict += record.prev to record.text else noPredict -= record.prev to record.text
-            is TableOrderReset -> tableOrderReset(record.im)
-            is TableBlock -> tableBlock(TableBlockRow(record.im, record.code, record.text), record.on)
+            is TableOrderReset, is TableForget, is TableBlock -> table(record)
             is EnCommit -> enCommit(record)
             is EnForget -> {
                 enWords.remove(record.word)
@@ -213,6 +213,15 @@ class LearnState {
             else -> row(record)
         }
         return emptyList()
+    }
+
+    private fun table(record: LearnRecord) {
+        when (record) {
+            is TableOrderReset -> tableOrderReset(record.im)
+            is TableForget -> forgetUnder(Code(Kinds.table(record.im), record.code), record.text)
+            is TableBlock -> tableBlock(TableBlockRow(record.im, record.code, record.text), record.on)
+            else -> error("not a table's: $record")
+        }
     }
 
     private fun touchesEnglish(record: LearnRecord) = when (record) {
@@ -549,7 +558,10 @@ class LearnState {
     }
 
     private fun forgotten(record: LearnRecord) {
-        if (record is Forget) return forget(record.text)
+        if (record is Forget) {
+            if (record.older && tableWords.keys.removeAll { it.third == record.text }) tableWordsVersion++
+            return forget(record.text)
+        }
         // a whole phrase's count alone: words of the same text stay
         changes.recount = true
         if (record is PhraseForget) phrases.remove(record.text)
@@ -575,9 +587,7 @@ class LearnState {
         pending.remove(text)
         dropMine(text)
         pairs.keys.removeAll { it.prev == text || it.next == text }
-        // not a whole phrase of the same text: deleting one is PhraseForget.
-        // Tables forget it too (Engines.forgottenEverywhere): their saved words as their logs have them
-        if (tableWords.keys.removeAll { it.third == text }) tableWordsVersion++
+        // not a whole phrase of the same text (PhraseForget), nor a table's remembered word: that table's to delete
         // a deleted imported word is gone
         noteImports(imports.forget(text))
     }
@@ -619,6 +629,17 @@ class LearnState {
             val texts = tableBlocks[key] ?: return
             texts -= r.text
             if (texts.isEmpty()) tableBlocks.remove(key)
+        }
+    }
+
+    // a table's 忘掉学到的: the text's uses and firsts under one code, nothing of it elsewhere
+    private fun forgetUnder(code: Code, text: String) {
+        removeStatsIf { key, _ -> key.code == code && key.text == text }
+        for (key in firsts.keys.filter { it.code == code }) {
+            val f = firsts.getValue(key)
+            val first = f.first?.takeIf { it.text != text }
+            val set = f.set.filter { it.text != text }
+            if (first != f.first || set.size != f.set.size) firsts[key] = First(first, set, f.lastDay, FORGOTTEN)
         }
     }
 

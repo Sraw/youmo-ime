@@ -12,6 +12,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
+import org.fcitx.fcitx5.android.engine.session.WordOffer
 
 /** The modules plugged into the host, each list in fcitx's registration order (`specs/host.md`). */
 data class HostModules(
@@ -501,6 +503,14 @@ class HostCore(
         updatePanel(ic)
     }
 
+    override fun wordOffer(ic: InputContext, offer: WordOffer?) {
+        if (ic === contexts.active) emit(HostEvent.WordOffer(offer))
+    }
+
+    override fun wordRemembered(ic: InputContext, word: OfferedWord) {
+        if (ic === contexts.active) emit(HostEvent.WordRemembered(word))
+    }
+
     override fun punctuationAsTyped(ic: InputContext, marks: Set<String>) {
         if (ic === contexts.active) emit(HostEvent.PunctuationAsTyped(marks))
     }
@@ -572,7 +582,7 @@ class HostCore(
             return
         }
         if (!list.bulk) {
-            emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }, list.predicting))
+            emit(HostEvent.Candidates(list.size, (0 until list.size).mapNotNull { i -> list.candidate(i)?.let { entry(ic, "", it) } }, list.predicting, list.lead))
             return
         }
         var total = list.totalSize
@@ -586,7 +596,7 @@ class HostCore(
             }
             out += entry(ic, "", word)
         }
-        emit(HostEvent.Candidates(total, out, list.predicting))
+        emit(HostEvent.Candidates(total, out, list.predicting, list.lead))
     }
 
     // 候选词注音's readings kept while each code point still has one (a rewritten phrase gets none)

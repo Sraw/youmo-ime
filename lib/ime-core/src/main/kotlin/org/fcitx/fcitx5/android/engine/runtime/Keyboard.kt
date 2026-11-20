@@ -149,6 +149,7 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
         // always handled: let through, the app would type its private-use character
         in STROKES -> session.apply(Action.Stroke(Strokes.KEYS[codePoint - STROKES.first])).copy(handled = true)
         LOOKUP -> session.apply(Action.LookUp)
+        REMEMBER -> (payload as? Action.Remember ?: payload as? Action.Unremember ?: payload as? Action.OfferShown)?.let(session::apply) ?: again(handled = true)
         else -> null
     }
 
@@ -235,8 +236,8 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
                 else -> error("event $event is not one taken while composing")
             },
         )
-        // a tap in the app's text: the panel as it was
-        event == EngineEvent.CURSOR -> again(handled = false).also { session.passedOn() }
+        // a tap in the app's text: the panel as it was, an offer of the words before the old cursor gone
+        event == EngineEvent.CURSOR -> again(handled = false).copy(wordOffer = null).also { session.passedOn() }
         else -> passOn()
     }
 
@@ -276,7 +277,8 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
     // the last snapshot again with its commit and deletion done: androidengine deletes before the cursor for any
     // snapshot it shows, handled or not
-    private fun again(handled: Boolean) = shown.copy(commit = "", deleteBefore = 0, handled = handled)
+    // the word remembered was told once, by the tap's own snapshot
+    private fun again(handled: Boolean) = shown.copy(commit = "", deleteBefore = 0, handled = handled, remembered = null)
 
     /** The key is the app's; a prediction offer goes away, and so does English's knowledge of the text before (Enter or an arrow: its added space is not there). */
     private fun passOn(): Snapshot {
@@ -331,6 +333,9 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
 
         /** A table's 拼 key ([Action.LookUp]); as [INK]. */
         const val LOOKUP = 0xF0104
+
+        /** A table's offered word tapped, its notice's 撤销, or the offer shown ([Action.Remember], [Action.Unremember], [Action.OfferShown] as the payload); as [INK]. */
+        const val REMEMBER = 0xF0105
 
         /** One per [Strokes.KEYS] for a stroke drawn while composing (笔画筛选, [Action.Stroke]; [strokeKey]); as [INK], never text. */
         val STROKES = 0xF0110 until 0xF0110 + Strokes.KEYS.length

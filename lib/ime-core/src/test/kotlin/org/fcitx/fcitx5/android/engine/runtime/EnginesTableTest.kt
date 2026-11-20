@@ -89,13 +89,15 @@ class EnginesTableTest {
         }
     }
 
-    // a table's own prediction forgotten is forgotten by the tables too: 五笔's phrase 你好 (an older build's) goes
+    // a table's prediction forgotten is forgotten by text, as pinyin's: the word 五笔 remembered under its code stays
     @Test
-    fun aTablesPredictionForgottenGoesFromTheTables() {
+    fun aTablesPredictionForgottenLeavesTheWordTheTableRemembered() {
         val dir = MemoryFiles()
         olderPhrases(dir, "wqvb" to "你好")
         Engines(::load, dir).use { engines ->
-            assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
+            // shown, not committed: the one word under its code commits itself as typed
+            engines.settings = wubiShown
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             val picked = engines.type("engine-wubi", "vbg ").candidates.indexOf("你好")
             assertEquals("你好", engines.onEvent("engine-wubi", EngineEvent.PICK, picked).commit)
@@ -104,7 +106,7 @@ class EnginesTableTest {
             assertTrue(Offer.FORGET in engines.offers("engine-wubi", i))
             engines.onEvent("engine-wubi", EngineEvent.FORGET, i)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            assertFalse("你好" in engines.type("engine-wubi", "wqv").candidates)
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
         }
         assertEquals(listOf("你好"), forgotten(dir))
     }
@@ -137,6 +139,7 @@ class EnginesTableTest {
         val dir = MemoryFiles()
         olderPhrases(dir, "wqvb" to "你好")
         Engines(::load, dir).use { engines ->
+            engines.settings = wubiShown
             val at = engines.type("engine-wubi", "vbg").candidates.indexOf("好")
             val menu = engines.learning("engine-wubi", LearningOp.Menu(at, "好")) as LearningResult.Menu
             assertEquals(BlockScope.UNDER_CODE, menu.scope)
@@ -147,12 +150,12 @@ class EnginesTableTest {
             assertTrue(engines.learning(null, LearningOp.ClearLearned(all = false)) is LearningResult.Cleared)
             assertFalse("好" in engines.type("engine-wubi", "vbg").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             assertTrue(engines.learning(null, LearningOp.ClearLearned(all = true)) is LearningResult.Cleared)
             assertTrue("好" in engines.type("engine-wubi", "vbg").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            assertFalse("你好" in engines.type("engine-wubi", "wqv").candidates)
+            assertFalse("你好" in engines.type("engine-wubi", "wqvb").candidates)
         }
     }
 
@@ -163,7 +166,9 @@ class EnginesTableTest {
         val dir = JvmFiles(disk)
         olderPhrases(dir, "wqvb" to "你好")
         Engines(::load, dir).use { engines ->
-            assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
+            // shown, not committed: the one word under its code commits itself as typed
+            engines.settings = wubiShown
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             // the record cannot be written anew where its folder takes no new file
             assertTrue(disk.setWritable(false))
@@ -173,7 +178,7 @@ class EnginesTableTest {
             } finally {
                 disk.setWritable(true)
             }
-            assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
         }
     }
 
@@ -252,7 +257,7 @@ class EnginesTableTest {
     fun whatIsTypedByTheCodeSaysItIsBlockedUnderIt() {
         Engines(::load, MemoryFiles()).use { engines ->
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            engines.type("engine-wubi", "wqv")
+            engines.type("engine-wubi", "wqvb")
             val text = engines.candidates("engine-wubi", 0, 1).first().text
             val menu = engines.learning("engine-wubi", LearningOp.Menu(0, text)) as LearningResult.Menu
             assertEquals(BlockScope.UNDER_CODE, menu.scope)
@@ -282,13 +287,15 @@ class EnginesTableTest {
     // the texts the learning record in [dir] has forgotten
     private fun forgotten(dir: UserFiles) = records(dir).filterIsInstance<LearnRecord.Forget>().map { it.text }
 
-    // a prediction forgotten in handwriting is forgotten by the tables too: 五笔's phrase 你好 goes
+    // a prediction forgotten in handwriting is forgotten by text: the word 五笔 remembered stays
     @Test
-    fun handwritingForgetsAPredictionInTheTables() {
+    fun handwritingForgetsAPredictionAndLeavesTheTablesWord() {
         val dir = MemoryFiles()
         olderPhrases(dir, "wqvb" to "你好")
         Engines(::load, dir).use { engines ->
-            assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
+            // shown, not committed: the one word under its code commits itself as typed
+            engines.settings = wubiShown
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             fun afterHao(): List<String> {
                 engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
@@ -299,7 +306,7 @@ class EnginesTableTest {
             assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, i))
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.FORGET, i)
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
-            assertFalse("你好" in engines.type("engine-wubi", "wqv").candidates)
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
         }
         assertEquals(listOf("你好"), forgotten(dir))
     }

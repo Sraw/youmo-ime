@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.english.EnglishBlocks
 import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
@@ -24,7 +25,7 @@ import java.io.IOException
 /**
  * The user's words for [Engines]: additions ([added]), the decoder's user model ([user], filled from the record via
  * [attach]), the layer prior, and hand-added and blocked lists ([WordLists]). Lists, adds, blocks, imports, exports
- * and forgets them; forgetting reaches the tables ([forgetInTables]) and the record ([forgotten]), and changes drop
+ * and forgets them; forgetting reaches the record ([forgotten]), never a table's remembered words, and changes drop
  * sessions. Also holds 生僻字屏蔽 ([held], [gate]): a setting, so the habits-off model holds the same back. On the fcitx thread.
  */
 internal class UserLexicon(
@@ -32,7 +33,6 @@ internal class UserLexicon(
     private val onError: (IOException) -> Unit,
     private val additions: () -> Additions?,
     private val assets: EngineAssets,
-    private val forgetInTables: (Collection<String>) -> Unit,
     private val dropSessions: () -> Unit,
     // texts the model forgot, whatever the tables do: for the learning record
     private val forgotten: (Collection<String>) -> Unit = {},
@@ -44,6 +44,9 @@ internal class UserLexicon(
     private val owned: (Map<Entry, Float>) -> Int = { 0 },
     // writes a list's words as an imported batch, skipping known words: how many went in
     private val imports: (String, List<ImportedWords.Incoming>, (String, String) -> Boolean) -> Int = { _, _, _ -> 0 },
+    // the words tables remembered, listed with the learned ones, and dropping some of them
+    private val tableWords: () -> List<TableWordRow> = { emptyList() },
+    private val dropTableWords: (List<TableWordRow>) -> Unit = {},
 ) {
 
     private val pinyinData get() = assets.pinyinData
@@ -140,13 +143,14 @@ internal class UserLexicon(
 
     fun userWords(kind: UserWord.Kind): List<UserWord> = when (kind) {
         UserWord.Kind.ADDED -> lists.voiceAlways.let { always -> lists.addedWords.map { it.word(kind).copy(voiceAlways = it.text in always) } }
-        UserWord.Kind.LEARNED -> user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(kind, count) }
+        UserWord.Kind.LEARNED -> user().ownWords().sortedByDescending { it.second }.map { (entry, count) -> entry.word(kind, count) } +
+            tableWords().map { UserWord(it.text, it.code, kind, table = it.im) }
         UserWord.Kind.BLOCKED -> lists.blockedWords.map { it.word(kind) } + englishBlocks.blocked.map { UserWord(it, "", kind) }
     }
 
     fun userWordCounts(): Map<UserWord.Kind, Int> = mapOf(
         UserWord.Kind.ADDED to lists.addedWords.size,
-        UserWord.Kind.LEARNED to user().ownWords().size,
+        UserWord.Kind.LEARNED to user().ownWords().size + tableWords().size,
         UserWord.Kind.BLOCKED to lists.blockedWords.size + englishBlocks.blocked.size,
     )
 
@@ -211,11 +215,11 @@ internal class UserLexicon(
         val byKind = words.groupBy({ it.kind }, { it.entry() })
         byKind[UserWord.Kind.ADDED]?.let { removeAdded(it.filterNotNull()) }
         // forgotten in the record, which takes each out of the model
-        val learned = words.filter { it.kind == UserWord.Kind.LEARNED }.map { it.text }
-        if (learned.isNotEmpty()) {
-            forgetInTables(learned)
-            forgotten(learned)
-        }
+        val learned = words.filter { it.kind == UserWord.Kind.LEARNED && it.table.isEmpty() }.map { it.text }
+        if (learned.isNotEmpty()) forgotten(learned)
+        // a table's under its code alone: pinyin's word of the same text stays
+        val tables = words.filter { it.kind == UserWord.Kind.LEARNED && it.table.isNotEmpty() }.mapTo(HashSet()) { Triple(it.table, it.pinyin, it.text) }
+        if (tables.isNotEmpty()) dropTableWords(tableWords().filter { Triple(it.im, it.code, it.text) in tables })
         byKind[UserWord.Kind.BLOCKED]?.let { unblock(it.filterNotNull()) }
         englishBlocks.unblock(words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() }.map { it.text })
         dropSessions()
@@ -234,8 +238,6 @@ internal class UserLexicon(
         // with no log the model is kept: no longer scored as the model's word
         removed.forEach { userModel?.unlistByHand(it) }
         selfMade(removed)?.let { (back, texts) ->
-            // and a table's pick of one is read back as its saved phrase
-            if (texts.isNotEmpty()) forgetInTables(texts)
             // forgotten in the record as a text, so only those listed at no other reading: its forget unlists every reading
             back.map { it.text }.filter { it in texts }.distinct().takeIf { it.isNotEmpty() }?.let(forgotten)
         }
@@ -329,9 +331,8 @@ internal class UserLexicon(
     /** Tables index into it, so only add() and user() change it. */
     val listedSince: List<String> get() = newlyListed
 
-    /** In pinyin, any reading, and every table that saved it. */
+    /** In pinyin, any reading; a table's remembered words are its own. */
     fun forgetEverywhere(text: String) {
-        forgetInTables(listOf(text))
         forgotten(listOf(text))
     }
 

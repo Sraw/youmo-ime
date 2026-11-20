@@ -63,6 +63,11 @@ class LearningMenuTest {
         assertEquals(Reason.PREDICTION, LearningMenu.reason(Why(null, 0, predicted)))
         // the rest of a whole phrase: that it was put in whole, whatever its tier
         assertEquals(Reason.PHRASE, LearningMenu.reason(Why(Tier.USED, 3, predicted, "你好呀亲爱的")))
+        // a table's remembered word says so whatever its tier, but a pin is a pin
+        val remembered = Code(Kinds.table("wbx"), "iije")
+        assertEquals(Reason.REMEMBERED, LearningMenu.reason(Why(Tier.USED, 1, remembered, remembered = true)))
+        assertEquals(Reason.REMEMBERED, LearningMenu.reason(Why(null, 0, remembered, remembered = true)))
+        assertEquals(Reason.PINNED, LearningMenu.reason(Why(Tier.PINNED, 1, remembered, remembered = true)))
         // a 联想's, as the session gives it: EnginesLearningTest.aPredictionsWhyIsThatItFollowsTheWordBefore
         assertEquals(Reason.UNKNOWN, LearningMenu.reason(Why(null)))
         assertEquals(Reason.UNKNOWN, LearningMenu.reason(null))

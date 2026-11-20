@@ -239,7 +239,8 @@ class TableSessionTest {
     @Test
     fun aPhraseSavedBeforeIsForgottenAndTheTablesOwnHaveNothingToForget() {
         val saved = wubi.savedBefore("wqwu" to "你们")
-        val t = TableSession(wubi, TableOptions.WUBI, saved = saved)
+        // shown, not committed: the one word under its code commits itself as typed
+        val t = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), saved = saved)
         val shown = t.type("aaaa").second
         assertEquals(listOf("工", "恭恭敬敬"), shown.candidates)
         // nothing learned of the table's own here, as pinyin; nothing to pin or block to without a learning record
@@ -247,10 +248,10 @@ class TableSessionTest {
         assertEquals(shown.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
         assertEquals(listOf("工", "恭恭敬敬"), t.apply(Forget(0)).candidates)
         t.apply(Reset)
-        assertEquals(listOf("你们"), t.type("wqw").second.candidates)
+        assertEquals(listOf("你们"), t.type("wqwu").second.candidates)
         assertEquals(setOf(Offer.FORGET), t.offers(0))
         assertTrue(t.apply(Forget(0)).candidates.isEmpty())
-        assertTrue(saved.saved("").isEmpty())
+        assertTrue(saved.all().isEmpty())
         t.apply(Reset)
         assertFalse(t.apply(Forget(0)).handled)
     }
@@ -269,7 +270,6 @@ class TableSessionTest {
             override fun forget(text: String) {
                 forgotten += text
             }
-            override fun learned(text: String) = true
         }
         val t = TableSession(wubi, TableOptions.WUBI, saved = saved, shared = shared)
         t.learning = false
@@ -280,7 +280,8 @@ class TableSessionTest {
         assertEquals(0, records.size)
         assertEquals(emptyList<String>(), forgotten)
         t.learning = true
-        assertEquals(setOf(Offer.FORGET), t.offers(0))
+        // pinyin's word is deleted in pinyin: a table offers no delete of it
+        assertEquals(emptySet<Offer>(), t.offers(0))
     }
 
     /** Reads keys as pinyin the dumb way: "ni" is 你, "wo" 我 then 窝; ' first it refuses. */

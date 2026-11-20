@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableKeyboard
@@ -81,7 +82,9 @@ class TablesKeysUatTest {
     private val cangjie = TableKeyboard(InputMethodCatalog.CANGJIE, setOf('*'), false, KeyLabels.NAMES, TableRoots.CANGJIE)
 
     private fun wubi(labels: KeyLabels = KeyLabels.NONE, on: Boolean = false) =
-        TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86)
+        TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86, lookUpKey = false)
+
+    private fun erbi(on: Boolean = false) = TableKeyboard(InputMethodCatalog.ERBI, setOf(';'), on, KeyLabels.NONE, null)
 
     @Test
     @Uat("TBL-46")
@@ -102,22 +105,51 @@ class TablesKeysUatTest {
     @Test
     @Uat("TBL-47")
     fun theLookUpKeyIsInShiftsPlaceAndDarkWhileOn() {
-        val h = harness(InputMethodCatalog.WUBI, "五笔", wubi())
+        val h = harness(InputMethodCatalog.ERBI, "二笔", erbi())
         assertNull(h.keyWithId(R.id.button_caps))
         assertNotNull(h.keyWithId(R.id.button_lookup))
         assertNull(h.keyWithId(R.id.button_lookup_on))
         h.tap(h.keyWithId(R.id.button_lookup)!!)
         assertEquals(h.api.calls.toString(), "sym=${UNICODE + Keyboard.LOOKUP}", h.sentSyms().last().substringAfter('(').substringBefore(','))
-        h.told(wubi(on = true))
+        h.told(erbi(on = true))
         assertNull(h.keyWithId(R.id.button_lookup))
         assertNotNull(h.keyWithId(R.id.button_lookup_on))
         h.typed("hao", auxUp = "拼")
-        h.capture("TablesKeysUatTest/wubi_lookup_on", h.inputView)
+        h.capture("TablesKeysUatTest/erbi_lookup_on", h.inputView)
         h.tap(h.keyWithId(R.id.button_lookup_on)!!)
         assertEquals(2, h.sentSyms().count { "${UNICODE + Keyboard.LOOKUP}" in it })
         h.switchTo(entry(InputMethodCatalog.PINYIN, "拼音"))
         assertNotNull(h.keyWithId(R.id.button_caps))
         assertTrue(h.keyWithId(R.id.button_lookup) == null && h.keyWithId(R.id.button_lookup_on) == null)
+    }
+
+    @Test
+    fun beforeTheEngineTellsTheTableItsOwnLookUpKeyIsShown() {
+        val rows = listOf(
+            Triple("仓颉: 拼, no ⇧ first", InputMethodCatalog.CANGJIE, true),
+            Triple("五笔: ⇧, it looks up with z", InputMethodCatalog.WUBI, false),
+        )
+        assertRows(rows, { it.first }) { (why, im, lookUp) ->
+            h?.close()
+            val h = harness(im, why.take(2), null)
+            assertEquals(why, lookUp, h.keyWithId(R.id.button_lookup) != null)
+            assertEquals(why, !lookUp, h.keyWithId(R.id.button_caps) != null)
+        }
+    }
+
+    // 五笔 looks up with z: ⇧ where 拼 was, while a code is typed too, and shifted the keys show the letters
+    @Test
+    @Uat("TBL-47a")
+    fun wubiHasShiftWhereTheLookUpKeyWas() {
+        val h = harness(InputMethodCatalog.WUBI, "五笔", wubi(KeyLabels.NAMES))
+        assertNull(h.keyWithId(R.id.button_lookup))
+        assertNotNull(h.keyWithId(R.id.button_caps))
+        h.typed("ig")
+        assertNotNull(h.keyWithId(R.id.button_caps))
+        assertNull(h.keyWithId(R.id.button_lookup))
+        h.tap(h.keyWithId(R.id.button_caps)!!)
+        assertEquals("A", letterKey(h, "a").label)
+        h.capture("TablesKeysUatTest/wubi_shifted", h.inputView)
     }
 
     @Test

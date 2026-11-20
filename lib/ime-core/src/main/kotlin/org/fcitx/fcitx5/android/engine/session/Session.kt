@@ -188,6 +188,15 @@ sealed class Action {
     /** Drops the input and the context (the cursor moved away). */
     object Reset : Action()
 
+    /** A table's offered word tapped ([Snapshot.wordOffer]): word [index] of offer [id]; [before] the field's text before the cursor read as tapped. */
+    data class Remember(val id: Int, val index: Int, val before: String) : Action()
+
+    /** The notice's 撤销 of a [Remember]: [text] saved under [code] taken back with its commit. */
+    data class Unremember(val text: String, val code: String) : Action()
+
+    /** Offer [id] went up on the notice strip: left untapped, it is not offered again in the field. */
+    data class OfferShown(val id: Int) : Action()
+
     /** 联想 put away (the bar's ×): unlike [Reset], the context, the session's own space and a correction's undo stay. */
     object DropPredictions : Action()
 
@@ -255,4 +264,17 @@ data class Snapshot(
     val readings: List<List<String>> = emptyList(),
     /** A key chose from a list shown (digit, space, the syllable bar): what it took depends on that list. */
     val picked: Boolean = false,
+    /** Words a table offers to remember, shown after a pause; null: none, or the last one withdrawn. */
+    val wordOffer: WordOffer? = null,
+    /** Which candidate space takes while [predicting] (-1 none): 空格上屏联想词 marks it as the first is marked while typing. */
+    val spacePicks: Int = -1,
+    /** 空格上屏联想词 is on and [predicting]: only [spacePicks] is marked, none when space types a space. */
+    val spaceMarks: Boolean = false,
+    /** The offered word a tap ([Action.Remember]) just committed and saved. */
+    val remembered: OfferedWord? = null,
 )
+
+/** A table's words to remember, each [OfferedWord.text] under its [OfferedWord.code]; [id] tells one offer from the next. */
+data class WordOffer(val id: Int, val words: List<OfferedWord>)
+
+data class OfferedWord(val text: String, val code: String)

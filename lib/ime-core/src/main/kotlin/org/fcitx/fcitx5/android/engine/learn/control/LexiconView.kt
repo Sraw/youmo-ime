@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.engine.learn.control
 
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.LearnState
-import org.fcitx.fcitx5.android.engine.learn.Mine
 
 /** How a user dictionary page list is shown: as it comes or 「最近学到」 first; all, or only 「很久没用」. */
 object LexiconView {
@@ -30,17 +29,22 @@ object LexiconView {
                 for ((key, stat) in state.stats) days[key.text] = maxOf(days[key.text] ?: Int.MIN_VALUE, stat.uses.lastDay)
             }
         }
-        // learned words by when they became the user's: typing day first (a merge shifts another install's), then seq
-        val learned = words.mapNotNull { w -> state.mine[w.text]?.takeIf { w.kind == UserWord.Kind.LEARNED }?.let { w.text to it } }
-            .sortedWith(compareBy<Pair<String, Mine>>({ it.second.since }, { it.second.sinceSeq }))
-            .mapIndexed { rank, (text, _) -> text to rank + 1L }.toMap()
+        // learned words by when they became the user's: typing day first (a merge shifts another install's), then seq;
+        // a table's remembered word has no seq, so it follows that day's own ones
+        val learned = words.mapNotNull { w -> if (w.kind == UserWord.Kind.LEARNED) since(state, w)?.let { w to it } else null }
+            .sortedWith(compareBy<Pair<UserWord, Pair<Int, Long>>>({ it.second.first }, { it.second.second }))
+            .mapIndexed { rank, (w, _) -> w to rank + 1L }.toMap()
         return words.mapIndexed { i, w ->
-            // an empty count's last day is MIN_VALUE: unknown
+            // an empty count's last day is MIN_VALUE: unknown; a table's word never typed since has the day it was remembered
             val day = (state.wordUses[w.text]?.values?.maxOfOrNull { it.lastDay } ?: coded[w.text])?.takeIf { it != Int.MIN_VALUE }
-            val order = if (w.kind == UserWord.Kind.LEARNED) learned[w.text] ?: 0 else i.toLong()
+                ?: w.table.takeIf { it.isNotEmpty() }?.let { state.tableWords[Triple(it, w.pinyin, w.text)] }
+            val order = if (w.kind == UserWord.Kind.LEARNED) learned[w] ?: 0 else i.toLong()
             w.copy(lastUsed = lastUsed(state, w.text, day), idle = day?.let { state.day - it } ?: UserWord.NEVER, order = order)
         }
     }
+
+    private fun since(state: LearnState, w: UserWord): Pair<Int, Long>? =
+        if (w.table.isEmpty()) state.mine[w.text]?.let { it.since to it.sinceSeq } else state.tableWords[Triple(w.table, w.pinyin, w.text)]?.let { it to Long.MAX_VALUE }
 
     private fun lastUsed(state: LearnState, text: String, day: Int?): Int {
         day?.let { state.dates[it] }?.let { return it }

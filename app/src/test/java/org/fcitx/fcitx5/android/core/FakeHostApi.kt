@@ -250,6 +250,18 @@ class FakeHostApi : HostApi {
 
     val glides: MutableList<Glide> = CopyOnWriteArrayList()
 
+    override suspend fun rememberWord(id: Int, index: Int, before: String) {
+        calls += "rememberWord($id, $index, $before)"
+    }
+
+    override suspend fun unrememberWord(text: String, code: String) {
+        calls += "unrememberWord($text, $code)"
+    }
+
+    override suspend fun offerShown(id: Int) {
+        calls += "offerShown($id)"
+    }
+
     override suspend fun offerGlide(glide: Glide): Boolean {
         calls += "offerGlide"
         glides += glide

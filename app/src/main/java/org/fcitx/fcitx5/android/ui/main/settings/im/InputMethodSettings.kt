@@ -242,6 +242,7 @@ object InputMethodSettings {
         Section(
             R.string.shared_section_chinese, listOf(
                 Toggle(EngineSettings.PREDICTION, text(R.string.im_prediction), R.string.im_prediction_summary),
+                Toggle(EngineSettings.SPACE_PICKS_PREDICTION, text(R.string.im_space_picks_prediction), R.string.im_space_picks_prediction_summary),
                 // HandwritingSession offers no emoji: its summary says so
                 Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary),
                 Toggle(EngineSettings.BUILT_IN_PHRASES, text(R.string.im_built_in_phrases), R.string.im_built_in_phrases_summary),
@@ -349,6 +350,7 @@ object InputMethodSettings {
                     TableSettings.ORDER_POLICY, text(R.string.im_order_by_use), R.string.im_order_by_use_summary,
                     read = { it != "No" }, write = { if (it) TableSettings.ORDER_BY_USE else "No" },
                 ),
+                Toggle(TableSettings.OFFER_WORDS, text(R.string.im_offer_words), R.string.im_offer_words_summary),
                 Action(
                     RESET_TABLE_ORDER, R.string.im_reset_table_order, R.string.im_reset_table_order_summary, R.string.im_reset_table_order_confirm,
                     R.string.im_reset_table_order_done,

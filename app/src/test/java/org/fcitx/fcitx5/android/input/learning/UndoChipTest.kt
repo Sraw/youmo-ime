@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.input.NoticeState
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.SAID_MS
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.STEADY_MS
 import org.fcitx.fcitx5.android.input.NoticeState.Companion.UNDO_MS
@@ -28,6 +29,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.placeholder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +40,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowWindowManagerImpl
+import splitties.dimensions.dp
 import java.time.Duration
 
 /** The keyboard's one notice: one window, replaced in place, put away by a tap, 撤销 or its time. */
@@ -132,6 +135,48 @@ class UndoChipTest {
         windows().single().find(undoLabel)!!.performClick()
         assertFalse(chip.showing)
         assertEquals(listOf("undo 删"), r.calls)
+    }
+
+    // a table's offered words: each its own button of at least 48 dp, the one tapped picked, the notice going; no time of
+    // its own: it stays till a key or the keyboard puts it away
+    @Test
+    fun anOffersWordsAreEachAButtonOfTheirOwn() {
+        val chip = chip()
+        val picked = mutableListOf<String>()
+        val choices = listOf("汪小明 iije", "小明 ihje").map { UndoChip.Choice(it, "said $it") { picked += it } }
+        chip.show("记住：", aboveKeys = true, ms = NoticeState.STAYS, choices = choices)
+        val window = windows().single()
+        assertEquals(listOf("记住：", "汪小明 iije", "小明 ihje"), window.texts())
+        val second = window.find("小明 ihje")!!
+        second.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        assertTrue(second.measuredWidth >= activity.dp(UndoChip.TOUCH_DP) && second.measuredHeight >= activity.dp(UndoChip.TOUCH_DP))
+        assertEquals("said 小明 ihje", second.contentDescription)
+        // no area beyond the buttons takes a word: a tap off them puts the notice away
+        assertNull((window.find("记住：")!!.parent as View).touchDelegate)
+        second.performClick()
+        assertEquals(listOf("小明 ihje"), picked)
+        assertFalse(chip.showing)
+        // once only
+        second.performClick()
+        assertEquals(listOf("小明 ihje"), picked)
+        chip.show("记住：", aboveKeys = true, ms = NoticeState.STAYS, choices = choices)
+        idle(60_000)
+        assertTrue(chip.showing)
+        chip.typed()
+        assertFalse(chip.showing)
+    }
+
+    @Test
+    fun anOfferReplacedTakesNoTapOnItsFadingWords() {
+        val chip = chip(Motion.Settings.DEFAULT)
+        val picked = mutableListOf<String>()
+        chip.show("记住：", choices = listOf(UndoChip.Choice("汪小明 iije", "") { picked += "汪小明" }))
+        idle(settled)
+        val old = windows().single().find("汪小明 iije")!!
+        chip.show("已复制")
+        old.performClick()
+        assertEquals(emptyList<String>(), picked)
+        assertTrue(chip.showing)
     }
 
     @Test

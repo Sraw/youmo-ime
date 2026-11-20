@@ -1,5 +1,5 @@
 # qwerty
-family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.1 commits []
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.3 commits []
 
 # k14
 family grouped ims [pinyin, shuangpin] pads [] min-app 0.6.1 commits []
@@ -38,7 +38,7 @@ W line 29: unnamed [r3c4]
 W line 30: unnamed [r3c5]
 
 # the-app-qwerty
-family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.3 commits []
 E id-built-in [qwerty]
 E based-on []
 
@@ -47,6 +47,6 @@ family nine ims [pinyin, shuangpin, english] pads [] min-app 0.6.3 commits []
 W lacks [digits] [0]
 
 # pack-qwerty
-family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.0 commits []
+family letters ims [pinyin, shuangpin, english, table] pads [] min-app 0.6.3 commits []
 W id-built-in [qwerty]
 W based-on []

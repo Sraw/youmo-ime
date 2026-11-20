@@ -28,7 +28,6 @@ class SharedWordsTest {
         override fun forget(text: String) {
             forgotten += text
         }
-        override fun learned(text: String) = text in words && text !in forgotten
     }
 
     @Test
@@ -47,7 +46,8 @@ class SharedWordsTest {
         // nothing commits itself: wqwu's one entry would, and no word from outside the table takes its place
         val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
         assertEquals(listOf("你们", "你门"), session.type("wqwu").second.candidates)
-        assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), session.offers(1))
+        // deleted in pinyin, not here: here it is blocked
+        assertEquals(setOf(Offer.PIN, Offer.BLOCK), session.offers(1))
         assertEquals(listOf("你们"), session.apply(Block(1)).candidates)
         // under that code alone: still the other input methods' word, under the start of its code too
         assertEquals(emptyList<String>(), shared.forgotten)
@@ -58,21 +58,22 @@ class SharedWordsTest {
     }
 
     @Test
-    fun forgottenAWordIsForgottenByAllTheTablesOwnOnceLearned() {
+    fun forgottenATablesOwnWordOnceLearnedForgetsItsOrderHereAloneAndPinyinsIsNotForgottenHere() {
         val shared = Fake(wubi, listOf("你门"))
         val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
         session.type("wqwu")
         assertFalse(Offer.FORGET in session.offers(0))
         session.apply(Forget(0))
         assertEquals(emptyList<String>(), shared.forgotten)
-        // picked, the table ordering by use: what every input method learned of it forgotten by all
+        // picked, the table ordering by use: its order under this code forgotten, what pinyin learned of it pinyin's
         session.apply(Action.Select(0))
         session.type("wqwu")
         assertTrue(Offer.FORGET in session.offers(0))
         session.apply(Forget(0))
-        assertEquals(listOf("你们"), shared.forgotten)
-        assertEquals(listOf("你们"), session.apply(Forget(1)).candidates)
-        assertEquals(listOf("你们", "你门"), shared.forgotten)
+        assertEquals(emptyList<String>(), shared.forgotten)
+        assertFalse(Offer.FORGET in session.offers(0))
+        assertEquals(listOf("你们", "你门"), session.apply(Forget(1)).candidates)
+        assertEquals(emptyList<String>(), shared.forgotten)
     }
 
     @Test

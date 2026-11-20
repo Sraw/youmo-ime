@@ -28,17 +28,19 @@ class EngineOptionsTest {
     @Test
     fun `the settings are what the engine reads`() {
         val options = EngineOptions().apply {
-            load("PageSize=5\nModelLevel=Low\n[Fuzzy]\nL_N=True\nNG_GN=False\n[Wubi]\nOrderPolicy=Freq\nHint=False\n")
+            load("PageSize=5\nModelLevel=Low\nSpacePicksPrediction=True\n[Fuzzy]\nL_N=True\nNG_GN=False\n[Wubi]\nOrderPolicy=Freq\nHint=False\nOfferWords=False\n")
         }
         val settings = options.toSettings()
         assertEquals(5, settings.pageSize)
         assertEquals(ModelLevel.LOW, settings.modelLevel)
         assertEquals(setOf(Fuzzy.L_N), settings.fuzzy)
         assertFalse(settings.typos)
-        assertEquals(TableSettings(autoSelect = true, hint = false, orderByUse = true, keyLabels = KeyLabels.NONE), settings.tables["Wubi"])
+        assertTrue(settings.spacePicksPrediction)
+        assertFalse(settingsOf("").spacePicksPrediction)
+        assertEquals(TableSettings(autoSelect = true, hint = false, orderByUse = true, keyLabels = KeyLabels.NONE, offerWords = false), settings.tables["Wubi"])
         // every table's settings are pushed, defaults too
         assertEquals(InputMethodCatalog.TABLES.values.map { it.group }.toSet(), settings.tables.keys)
-        assertEquals(TableSettings(true, false, false, KeyLabels.NAMES), settings.tables["Cangjie"])
+        assertEquals(TableSettings(true, false, false, KeyLabels.NAMES, offerWords = true), settings.tables["Cangjie"])
         // a table with no roots has nothing of them to set
         assertNull(settings.tables["Erbi"]?.keyLabels)
         assertEquals(true, settingsOf("[Wubi]\nOrderPolicy=Fast\n").tables["Wubi"]?.orderByUse)

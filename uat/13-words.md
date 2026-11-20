@@ -296,6 +296,13 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 
 ## 学到的东西：看、删、清
 
+### WD-66 [P1] 码表记住的词列在「自动学到的词」里，能删能撤销
+<!-- learning: U-28 U-80 -->
+- **前提**：B0-五笔，照 TBL-11 记住「汪小明」。
+- **操作**：**设置 → 词库与短语 → 用户词库 → 自动学到的词**，搜 `iije`；点「汪小明」，看菜单；选删除，点提示条的 **撤销**。然后点右下角 **+**，看拼音框下面的说明。
+- **预期**：搜得到「汪小明」，下面写着「五笔 · iije · 最近用于 <今天的日期>」；菜单里没有「编辑」（编码按规则算，不能改）；删除后能撤销，撤销后又在。加词框的拼音框下面写着「码表里也能打这个词，编码按组词规则自动算，不用填」。
+- **JVM**：ime-core `TableRegistryTest.theWordListDeletesATablesWordOrPinyinsAlone`（码表的词单独删）+ app `TableWordRowTest`（「五笔 · iije」、日期、没有编辑）+ ime-core `LexiconViewTest.aTablesWordIsDatedFromItsRemembering`；设备上跑。
+
 ### WD-21 [P1] 用户词库的分页、次数和日子
 <!-- learning: U-80 F2992 -->
 - **前提**：B0，按 PY-34 让「汪小明」成为你的词，点 s h i，长按第五个候选选 **固定首位**，按 PY-29 屏蔽「是」；然后照 PY-34 的做法，把「鲸喵屿」（j i n g m i a o y u，一个字一个字选）选两次，让它在「汪小明」之后成为你的词。

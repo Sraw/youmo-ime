@@ -11,6 +11,8 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 internal class FieldJournal(
     private val habits: () -> Habits,
     private val simplify: (String) -> String,
+    // a commit taken back as its text was deleted
+    private val undone: (Commit) -> Unit = {},
     private val cleared: () -> Unit = {},
 ) {
     val journal = CommitJournal()
@@ -35,7 +37,7 @@ internal class FieldJournal(
     val pending: List<Commit> get() = now().pending
 
     /** See CommitJournal.settle. */
-    fun settle() = now().settle(::undo)
+    fun settle() = now().settle { undo(it) }
 
     /** Before the session acts: a context checks the field; anything else settles deletions, a Reset leaving the field unknown till a context. */
     fun before(action: Action, learning: Boolean) {
@@ -78,15 +80,29 @@ internal class FieldJournal(
         if (learning) journal.committed(simplify(text), commit, again?.typedAgain ?: 0, again?.goesOn == true) else clear()
     }
 
+    /** See CommitJournal.lastWhole; null too where the record was rewritten since. */
+    fun lastWhole(n: Int): List<String>? = now().lastWhole(n)
+
+    /** See CommitJournal.merge: the merged commits taken back, last first, those that cannot be left counted. */
+    fun merge(n: Int, text: String, commit: Commit?) {
+        now().merge(n, simplify(text), commit).asReversed().forEach { c -> if (c != null) undo(c, tell = false) }
+    }
+
+    /** Takes [commit] back now, its text left in the field. */
+    fun takeBack(commit: Commit): Boolean {
+        now().forgo(commit)
+        return undo(commit, tell = false)
+    }
+
     /** Written by the session on its own (a held glide word): journaled as any commit. */
     fun own(text: String, commit: Commit?) = now().committed(simplify(text), commit)
 
     // a record fault is learning's, never the commit's (Habits.failed)
-    private fun undo(c: Commit): Boolean {
+    private fun undo(c: Commit, tell: Boolean = true): Boolean {
         val h = habits()
         if (!h.learns) return false
         return try {
-            h.undo(c)
+            h.undo(c).also { if (it && tell) undone(c) }
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
             h.failed(e)
             false

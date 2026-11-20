@@ -57,6 +57,7 @@ class EngineOptions {
     private val shuangpin = Option(EngineSettings.SHUANGPIN_PROFILE, Names(EngineSettings.SCHEMES.keys.toList()), EngineSettings.XIAOHE)
     private val pageSize = Option(EngineSettings.PAGE_SIZE, Number(EngineSettings.PAGE_SIZES), EngineSettings.DEFAULT_PAGE_SIZE.toString())
     private val prediction = Option(EngineSettings.PREDICTION, Flag, TRUE)
+    private val spacePicks = Option(EngineSettings.SPACE_PICKS_PREDICTION, Flag, FALSE)
     private val emoji = Option(EngineSettings.EMOJI, Flag, TRUE)
     private val chaizi = Option(EngineSettings.CHAIZI, Flag, TRUE)
     private val builtInPhrases = Option(EngineSettings.BUILT_IN_PHRASES, Flag, TRUE)
@@ -75,7 +76,8 @@ class EngineOptions {
     private val autoSelect = Option(TableSettings.AUTO_SELECT, Flag, TRUE)
     private val hint = Option(TableSettings.HINT, Flag, TRUE)
     private val orderPolicy = Option(TableSettings.ORDER_POLICY, Names(listOf(NO_ORDER, "Freq", "Fast")), NO_ORDER)
-    private val tableOptions = listOf(autoSelect, hint, orderPolicy)
+    private val offerWords = Option(TableSettings.OFFER_WORDS, Flag, TRUE)
+    private val tableOptions = listOf(autoSelect, hint, orderPolicy, offerWords)
 
     // the app's own (仓颉, 五笔): what keys show of roots; the preset's by default even in a fresh group
     private fun keyLabels(default: KeyLabels) = Option(TableSettings.KEY_LABELS, Names(KeyLabels.entries.map { it.key }), default.key)
@@ -88,7 +90,7 @@ class EngineOptions {
 
     /** In order; the two `ExternalOption`s are never saved. */
     private val entries: List<Any> = listOf(
-        shuangpin, pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest, candidateReading,
+        shuangpin, pageSize, prediction, spacePicks, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest, candidateReading,
         strokeSingles, shuangpinKeysShown,
     ) + tables.values
 
@@ -189,6 +191,7 @@ class EngineOptions {
             fuzzy = Fuzzy.entries.filterTo(HashSet()) { values["${fuzzy.key}/${it.name}"] == TRUE },
             typos = flag("${fuzzy.key}/${EngineSettings.TYPOS}"),
             prediction = flag(prediction.key),
+            spacePicksPrediction = flag(spacePicks.key),
             emoji = flag(emoji.key),
             chaizi = flag(chaizi.key),
             builtInPhrases = flag(builtInPhrases.key),
@@ -200,6 +203,7 @@ class EngineOptions {
                     autoSelect = flag(path(group, autoSelect)),
                     hint = flag(path(group, hint)),
                     orderByUse = values.getValue(path(group, orderPolicy)) != NO_ORDER,
+                    offerWords = flag(path(group, offerWords)),
                     keyLabels = values["${group.key}/${TableSettings.KEY_LABELS}"]?.let(KeyLabels::of),
                 )
             },
@@ -252,10 +256,10 @@ class EngineOptions {
 
     // EnginePinyinPage and the others
     private fun pageOf(im: String): List<Any>? = when (im) {
-        InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, strokeSingles, fuzzy)
-        InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, shuangpinKeysShown, fuzzy)
+        InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, spacePicks, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, strokeSingles, fuzzy)
+        InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, spacePicks, emoji, modelLevel, shuangpinKeysShown, fuzzy)
         InputMethodCatalog.ENGLISH -> listOf(englishSuggest)
-        in tables -> listOf(pageSize, prediction, emoji, modelLevel)
+        in tables -> listOf(pageSize, prediction, spacePicks, emoji, modelLevel)
         else -> null
     }
 

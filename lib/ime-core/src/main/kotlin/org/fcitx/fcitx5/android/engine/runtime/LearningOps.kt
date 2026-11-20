@@ -35,7 +35,6 @@ internal class LearningOps(
     private val useHabits: (Boolean) -> Unit,
     private val dropSessions: () -> Unit,
     private val first: (String) -> Int,
-    private val tableForgets: () -> Int,
     private val backups: Backups = Backups.NONE,
     private val backup: (BackupOp) -> LearningResult = { LearningResult.Unavailable },
     private val restoreCorrection: (List<String>) -> Unit = {},
@@ -136,7 +135,6 @@ internal class LearningOps(
         // as written: "The" is not listed where "the" is, though has() says it is blocked
         val englishNow = english.blocked.toSet()
         val englishBlocked = words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() && it.text in englishNow }.map { it.text }
-        val forgets = tableForgets()
         val token = control.undoable(inverse = {
             lexicon.reAdd(added)
             lexicon.putVoiceAlways(always, true)
@@ -144,8 +142,7 @@ internal class LearningOps(
             english.block(englishBlocked)
             dropSessions()
         }) { lexicon.removeWords(words) }
-        // what tables' logs forgot stays forgotten: no undo rather than half of one (an unloaded table cannot tell)
-        return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
+        return LearningResult.Done(token)
     }
 
     // a session told to show anew rereads the record, keeping its input; one that cannot (Session.rereads false)
@@ -247,7 +244,6 @@ internal class LearningOps(
         // takes no word with it. Look-alikes are words even when the pressed one is a phrase's rest
         val added = lexicon.addedPlaces((if (whole.isEmpty()) texts else texts.drop(1)).flatMap { lexicon.addedOf(it) })
         val always = lexicon.voiceAlways.filter { it in texts }
-        val forgets = tableForgets()
         var done = emptyList<String>()
         val token = acted(inverse = {
             lexicon.reAdd(added.filter { it.value.text in done })
@@ -256,9 +252,7 @@ internal class LearningOps(
             done = act()
             texts.first() in done
         } ?: return LearningResult.Unavailable
-        // what tables' own logs forgot no record rewrite brings back: no chip rather than a half undo (an unloaded
-        // table forgets every row of the word, so none either)
-        return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
+        return LearningResult.Done(token)
     }
 
     // [texts]: the pressed one first, then look-alikes; [act] returns those blocked
@@ -306,12 +300,14 @@ internal class LearningOps(
         // says (a character by strokes under them alone, a table's pinyin lookup everywhere)
         val underCode = im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION
         val scope = s.blockScope(op.index) ?: if (underCode) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
-        return LearningResult.Menu(op.text, kindOf(op.text), items, why, scope)
+        return LearningResult.Menu(op.text, kindOf(im, op.text), items, why, scope)
     }
 
-    private fun kindOf(text: String) = when {
+    private fun kindOf(im: String, text: String) = when {
         lexicon.addedOf(text).isNotEmpty() -> WordKind.ADDED
         text in log().state.mine -> WordKind.MINE
+        // a word the table remembered is the user's: deleted, not forgotten
+        log().state.tableWords.keys.any { it.first == im && it.third == text } -> WordKind.MINE
         log().state.imports.placesOf(text).isNotEmpty() -> WordKind.IMPORTED
         else -> WordKind.DICTIONARY
     }

@@ -68,8 +68,8 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
     private fun label(index: Int) = if (index < 0) "" else SceneBar.label(bar.labelStyle, index)
 
     /** [index] -1: drawn as any but the first, no label. */
-    fun updateCandidate(candidate: CandidateWord, index: Int = -1) {
-        val look = bar.candidate(first = index == 0, selected = false)
+    fun updateCandidate(candidate: CandidateWord, index: Int = -1, first: Boolean = index == 0) {
+        val look = bar.candidate(first = first, selected = false)
         if (look != shown) {
             if (look.fill != shown.fill || look.pressed != shown.pressed) root.background = SceneBar.candidateBackground(ctx, bar, look)
             if (look.font != shown.font || look.weight != shown.weight) text.typeface = SceneBar.typeface(theme, look) ?: Typeface.DEFAULT

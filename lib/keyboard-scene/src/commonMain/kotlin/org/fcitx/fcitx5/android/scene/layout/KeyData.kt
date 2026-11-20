@@ -72,7 +72,10 @@ object KeyData {
     ): Result {
         val own = listOfNotNull(app[id], basedOn?.let { app[it] })
         val all = (listOfNotNull(id, basedOn) + ORDER + app.keys.sorted()).distinct().mapNotNull { app[it] }
-        val r = Reading(own, all, mode == Mode.Own || id in LISTED, DefaultMarks.variantOf(layout, shape).form)
+        val rows = layout.parts.filterIsInstance<Row>().map { it to layout.defaults } +
+            fragments.values.flatMap { f -> f.rows.map { it to f.defaults.over(layout.defaults) } }
+        val looksUp = rows.any { (row, under) -> row.cells.any { it is Key && it.attrs.over(row.defaults.over(under)).looksUp() } }
+        val r = Reading(own, all, mode == Mode.Own || id in LISTED, DefaultMarks.variantOf(layout, shape).form, looksUp)
         val parts = layout.parts.map { p -> if (p is Row) r.row(id, p, layout.defaults) else p }
         val frags = fragments.mapValues { (src, f) ->
             Fragment(f.id, f.defaults.holding(NONE), f.rows.map { r.row(src, it, f.defaults.over(layout.defaults)) })
@@ -82,7 +85,13 @@ object KeyData {
         return Result(layout.with(layout.defaults.holding(NONE), parts, popups), frags, r.ignored.toList())
     }
 
-    private class Reading(val own: List<Board>, val all: List<Board>, val keepOwn: Boolean, val form: KeyboardVariant.Form) {
+    private class Reading(
+        val own: List<Board>,
+        val all: List<Board>,
+        val keepOwn: Boolean,
+        val form: KeyboardVariant.Form,
+        val looksUp: Boolean,
+    ) {
         val ignored = LinkedHashSet<Ignored>()
 
         fun take(name: String?, keyId: String?, group: Boolean): Taken {
@@ -102,8 +111,9 @@ object KeyData {
             if (written.menu.isNotEmpty() && written.menu != taken.menu) ignored += Ignored(file, line, "menu", key)
         }
 
-        fun key(file: String, k: Key, under: KeyAttrs): Key {
-            val a = k.attrs.over(under)
+        fun key(file: String, written: Key, under: KeyAttrs): Key {
+            val a = written.attrs.over(under)
+            val k = lookUpMoved(written, a, looksUp)
             val t = take(a.shortcut, k.id, k.letters != null)
             if (t is Taken.Written) {
                 val variants = k.variants.map { v -> if (v.attrs.shortcut != null) variant(file, v, a.shortcut ?: k.id) else v }
@@ -153,6 +163,32 @@ object KeyData {
     }
 
     private fun held(actions: Map<String, String>) = actions.filterKeys { it in HELD }
+
+    private const val LOOK_UP = "code:U+F0104"
+    private const val TABLE_LOOKUP = "table-lookup"
+    private val ON_TABLE = Condition.Term("table", null, false)
+    private val OFF_TABLE = Condition.Term("table", null, true)
+
+    private fun KeyAttrs.looksUp() = role == "lookup" || role == "lookup-on" || actions["send"] == LOOK_UP
+
+    private fun KeyAttrs.shifts() = role == "shift" || role == null && actions["send"].let { it == "caps" || it == "caps:lock" }
+
+    /**
+     * Which tables have 拼 is the engine's (二笔, 仓颉, 自然码; 五笔 looks up behind z), not a layout's: one written before
+     * `table-lookup` shows 拼 where it would do nothing, and its Shift, off every table, comes back where 拼 goes.
+     */
+    internal fun lookUpMoved(k: Key, a: KeyAttrs, looksUp: Boolean): Key {
+        val groups = k.condition?.anyOf ?: listOf(emptyList())
+        if (groups.any { g -> g.any { it.name == TABLE_LOOKUP } }) return k
+        val moved = when {
+            // after `table`, as the app's own qwerty writes it
+            a.looksUp() -> groups.map { g -> (g.indexOf(ON_TABLE) + 1).let { at -> g.take(at) + Condition.Term(TABLE_LOOKUP, null, false) + g.drop(at) } }
+            looksUp && a.shifts() && k.condition != null && groups.all { OFF_TABLE in it } ->
+                groups + groups.map { g -> g.filter { it.name != "table" && it.name != "composing" } + ON_TABLE + Condition.Term(TABLE_LOOKUP, null, true) }.distinct()
+            else -> return k
+        }
+        return Key(k.id, Condition(moved), k.attrs, k.popup, k.menu, k.line, k.variants, k.letters, k.lean, k.place)
+    }
 
     private fun Held.besides(corner: String): Held = copy(
         alt = alt?.takeUnless { it == Text.Literal(corner) || it == Text.Binding("punct", corner) },

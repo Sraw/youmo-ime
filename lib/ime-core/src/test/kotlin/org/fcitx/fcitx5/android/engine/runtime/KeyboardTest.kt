@@ -12,10 +12,13 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.session.WordOffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,6 +44,7 @@ class KeyboardTest {
 
         // a key it does not read ends the input but still says it was handled: the keyboard decides
         var endsHandled = false
+        var offer: WordOffer? = null
 
         override fun fieldFlags(flags: Int) {
             this.flags = flags
@@ -118,10 +122,11 @@ class KeyboardTest {
                     predicting = false
                 }
                 Action.DropPredictions -> predicting = false
-                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step, Action.LookUp -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> {}
             }
             val shown = all()
-            return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0)
+            val remembered = (action as? Action.Remember)?.let { OfferedWord(it.before, "iije") }
+            return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0, remembered = remembered, wordOffer = offer)
         }
     }
 
@@ -131,6 +136,22 @@ class KeyboardTest {
     private fun char(c: Char) = keyboard.onEvent(EngineEvent.CHAR, c.code)
 
     private fun type(text: String) = text.forEach { char(it) }
+
+    // told by the tap's own snapshot alone: the last shown again (a recall, a cursor tap while idle) says it no more
+    @Test
+    fun aWordRememberedIsToldOnce() {
+        val tapped = keyboard.onEvent(EngineEvent.CHAR, Keyboard.REMEMBER, payload = Action.Remember(1, 0, "汪小明"))
+        assertEquals(OfferedWord("汪小明", "iije"), tapped.remembered)
+        assertNull(keyboard.onEvent(EngineEvent.CHAR, Keyboard.RECALL).remembered)
+    }
+
+    // the words offered are those before the cursor: a tap elsewhere in the field withdraws them
+    @Test
+    fun aCursorTapWhileIdleWithdrawsTheOffer() {
+        session.offer = WordOffer(1, listOf(OfferedWord("汪小明", "iije")))
+        assertEquals(session.offer, keyboard.onEvent(EngineEvent.CHAR, Keyboard.REMEMBER, payload = Action.OfferShown(1)).wordOffer)
+        assertNull(keyboard.onEvent(EngineEvent.CURSOR, 0).wordOffer)
+    }
 
     @Test
     fun aStrokesKeyComesThroughAsItsStrokeHandledWhateverTheSession() {

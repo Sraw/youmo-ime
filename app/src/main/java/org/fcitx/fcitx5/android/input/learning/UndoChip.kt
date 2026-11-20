@@ -62,6 +62,9 @@ class UndoChip(
      */
     class Undo(val undo: () -> Unit, val lapsed: () -> Unit = {}, @StringRes val action: Int = R.string.learning_undo)
 
+    /** A button of its own after the words, as a table's offered word: [label] shown, [said] to a screen reader. */
+    class Choice(val label: String, val said: String, val pick: () -> Unit)
+
     private var window: PopupWindow? = null
 
     // two rows while one replaces another
@@ -82,6 +85,9 @@ class UndoChip(
 
     private var animator: ValueAnimator? = null
 
+    // the choices of the notice shown now
+    private var shownChoices: List<Choice> = emptyList()
+
     private val timeout = Runnable { dismiss(animated = true) }
 
     // for its time again after [uncovered]
@@ -97,7 +103,14 @@ class UndoChip(
      * the engine says as a key fails (the key arrives after it and would put it away unseen). False if not
      * shown: [undo] lapsed, the caller says it otherwise.
      */
-    fun show(message: String, undo: Undo? = null, aboveKeys: Boolean = false, steady: Boolean = false, ms: Long? = null): Boolean {
+    fun show(
+        message: String,
+        undo: Undo? = null,
+        aboveKeys: Boolean = false,
+        steady: Boolean = false,
+        ms: Long? = null,
+        choices: List<Choice> = emptyList(),
+    ): Boolean {
         anchor.removeCallbacks(timeout)
         // a keyboard hidden is still attached: a result coming after it went is not shown on it
         if (!anchor.isAttachedToWindow || !anchor.isShown) {
@@ -108,7 +121,8 @@ class UndoChip(
             return false
         }
         this.aboveKeys = aboveKeys
-        val row = row(message, undo)
+        shownChoices = choices
+        val row = row(message, undo, choices)
         val to = place(row.layoutParams.width, row.layoutParams.height, aboveKeys)
         // said under the edit menu where it meets it, shown as the menu goes
         val hide = menu?.let { Rect.intersects(it, Rect(to.left, to.top, to.left + row.layoutParams.width, to.top + row.layoutParams.height)) } == true
@@ -125,15 +139,15 @@ class UndoChip(
             if (replacing) ViewCompat.setAccessibilityPaneTitle(it, null)
             ViewCompat.setAccessibilityPaneTitle(it, message)
         }
-        val shownFor = anchor.context.getSystemService(AccessibilityManager::class.java)?.let { a ->
+        val shownFor = if (shownMs == NoticeState.STAYS) shownMs else anchor.context.getSystemService(AccessibilityManager::class.java)?.let { a ->
             // as long as its user needs: to read it, and to reach its button
-            val content = if (undo != null) AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS
+            val content = if (undo != null || choices.isNotEmpty()) AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS
             else AccessibilityManager.FLAG_CONTENT_TEXT
             a.getRecommendedTimeoutMillis(shownMs.toInt(), content).toLong()
         } ?: shownMs
         this.shownFor = shownFor
         // hidden: timed from when the menu goes ([uncovered])
-        if (!hide) anchor.postDelayed(timeout, shownFor)
+        if (!hide) timed()
         return true
     }
 
@@ -181,7 +195,12 @@ class UndoChip(
         menu = null
         if (!state.uncover() || window?.isShowing != true) return
         shown(true)
-        anchor.postDelayed(timeout, shownFor)
+        timed()
+    }
+
+    // a time past the uptime clock's end would run at once
+    private fun timed() {
+        if (shownFor != NoticeState.STAYS) anchor.postDelayed(timeout, shownFor)
     }
 
     // hidden, it neither shows nor takes a touch meant for what is under it
@@ -338,14 +357,14 @@ class UndoChip(
         animator = null
     }
 
-    private fun row(message: String, undo: Undo?): View {
+    private fun row(message: String, undo: Undo?, choices: List<Choice>): View {
         val ctx = anchor.context
         val text = ctx.textView {
             text = message
             setTextColor(theme.popupTextColor)
             textSize = 14f
             // the line beside 撤销 is the gap between them
-            setPaddingDp(16, 10, if (undo == null) 16 else 12, 10)
+            setPaddingDp(16, 10, if (undo == null && choices.isEmpty()) 16 else if (choices.isEmpty()) 12 else 4, 10)
         }
         val row = ctx.horizontalLayout {
             gravity = gravityCenterVertical
@@ -376,6 +395,24 @@ class UndoChip(
             button.measure(UNSPECIFIED, UNSPECIFIED)
             room -= button.measuredWidth + ctx.dp(1)
         }
+        // each its own button, no area beyond it: a tap between two must not take the wrong word
+        choices.forEachIndexed { i, choice ->
+            if (i > 0) row.add(View(ctx).apply { setBackgroundColor(theme.dividerColor) }, row.lParams(ctx.dp(1), ctx.dp(DIVIDER_DP)))
+            val button = button(choice.label) {
+                // one replaced and fading, or going: not picked
+                if (shownChoices !== choices || !state.choose()) return@button
+                shownChoices = emptyList()
+                dismiss(animated = true)
+                choice.pick()
+            }.apply {
+                contentDescription = choice.said
+                minWidth = ctx.dp(TOUCH_DP)
+                minHeight = ctx.dp(TOUCH_DP)
+            }
+            row.add(button, row.lParams(row.wrapContent, ViewGroup.LayoutParams.MATCH_PARENT))
+            button.measure(UNSPECIFIED, UNSPECIFIED)
+            room -= button.measuredWidth + ctx.dp(1)
+        }
         text.maxWidth = room.coerceAtLeast(ctx.dp(MIN_WORDS_DP))
         row.measure(UNSPECIFIED, UNSPECIFIED)
         // its own size whatever the box's: as the box eases from one to another, neither row re-wraps
@@ -383,9 +420,17 @@ class UndoChip(
         return row
     }
 
+    private fun undoButton(undo: Undo) = button(anchor.context.getString(undo.action)) {
+        // one replaced and fading has lapsed: its act stands, the notice shown now stays
+        if (!state.undo(undo)) return@button
+        // taken, not lapsed
+        dismiss(animated = true)
+        undo.undo()
+    }
+
     // a text button in the accent colour, no block of colour
-    private fun undoButton(undo: Undo) = anchor.context.textView {
-        setText(undo.action)
+    private fun button(label: String, onClick: () -> Unit) = anchor.context.textView {
+        text = label
         setTextColor(undoColour(theme))
         typeface = Typeface.DEFAULT_BOLD
         textSize = 14f
@@ -398,13 +443,7 @@ class UndoChip(
         background = RippleDrawable(ColorStateList.valueOf(theme.keyPressHighlightColor), null, InsetDrawable(mask, dp(RIPPLE_INSET_DP)))
         // after the background: the inset's own padding (4 dp) would replace it
         setPaddingDp(12, 0, 16, 0)
-        setOnClickListener {
-            // one replaced and fading has lapsed: its act stands, the notice shown now stays
-            if (!state.undo(undo)) return@setOnClickListener
-            // taken, not lapsed
-            dismiss(animated = true)
-            undo.undo()
-        }
+        setOnClickListener { onClick() }
     }
 
     private object ButtonRole : View.AccessibilityDelegate() {
@@ -422,6 +461,9 @@ class UndoChip(
         const val RIPPLE_INSET_DP = 4
         const val DIVIDER_DP = 20
         const val MARGIN_DP = 16
+
+        // the least a finger is given
+        const val TOUCH_DP = 48
 
         /** The theme's accent, toward the popup's text till it reads at 4.5:1 on the popup's colour. */
         fun undoColour(theme: Theme): Int =

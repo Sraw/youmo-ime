@@ -231,6 +231,12 @@
 - **预期**：联想时最右边有 ×（⌄ 在它左边），打字时（有编码）没有 ×；点 × 后联想收起，栏上回到工具栏，什么都没上屏也没删；「联想下一个词」设置还开着，「明天」上屏后照常给出联想。
 - **JVM**：`BarUatTest.theCrossWithThePredictionsDropsThem`（联想时 × 在最右、⌄ 在它左边，点了只请宿主收起联想、不改设置，也不再把前文告诉引擎；没有联想、有编码时没有 ×）；宿主那一边见 ime-core `DropPredictionsTest`（联想时只收起联想，有编码时什么都不做）和 `DropPredictionsEnginesTest`（真会话上：英文纠错后点 ×，退格照样改回；英文自动加的空格照样让给逗号；拼音上屏的词照样是前文）。
 
+### PY-160 [P1] 空格上屏联想词：开着时空格上屏联想词，后面不多空格
+- **前提**：B0，**通用输入** 里打开 **空格上屏联想词**。空框。
+- **操作**：点 j i n t i a n，点空格；等 1 秒，看候选栏（截图），点空格；看框；马上再点空格。关掉开关，回空框同样打「今天」，等 1 秒点空格。
+- **预期**：开着时联想的第一个词画成首选的样子；空格后框里是「今天」加第一个联想词，后面没有空格；紧接着的那一下空格打出一个空格。关着时空格收起联想、打出一个空格。码表里一样；码表自动上屏后紧接的那一下空格不取联想词（JVM）。
+- **JVM**：ime-core `PinyinSpacePicksTest.aSpaceTakesTheFirstPredictionShownOnlyWithTheSwitchOn`（开、关、联想出现不到 0.3 秒三行；取过一次后下一下是空格）、`PinyinSpacePicksTest.aSpaceJustAfterATappedPredictionsNextRoundIsASpace`、`TableWordLearningTest.aSpaceJustAfterATappedPredictionsNextRoundIsASpace`（点联想词后新一轮出来不到 0.3 秒的空格仍是空格）、`TableWordLearningTest.aSpaceTakesThePredictionShownOnlyWithTheSwitchOn`、`noSpaceAfterASelfCommitTakesAPrediction`、`DropPredictionsTest.theBarLeadsWithWhatSpaceTakes`（候选栏画哪一个）、ime-eval `PinyinUatTest.aSpaceTakesThePredictionShownThenTypesASpace`（真数据，经键盘的空格）+ app `BarThemeTest.theBarDrawsAsFirstTheOneItIsToldLeads`；设备上跑。
+
 ## 长按候选
 
 ### PY-29 [P0] 屏蔽一个词

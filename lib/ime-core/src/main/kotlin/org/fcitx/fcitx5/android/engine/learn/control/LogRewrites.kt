@@ -43,7 +43,7 @@ import java.io.OutputStream
 /** How the user's acts rewrite the learning log: bytes in, what is kept out; run under `LearnLog.rewrite`. */
 internal object LogRewrites {
 
-    /** 清掉最近: [log] without commits at or after [cut] and their undos; the snapshot, user acts and unknown records stay. False if nothing to take out. */
+    /** 清掉最近: [log] without commits at or after [cut], their undos and the words tables remembered then; the snapshot, other user acts (a word deleted stays so) and unknown records stay. False if nothing to take out. */
     fun clearSince(log: ByteArray, cut: Int, to: OutputStream): Boolean {
         val spans = spans(log)
         val reader = LearnRecords.Reader()
@@ -61,7 +61,7 @@ internal object LogRewrites {
             }
             if (seq != null) gone += seq
             // in the log after the commit it takes back, so that one is known by now
-            keep[i] = seq == null && !(r is Undo && r.undoneSeq in gone)
+            keep[i] = seq == null && !(r is Undo && r.undoneSeq in gone) && !remembered(r, cut)
         }
         if (keep.all { it }) return false
         to.write(log, 0, RecordFormat.HEADER_SIZE)
@@ -70,6 +70,10 @@ internal object LogRewrites {
         }
         return true
     }
+
+    // a table's word remembered at or after [cut]: a word made then is no longer the user's
+    private fun remembered(r: LearnRecord?, cut: Int) =
+        r is Absorbed && r.minute >= cut && r.removed.isEmpty() && r.added.isNotEmpty() && r.added.all { it is TableWordRow }
 
     // the flag a reverted English commit set, without the commit
     private fun neverCorrected(c: EnCommit) =
@@ -107,7 +111,7 @@ internal object LogRewrites {
             is MineRow, is PinRow, is NoPredictRow, is TableBlockRow, is TableWordRow, is BatchRow, is ImportedRow -> r.takeIf { !all }
             // events: never in a snapshot
             is Commit, is Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
-            is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is EnCommit, is LearnRecord.EnForget,
+            is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is LearnRecord.TableForget, is EnCommit, is LearnRecord.EnForget,
             is LearnRecord.EnAdd, is LearnRecord.EnCorrect, is LearnRecord.Restored, is LearnRecord.ImportBatch,
             is LearnRecord.Imported, is LearnRecord.ImportUndo, is Absorbed,
             -> r.takeIf { !all }

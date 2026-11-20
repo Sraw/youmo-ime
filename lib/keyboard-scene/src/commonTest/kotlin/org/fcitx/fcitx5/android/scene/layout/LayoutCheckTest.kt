@@ -30,6 +30,9 @@ class LayoutCheckTest {
 
     private val qwerty = own("qwerty")
 
+    // as 0.6.2 shipped it, before the lookup key's switch: what each feature alone asks
+    private val qwerty062 = qwerty.replace(", table !table-lookup", "").replace(" table-lookup", "")
+
     private fun check(text: String, strict: Boolean = true, app: String = "0.6.1") = LayoutCheck.check(text, sources, app, strict = strict)
 
     private fun errors(text: String) = check(text).errors.map { it.key }
@@ -74,7 +77,7 @@ class LayoutCheckTest {
             val r = check(own(id))
             assertEquals(emptyList(), r.errors, id)
             assertEquals(ims, r.ims, id)
-            assertEquals("0.6.1", r.minApp, "$id: based-on= is 0.6.1's")
+            assertEquals(if (id == "qwerty") "0.6.3" else "0.6.1", r.minApp, "$id: based-on= is 0.6.1's, the lookup key's switch 0.6.3's")
         }
         assertEquals(listOf("full"), check(own("number")).pads, "a number board with no pads= is for 123's")
         val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
@@ -226,7 +229,7 @@ class LayoutCheckTest {
         val over = check(tall.replace("<key id=\"g\" label", "<key id=\"g\" width=\"1.5\" label")).errors
         assertTrue(over.isNotEmpty() && over.all { "over the 9 it has" in it.args[1] }, over.toString())
         // drawn, only unseen: told, as a theme's blank key is
-        val blank = check(qwerty.replace("label=\"拼\" text-size=\"18\" text-style=\"bold\"\n         send=\"code:U+F0104\" when=\"table !looking-up\"", "send=\"code:U+F0104\" when=\"table !looking-up\""))
+        val blank = check(qwerty.replace("label=\"拼\" text-size=\"18\" text-style=\"bold\"\n         send=\"code:U+F0104\" when=\"table table-lookup !looking-up\"", "send=\"code:U+F0104\" when=\"table table-lookup !looking-up\""))
         assertEquals(emptyList(), blank.errors)
         assertEquals(listOf("blank"), blank.warnings.map { it.key }.filter { it == "blank" })
         assertEquals("0.6.3", blank.minApp, "the old app refused it")
@@ -288,13 +291,15 @@ class LayoutCheckTest {
     @Test
     fun theFeaturesTableIsTheReaders() {
         val samples = mapOf(
-            "meta" to qwerty.replaceFirst("<defaults", "<meta author=\"me\"/>\n  <defaults"),
-            "based-on" to qwerty,
+            "meta" to qwerty062.replaceFirst("<defaults", "<meta author=\"me\"/>\n  <defaults"),
+            "based-on" to qwerty062,
             "pads" to own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"full\""),
-            "rows-middle" to qwerty.replace("<key id=\"g\" label", "<key id=\"g\" rows=\"2\" label"),
+            "rows-middle" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" rows=\"2\" label"),
             // a key id twice in rows each shown on its own (the old app refused the second); a gap's id too
-            "row-when gap" to qwerty.replace("</keyboard>", "<row when=\"field=url\"><gap id=\"g1\" width=\"1\"/><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><gap id=\"g1\" width=\"1\"/></row>\n</keyboard>"),
-            "row-when" to qwerty.replace("</keyboard>", "<row when=\"field=url\"><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><key id=\"zz\" label=\"y\"/></row>\n</keyboard>"),
+            "row-when gap" to qwerty062.replace("</keyboard>", "<row when=\"field=url\"><gap id=\"g1\" width=\"1\"/><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><gap id=\"g1\" width=\"1\"/></row>\n</keyboard>"),
+            "row-when" to qwerty062.replace("</keyboard>", "<row when=\"field=url\"><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><key id=\"zz\" label=\"y\"/></row>\n</keyboard>"),
+            // the app's own: an older app fails the board on the switch
+            "table-lookup" to qwerty,
         )
         // lacks is the check's (whatABoardLacksIsToldOnceAndTaken), not the reader's
         assertEquals(LayoutCheck.FEATURES.keys - "lacks", samples.keys.map { it.substringBefore(' ') }.toSet())
@@ -304,7 +309,7 @@ class LayoutCheckTest {
             assertTrue(feature in LayoutCheck.features(layout), feature)
             assertEquals(LayoutCheck.FEATURES.getValue(feature), LayoutCheck.minApp(layout), feature)
         }
-        for (id in boards) assertEquals(LayoutCheck.BASE_VERSION, LayoutCheck.minApp(LayoutReader.layout(testData("$id.xml")).ok()), id)
+        for (id in boards - "qwerty") assertEquals(LayoutCheck.BASE_VERSION, LayoutCheck.minApp(LayoutReader.layout(testData("$id.xml")).ok()), id)
         val nine = LayoutReader.layout(testData("nine.xml")).ok()
         assertTrue("rows-middle" !in LayoutCheck.features(nine))
     }

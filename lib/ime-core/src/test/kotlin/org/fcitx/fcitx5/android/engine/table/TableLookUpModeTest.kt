@@ -72,7 +72,8 @@ class TableLookUpModeTest {
         }
     }
 
-    private fun wubi(mode: TableSession.LookUpMode = TableSession.LookUpMode(), options: TableOptions = TableOptions.WUBI, pinyin: Pinyin = Pinyin()) =
+    // 五笔 itself has no 拼 key (z looks up there): the mode as the tables that keep one have it, on 五笔's codes
+    private fun wubi(mode: TableSession.LookUpMode = TableSession.LookUpMode(), options: TableOptions = TableOptions.WUBI.copy(lookUpKey = true), pinyin: Pinyin = Pinyin()) =
         TableSession(dictionary("trnt 我", "wqiy 你", "aawt 工作", "haob 好", "xiab 系"), options, pinyin, lookUpMode = mode)
 
     @Test
@@ -169,6 +170,12 @@ class TableLookUpModeTest {
         val alone = TableSession(dictionary("trnt 我"), TableOptions.WUBI)
         alone.apply(Action.LookUp)
         assertFalse(alone.type("wo").second.lookingUp)
+        // 五笔 and 五笔拼音 have no 拼 key: a LookUp there turns nothing on
+        for (options in listOf(TableOptions.WUBI, TableOptions.WUBI_PINYIN)) {
+            val keyless = TableSession(dictionary("trnt 我"), options, Pinyin(), lookUpMode = TableSession.LookUpMode())
+            keyless.apply(Action.LookUp)
+            assertFalse(options.toString(), keyless.type("wo").second.lookingUp)
+        }
     }
 
     @Test
@@ -244,8 +251,8 @@ class TableLookUpModeTest {
                 // t, as trnt 我 starts: a code the table has (a key no code starts is the app's, and z after it would look up)
                 Row("五笔's wildcard is a letter, z: past the first key it is still a code", { wubi() }, "tz", false),
                 Row(
-                    "五笔拼音's z past the first key is pinyin's: looked up",
-                    { TableSession(dictionary("trnt 我", "@wo 我", header = mapOf("拼音" to "@")), TableOptions.WUBI_PINYIN, Pinyin(), lookUpMode = TableSession.LookUpMode()) },
+                    "a table spelling pinyin: z past the first key is pinyin's, looked up",
+                    { TableSession(dictionary("trnt 我", "@wo 我", header = mapOf("拼音" to "@")), TableOptions.WUBI_PINYIN.copy(lookUpKey = true), Pinyin(), lookUpMode = TableSession.LookUpMode()) },
                     "tz", true,
                 ),
             ),

@@ -40,6 +40,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
+import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSlips
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -165,6 +166,19 @@ internal val COMMANDS = listOf(
         if (r.samplesSkipped > 0) out.appendLine("${r.samplesSkipped} samples left out: their syllables are not one a character")
         out.appendLine(r.stepsRow())
         o["misses"]?.let { path -> File(path).printWriter().use { w -> r.misses.forEach(w::println) } }
+        0
+    },
+    Command("table-offers", "<pinyin.data> <set.tsv> <x.data> [--names <names.txt>]", 3..3, "names") { args, out, _ ->
+        val (dataPath, setPath, tablePath) = args.operands
+        val data = loadData(dataPath)
+        val words = TextWords(data.model, data.wordIndex)
+        val run = TableOfferRun(TableDictionary(CodeTable.load(mapFile(tablePath))), TableOptions.WUBI) { words.boundaries(it) }
+        val names = args.options["names"]?.let { path -> File(path).readLines().map(String::trim).filter(String::isNotEmpty) }.orEmpty()
+        val r = run.run(readSet(setPath).map { it.expected }, names)
+        fun pct(n: Int, of: Int) = String.format(Locale.ROOT, "%.1f%%", if (of == 0) 0.0 else 100.0 * n / of)
+        out.appendLine("offered after a character   ${r.offeredAt} of ${r.positions} (${pct(r.offeredAt, r.positions)}), ${r.words} words")
+        out.appendLine("offered at a sentence's end ${r.offeredAtEnd} of ${r.sentences} (${pct(r.offeredAtEnd, r.sentences)})")
+        if (names.isNotEmpty()) out.appendLine("names offered whole         ${r.namesOffered} of ${r.names} (${pct(r.namesOffered, r.names)})")
         0
     },
     Command("predict-learn", "<pinyin.data> <set.tsv> [--user-weight <w>] [--continuations on|off]", 2..2, "user-weight", "continuations") { args, out, _ ->

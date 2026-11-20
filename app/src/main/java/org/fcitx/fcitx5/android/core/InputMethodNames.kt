@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import android.content.Context
+import android.content.res.Resources
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
@@ -34,8 +35,10 @@ object InputMethodNames {
         InputMethodCatalog.ENGLISH to R.string.im_english,
     )
 
-    fun of(context: Context, uniqueName: String, fallback: String): String =
-        names[uniqueName]?.let(context::getString) ?: fallback
+    fun of(context: Context, uniqueName: String, fallback: String): String = names[uniqueName]?.let(context::getString) ?: fallback
+
+    fun of(res: Resources, uniqueName: String, fallback: String): String =
+        names[uniqueName]?.let(res::getString) ?: fallback
 
     fun of(context: Context, entry: InputMethodEntry) = of(context, entry.uniqueName, entry.displayName)
 }

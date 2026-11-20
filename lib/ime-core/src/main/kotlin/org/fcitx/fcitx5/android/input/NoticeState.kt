@@ -73,6 +73,9 @@ class NoticeState<U : Any> {
         leaving = false
     }
 
+    /** Whether a button of the notice shown takes a tap: not once it is going. */
+    fun choose(): Boolean = !leaving
+
     /** One replaced, fading, has lapsed: its act stands. */
     fun undo(undo: U): Boolean {
         if (pending !== undo) return false
@@ -89,5 +92,8 @@ class NoticeState<U : Any> {
 
         // a line said, with nothing to reach for
         const val SAID_MS = 1000L
+
+        /** Words offered to remember: no time of their own; a key, another field or the keyboard going puts them away. */
+        const val STAYS = Long.MAX_VALUE
     }
 }

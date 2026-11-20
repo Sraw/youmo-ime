@@ -46,6 +46,9 @@ interface CandidateList {
     /** 联想's words with nothing typed: the bar's × drops them. */
     val predicting: Boolean get() = false
 
+    /** The one the bar draws as the first; -1 none. */
+    val lead: Int get() = 0
+
     val pageable: Boolean get() = false
 
     /** What the paged window's orientation follows when automatic (Unicode's: vertical). */

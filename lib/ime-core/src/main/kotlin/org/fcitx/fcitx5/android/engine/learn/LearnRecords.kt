@@ -35,6 +35,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.PinRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Restored
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.StatRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlock
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableForget
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableOrderReset
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableBlockRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
@@ -54,8 +55,8 @@ import java.io.DataOutputStream
  * only while bytes remain ([intOr], [utfOr]): an older reader stops before them, as [RecordFormat.read]
  * does not require reading a record to its end. An appended field may be omitted when empty only while
  * it is the type's last: [Commit.continued] is written only when present, so the next field appended to
- * a commit needs it always written first, "" too. Types are never reused. Allocated: events 1–16 (16
- * [PHRASE_FORGET]) and 28 ([EN_CORRECT]); events 17–27, 29–31 free (31 the last event type); rows 32–49
+ * a commit needs it always written first, "" too. Types are never reused. Allocated: events 1–17 (17
+ * [TABLE_FORGET]) and 28 ([EN_CORRECT]); events 18–27, 29–31 free (31 the last event type); rows 32–49
  * (49 [PHRASE_ROW]), 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup file's
  * ([backup.LearnBackup]; 73 [backup.BackupMerge.ORIGIN] the one a log may also hold, 74 its END, 75–79
  * reserved for the file), never a log's. Free rows: 50–64, 66–69, 81 on. Only snapshot rows name a kind
@@ -93,7 +94,10 @@ object LearnRecords {
     /** [PhraseForget]. */
     const val PHRASE_FORGET: Byte = 16
 
-    // 17–27 free (see the class's allocation)
+    /** [TableForget]. */
+    const val TABLE_FORGET: Byte = 17
+
+    // 18–27 free (see the class's allocation)
     const val EN_CORRECT: Byte = 28
 
     /** A snapshot's rows are of this type and after: its [HEAD] first, its [CUT] last. */
@@ -137,6 +141,7 @@ object LearnRecords {
         is NoPredict -> NO_PREDICT
         is TableOrderReset -> TABLE_ORDER_RESET
         is TableBlock -> TABLE_BLOCK
+        is TableForget -> TABLE_FORGET
         is EnCommit -> EN_COMMIT
         is EnForget -> EN_FORGET
         is EnAdd -> EN_ADD
@@ -212,6 +217,7 @@ object LearnRecords {
                 writeInt(r.minute)
                 writeInt(r.day)
                 writeUTF(r.text)
+                writeBoolean(!r.older)
             }
             is PhraseForget -> {
                 writeInt(r.minute)
@@ -223,15 +229,7 @@ object LearnRecords {
                 writeUTF(r.text)
                 writeBoolean(r.on)
             }
-            is TableOrderReset -> {
-                writeInt(r.minute)
-                writeUTF(r.im)
-            }
-            is TableBlock -> {
-                writeInt(r.minute)
-                listOf(r.im, r.code, r.text).forEach(::writeUTF)
-                writeBoolean(r.on)
-            }
+            is TableOrderReset, is TableBlock, is TableForget -> table(r)
             is EnCommit -> {
                 stamp(r.seq, r.minute, r.day, r.localDay)
                 writeByte(r.flags)
@@ -256,6 +254,25 @@ object LearnRecords {
             is Restored -> writeInt(r.minute)
             is ImportBatch, is Imported, is ImportUndo, is Absorbed -> bulk(r)
             else -> rowFields(r, kind)
+        }
+    }
+
+    private fun DataOutputStream.table(r: LearnRecord) {
+        when (r) {
+            is TableOrderReset -> {
+                writeInt(r.minute)
+                writeUTF(r.im)
+            }
+            is TableBlock -> {
+                writeInt(r.minute)
+                listOf(r.im, r.code, r.text).forEach(::writeUTF)
+                writeBoolean(r.on)
+            }
+            is TableForget -> {
+                writeInt(r.minute)
+                listOf(r.im, r.code, r.text).forEach(::writeUTF)
+            }
+            else -> error("not one: $r")
         }
     }
 
@@ -529,7 +546,7 @@ object LearnRecords {
                     Undo(seq, minute, day, localDay, nested(nested), List(readUnsignedShort()) { before() })
                 }
                 PIN -> Pin(readInt(), readInt(), code(), readUTF(), readUTF(), readBoolean())
-                FORGET -> Forget(readInt(), readInt(), readUTF())
+                FORGET -> Forget(readInt(), readInt(), readUTF(), older = available() == 0 || !readBoolean())
                 NO_PREDICT -> NoPredict(readInt(), readUTF(), readUTF(), readBoolean())
                 TABLE_ORDER_RESET -> TableOrderReset(readInt(), readUTF())
                 EN_COMMIT -> EnCommit(readLong(), readInt(), readInt(), readInt(), readUnsignedByte(), readUTF(), readUTF(), readUTF(), readUnsignedByte())
@@ -549,6 +566,7 @@ object LearnRecords {
             when (type) {
                 TABLE_BLOCK -> TableBlock(readInt(), readUTF(), readUTF(), readUTF(), readBoolean())
                 PHRASE_FORGET -> PhraseForget(readInt(), readUTF())
+                TABLE_FORGET -> TableForget(readInt(), readUTF(), readUTF(), readUTF())
                 EN_CORRECT -> EnCorrect(readInt(), readUTF())
                 else -> Unknown(type, ByteArray(available()).also { readFully(it) })
             }

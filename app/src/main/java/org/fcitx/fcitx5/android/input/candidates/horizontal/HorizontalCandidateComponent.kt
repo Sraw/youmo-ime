@@ -128,7 +128,7 @@ class HorizontalCandidateComponent :
             // stretched over the small leftover beside ⌄ only when more wait behind it: a short list that fits whole stays packed
             layoutManager.grows = { shown -> CandidateSpacing.stretches(shown, total) }
         }
-        adapter.updateCandidates(candidates, total)
+        adapter.updateCandidates(candidates, total, data.lead)
         // an empty list told at once: the layout after it may wait for the next frame
         if (candidates.isEmpty()) {
             refreshExpanded(0)

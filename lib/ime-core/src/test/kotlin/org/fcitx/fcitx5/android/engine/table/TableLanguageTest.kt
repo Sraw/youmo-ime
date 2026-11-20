@@ -215,7 +215,7 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `forgetting a table entry forgets it everywhere, as every input method learned it, once learned while ordering by use`() {
+    fun `forgetting a table entry forgets its order under the code alone, once learned while ordering by use`() {
         val forgotten = ArrayList<String>()
         val shared = object : SharedWords by SharedWords.NONE {
             override fun forget(text: String) {
@@ -232,7 +232,9 @@ class TableLanguageTest {
         val again = s.type("abcd").second.candidates.indexOf("山")
         assertTrue(Offer.FORGET in s.offers(again))
         s.apply(Action.Forget(again))
-        assertEquals(listOf("山"), forgotten)
+        // pinyin's learning of 山 is pinyin's: nothing forgotten everywhere, the order here is
+        assertEquals(emptyList<String>(), forgotten)
+        assertFalse(Offer.FORGET in s.offers(s.type("abcd").second.candidates.indexOf("山")))
         // 调频 off: the table's order is all there is, nothing of its own to forget
         val fixed = TableSession(table, TableOptions.WUBI.copy(orderByUse = false), language = language(learner.model, habits = learner.habits))
         assertTrue(fixed.type("abcd").second.candidates.indices.none { Offer.FORGET in fixed.offers(it) })

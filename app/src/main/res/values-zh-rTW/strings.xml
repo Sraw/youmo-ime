@@ -446,6 +446,9 @@
     <plurals name="learning_why_used">
         <item quantity="other">最近在這串鍵下用過 %d 次</item>
     </plurals>
+    <plurals name="learning_why_remembered">
+        <item quantity="other">你在%1$s裡記住的詞，最近在這串鍵下用過 %2$d 次</item>
+    </plurals>
     <plurals name="learning_why_phrase">
         <item quantity="other">這段話你完整打過 %d 次</item>
     </plurals>
@@ -1553,4 +1556,12 @@
     <string name="layout_finding_full_lacks">數字鍵盤缺 %1$s：數字框裡打不出來（比如金額的負號、小數點）</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 內建的一樣）</string>
     <string name="layout_finding_split_scaled">分體時這一行在「%2$s」有 %1$s 個鍵，不是 9 或 10 個，分不成左右兩半，只能整行縮小</string>
+    <string name="word_offer">記住：</string>
+    <string name="word_offer_said">可以記住：%1$s，%2$s編碼 %3$s</string>
+    <string name="word_remembered">記住了『%1$s』：%2$s %3$s</string>
+    <string name="im_space_picks_prediction">空格上屏聯想詞</string>
+    <string name="im_space_picks_prediction_summary">聯想詞顯示時，按空格上屏第一個聯想詞。碼表自動上屏後緊接的空格、剛上屏後馬上按的空格，仍是空格</string>
+    <string name="im_offer_words">逐字打出後給出組詞</string>
+    <string name="im_offer_words_summary">一個字一個字打出 2～4 個字後停一下，鍵盤上方給出連起來的詞和它的編碼，點了才記住</string>
+    <string name="word_table_code_hint">碼表裡也能打這個詞，編碼按組詞規則自動算，不用填</string>
 </resources>

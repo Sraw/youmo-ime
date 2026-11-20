@@ -63,7 +63,8 @@ internal fun savedLog(vararg phrases: Pair<String, String>, im: String = "engine
 }
 
 /** This table's saved phrases read from [log], a forget written back to it. */
-internal fun TableDictionary.savedIn(log: LearnLog, im: String = "engine-wubi") = SavedPhrases(this, im, { log.state }, log::dropTableWords)
+internal fun TableDictionary.savedIn(log: LearnLog, im: String = "engine-wubi") =
+    SavedPhrases(this, im, { log.state }, log::dropTableWords) { code, text -> log.rememberTableWord(im, code, text) }
 
 /** What an older build saved in this table: [phrases] as code and text. */
 internal fun TableDictionary.savedBefore(vararg phrases: Pair<String, String>, im: String = "engine-wubi") = savedIn(savedLog(*phrases, im = im), im)

@@ -74,7 +74,7 @@ class FacadeShotsTest {
             oneHanded = SplitKeyboard.Dock.LEFT, dock = SplitKeyboard.Dock.FULL, dark = true, flat = true,
             input = Input(
                 ime = "table", scheme = "Ziranma", schemeTypes = setOf("semicolon"), table = "wbx", tableExtra = "x", roots = true,
-                field = null, action = "send", voice = true, holdVoice = true, langKey = false, composing = true, lookingUp = true, pad = "phone",
+                field = null, action = "send", voice = true, holdVoice = true, langKey = false, composing = true, lookingUp = true, tableLookUp = true, pad = "phone",
             ),
             shift = Shift.Lock,
             texts = Texts(
@@ -165,6 +165,7 @@ object FacadeShots {
             s("table", i.table, d.table), s("tableExtra", i.tableExtra, d.tableExtra), b("roots", i.roots, d.roots),
             s("field", i.field, d.field), s("action", i.action, d.action), b("voice", i.voice, d.voice), b("holdVoice", i.holdVoice, d.holdVoice),
             b("langKey", i.langKey, d.langKey), b("composing", i.composing, d.composing), b("lookingUp", i.lookingUp, d.lookingUp),
+            b("tableLookUp", i.tableLookUp, d.tableLookUp),
             s("pad", i.pad, d.pad),
         )
     }

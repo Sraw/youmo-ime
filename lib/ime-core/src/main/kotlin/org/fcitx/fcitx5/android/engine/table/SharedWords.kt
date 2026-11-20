@@ -23,8 +23,6 @@ interface SharedWords {
 
     fun forget(text: String)
 
-    fun learned(text: String): Boolean = false
-
     /** Starts what [words] needs in the background as the table comes up: made at the first key, it came too late for the first code. */
     fun prepare() = Unit
 

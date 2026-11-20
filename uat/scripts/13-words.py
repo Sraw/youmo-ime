@@ -9,7 +9,7 @@ import tempfile
 import time
 import unicodedata
 
-from uat import Blocked, PKG, case, check, ensure_ime, first, home, pinyin_keyboard, sym_char, in_picker, to_downloads
+from uat import Blocked, PKG, case, check, ensure_ime, first, home, pinyin_keyboard, script, sym_char, in_picker, to_downloads
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fixtures")
 DOWNLOAD = "/sdcard/Download"
@@ -1019,3 +1019,27 @@ def wd57(d):
     check(rare_note(s) == first_note, f"恢复默认后页顶：{rare_note(s)!r}，原来 {first_note!r}")
     check(any(n.text == "撤销" for n in s.app()), "恢复默认后底部没有「撤销」")
     return f"搜 da {len(found)} 格；{first_note.split(' · ')[0]}"
+
+
+@case("WD-66", base="B0-五笔", mutates="learn", clean=True)
+def wd66(d):
+    tables = script("10-tables")
+    tables.wang_xiao_ming(d)
+    tables.offer(d, "汪小明 iije", "给出「汪小明」")
+    tables.remember(d, "汪小明 iije")
+    d.clear()
+    user_lexicon(d, "自动学到的词")
+    # dated after the code: 五笔 · iije · 最近用于 …
+    d.tap_text("五笔 · iije", contains=True, after=1.0)
+    menu = [x.text for x in d.screen().nodes if x.text]
+    d.shot("full", "码表记住的「汪小明」：五笔 · iije，菜单里没有编辑")
+    check("编辑" not in menu, f"码表的词有编辑：{menu[:12]}")
+    check("删除" in menu, f"菜单里没有删除：{menu[:12]}")
+    d.back(after=0.8)
+    user_lexicon(d, "手动添加的词")
+    fab(d)
+    hint = [t for t in d.screen().texts() if "码表里也能打这个词" in t]
+    d.shot("full", "加词：拼音框下面的说明")
+    check(hint, "加词框里没有码表的说明")
+    d.back(after=0.6)
+    return f"菜单 {[t for t in menu if len(t) < 6][:6]}；说明 {hint}"

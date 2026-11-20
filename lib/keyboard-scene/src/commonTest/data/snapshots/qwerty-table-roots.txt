@@ -290,17 +290,17 @@ key l kind=letter a11y="l，l"
     text "l" 991.38,223.78 system 700 28 #ff7a858a
   pressed
     +2 fill rect(925.88,194.38,1018.13,332.63 r=10.5,10.5,10.5,10.5) #1f000000
-key lookup kind=function role=lookup a11y="拼"
+key shift kind=function role=shift a11y="a11y_key_shift"
   bounds 0,351,162,527
   shape rect(7.88,369.38,154.13,508.63 r=10.5,10.5,10.5,10.5)
   hit rect(0,351,162,527)
   anchor 81,439 up 0,-1
-  actions send="code:U+F0104"
-  text label="拼"
+  actions double-tap="caps:lock" send="caps"
+  shortcut="fn/shift"
   normal
     shadow rect(7.88,369.38,154.13,511.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4
     fill rect(7.88,369.38,154.13,508.63 r=10.5,10.5,10.5,10.5) #ffdfe2e4
-    text "拼" 56.19,456.72 system 700 47.25 #ff7a858a
+    icon shift 49.5,407.5,112.5,470.5 #ff7a858a
   pressed
     +2 fill rect(7.88,369.38,154.13,508.63 r=10.5,10.5,10.5,10.5) #1f000000
 key z kind=letter a11y="z，z"

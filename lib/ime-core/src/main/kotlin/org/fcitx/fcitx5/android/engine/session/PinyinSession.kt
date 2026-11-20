@@ -73,6 +73,10 @@ class PinyinSession(
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
     private val user: UserModel? = null,
     private val prediction: Boolean = true,
+    /** 空格上屏联想词: a space takes the first prediction shown, unless it came just now or a space just took one. */
+    private val spacePicksPrediction: Boolean = false,
+    /** A clock that does not jump: how long predictions have shown. */
+    private val uptime: () -> Long = JvmClock::uptimeMillis,
     /** The prior per layer the scores go through; no longer learned. */
     prior: LayerPrior? = null,
     private val phraseBook: PhraseBook = PhraseBook(),
@@ -172,7 +176,34 @@ class PinyinSession(
 
     override var learning = true
 
+    // 空格上屏联想词: when the predictions shown came, and whether a space just took one
+    private var predictionsAt = 0L
+    private var spacePicked = false
+
     override fun apply(action: Action): Snapshot {
+        val was = if (predicting) candidates.map { it.text } else null
+        val at = uptime()
+        val picks = action is Action.Key && action.char == ' ' && spacePicksNow() && at - predictionsAt >= SPACE_PICK_AFTER_MS
+        val s = if (picks) {
+            recorder.settle()
+            pick(spaceTakes())
+        } else {
+            // still picked while the space after a pick is applied: its endsInput must not read it
+            applied(action)
+        }
+        // the field's report of the pick's commit is no new step: the next space is still a space
+        if (action !is Action.Context) spacePicked = picks
+        // each new round of predictions, a tapped one's next too: a space right after it is still a space
+        if (predicting && candidates.map { it.text } != was) predictionsAt = at
+        return if (spacePicksPrediction && predicting) s.copy(spacePicks = if (spacePicksNow()) spaceTakes() else -1, spaceMarks = true) else s
+    }
+
+    // the first prediction that is no emoji; -1 none
+    private fun spaceTakes() = if (predicting) candidates.indexOfFirst { c -> c.text.any(Character::isLetter) } else -1
+
+    private fun spacePicksNow() = spacePicksPrediction && predicting && input.isEmpty() && !spacePicked && spaceTakes() >= 0
+
+    private fun applied(action: Action): Snapshot {
         // a Backspace's whole deletions taken back now that no context says otherwise; a Reset too, since the host
         // posts one before a cursor report's context
         if (action !is Action.Context) recorder.settle()
@@ -187,7 +218,7 @@ class PinyinSession(
 
     private fun act(action: Action): Snapshot = when (action) {
         Action.Refine -> refine()
-        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.NineKey, Action.LookUp -> snapshot()
+        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> snapshot()
         is Action.Key -> type(action.char, action.glided, action.at, action.touch)
         is Action.Letter -> letter(action.letter, action.again, glided = action.glided)
         Action.Backspace -> backspace()
@@ -327,7 +358,7 @@ class PinyinSession(
     override fun endsInput(c: Char): Boolean = !reads(c) || !segmenter.readsAfter(input.substring(readFrom(), cursor), c)
 
     // a zhuyin tone with nothing typed is not typed (it would go unseen); a separator only after something typed
-    override fun reads(c: Char): Boolean = readsKey(c) || input.isNotEmpty() && separates(c, nineKeys?.oneSeparates == true) || c == ' ' && keyed?.tonesBySpace(input.substring(readFrom(), cursor)) == true
+    override fun reads(c: Char): Boolean = c == ' ' && spacePicksNow() || readsKey(c) || input.isNotEmpty() && separates(c, nineKeys?.oneSeparates == true) || c == ' ' && keyed?.tonesBySpace(input.substring(readFrom(), cursor)) == true
     private fun readsKey(c: Char) = segmenter.reads(c) && (input.isNotEmpty() || ZhuyinKeys.toneOf(c) == 0)
 
     override fun candidates(from: Int, count: Int): List<Choice> {
@@ -956,6 +987,9 @@ class PinyinSession(
     }
 
     companion object {
+        // predictions shown less than this: a space is a space (two quick spaces after a pick add no unseen word)
+        private const val SPACE_PICK_AFTER_MS = 300L
+
         const val DEFAULT_PAGE_SIZE = 5
 
         /** The nine keys' 分词 key: a separator while something is typed, the app's 1 otherwise. */

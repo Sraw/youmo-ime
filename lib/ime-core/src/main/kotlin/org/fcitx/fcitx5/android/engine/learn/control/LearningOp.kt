@@ -161,8 +161,11 @@ enum class BlockScope {
     UNDER_CODE,
 }
 
-/** Why a candidate is where it is: its [tier] (null: unknown), [uses] under [code] in the last 30 typing days; for a whole phrase's rest, [whole] and its whole commits. */
-data class Why(val tier: HabitRanker.Tier?, val uses: Int = 0, val code: Code? = null, val whole: String = "")
+/**
+ * Why a candidate is where it is: its [tier] (null: unknown), [uses] under [code] in the last 30 typing days; for a whole phrase's rest, [whole] and its whole commits;
+ * [remembered] a table's word the user had it remember under [code].
+ */
+data class Why(val tier: HabitRanker.Tier?, val uses: Int = 0, val code: Code? = null, val whole: String = "", val remembered: Boolean = false)
 
 /** A pin ([code], word), a word [blocked] under a table's [code], or a prediction off after [prev]. */
 data class ListedItem(val code: Code?, val prev: String, val text: String, val reading: String = "", val blocked: Boolean = false)

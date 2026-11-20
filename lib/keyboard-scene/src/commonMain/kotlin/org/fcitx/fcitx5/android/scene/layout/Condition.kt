@@ -38,7 +38,7 @@ data class Condition(val anyOf: List<List<Term>>) {
         /** Flags: set or not. */
         val FLAGS = setOf(
             "roots", "compact", "landscape", "split", "floating", "one-handed", "voice", "hold-voice", "lang-key",
-            "composing", "looking-up", "shifted", "caps-lock",
+            "composing", "looking-up", "table-lookup", "shifted", "caps-lock",
         )
 
         private val VALUE = Regex("[A-Za-z0-9_-]+")

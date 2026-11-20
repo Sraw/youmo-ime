@@ -15,7 +15,7 @@ class LatinSyncTest : EnginesFixture() {
 
     private val log = LearnLog(null)
     private val englishUser = EnglishUser { log }
-    private val lexicon = UserLexicon(null, {}, { null }, EngineAssets(::load, {}, null), forgetInTables = {}, dropSessions = {})
+    private val lexicon = UserLexicon(null, {}, { null }, EngineAssets(::load, {}, null), dropSessions = {})
     private val latin = LatinSync { false }
 
     private fun sync() = latin.sync(true, englishUser, { log.state }, lexicon)

@@ -9,7 +9,9 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.daemon.HostConnection
+import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.control.BlockScope
 import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu
 import org.fcitx.fcitx5.android.engine.learn.control.LearningMenu.Reason
@@ -139,6 +141,11 @@ class CandidateLearningMenu(
         Reason.DICTIONARY -> context.getString(R.string.learning_why_dictionary)
         Reason.PREDICTION -> context.getString(R.string.learning_why_prediction)
         Reason.PHRASE -> (why?.uses ?: 0).let { context.resources.getQuantityString(R.plurals.learning_why_phrase, it, it) }
+        Reason.REMEMBERED -> {
+            val im = Kinds.tableOf(why?.code?.kind.orEmpty())
+            val uses = why?.uses ?: 0
+            context.resources.getQuantityString(R.plurals.learning_why_remembered, uses, InputMethodNames.of(context, im, im), uses)
+        }
         Reason.UNKNOWN -> context.getString(R.string.learning_why_unknown)
     }
 }

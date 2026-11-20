@@ -102,9 +102,6 @@ open class EnginesFixture {
     // warm-ups run in place: [loaded] is complete before a test looks
     protected val inPlace = Executor { it.run() }
 
-    // 五笔 shown, not a code's one candidate committing itself and leaving none to look at
-    protected val wubiShown = EngineSettings(tables = mapOf("Wubi" to TableSettings(autoSelect = false)))
-
     // 调频 [on] for Wubi, what kkkk shows then
     protected fun byUse(engines: Engines, on: Boolean): List<String> {
         engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.RESET, 0)
@@ -161,3 +158,6 @@ internal fun records(dir: UserFiles): List<LearnRecord> {
 internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
 internal fun Engines.type(im: String, keys: String) = keys.map { onEvent(im, EngineEvent.CHAR, it.code) }.last()
+
+// 五笔 shown, not a code's one candidate committing itself and leaving none to look at
+internal val wubiShown = EngineSettings(tables = mapOf("Wubi" to TableSettings(autoSelect = false)))

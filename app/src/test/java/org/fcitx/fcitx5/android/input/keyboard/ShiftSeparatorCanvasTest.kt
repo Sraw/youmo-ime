@@ -123,7 +123,7 @@ class ShiftSeparatorCanvasTest {
         val builtIn = BuiltInLayouts(app)
         val own = builtIn.text("qwerty")!!.lines()
             .filterNot { "id=\"apostrophe\"" in it || "shortcut=\"separator\"" in it }
-            .joinToString("\n").replace("when=\"!table !composing\"", "when=\"!table\"")
+            .joinToString("\n").replace("when=\"!table !composing, table !table-lookup\"", "when=\"!table, table !table-lookup\"")
         val real = SceneLayouts.source
         SceneLayouts.source = {
             object : LayoutSource {
@@ -163,7 +163,7 @@ class ShiftSeparatorCanvasTest {
         val builtIn = BuiltInLayouts(app)
         val own = builtIn.text("qwerty")!!
             .replace("width=\"1.5\" icon=\"{shift-icon}\"", "width=\"1\" icon=\"{shift-icon}\"")
-            .replace("when=\"!table !composing\"", "when=\"!table\"")
+            .replace("when=\"!table !composing, table !table-lookup\"", "when=\"!table, table !table-lookup\"")
             .replace("id=\"apostrophe\" role=\"apostrophe\" kind=\"function\" width=\"1.5\"", "id=\"apostrophe\" role=\"apostrophe\" kind=\"function\" width=\"0.5\"")
         val real = SceneLayouts.source
         SceneLayouts.source = {

@@ -17,9 +17,13 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 剪贴板加了 **收藏**：面板栏上分「最近」「收藏」两页，在最近里长按一条选 **收藏**，它就一直留着，不算进上限，清空最近也不影响；收藏里能 **取消收藏**（可撤销）、**移到最前**。以前置顶的条目升级后在收藏里。恢复备份时收藏和手机上的合并，手机上的收藏（包括敏感的）都留着。关掉「记录剪贴板历史」后收藏照样能用。
 - 九键、14 键、18 键的拼音也能中英混输了：按英文词每个字母所在的键，比如九键 `474663` 出 iPhone，`9633474663` 出「我的iPhone」，和全键盘一样由 **中英混输** 开关管，也打得出英文里学到的词。编码行上英文那段显示小写字母，按回车上屏的就是它（`iphone`）。
 - 语音把听到的换成你的同音词时看整句：说得通才换，不再一见到同音就换。加了「攻势」，「敌人的公式很猛」打成「敌人的攻势很猛」，「推导这个公式」照样是「公式」；手动加的词比打字学成的更容易换。语音在那儿不肯换、你删掉重打成你的词时，会问「以后总是把『公式』写成『攻势』？」（语音在那儿会换的，问「记住」），点 **总是换** 以后这个词不看整句、总是换；在 **用户词库 → 手动添加的词** 里点这个词选 **取消语音总是换** 可以取消。
+- 码表（五笔、二笔、五笔拼音等）逐字打出一个词后停一下，键盘上方的提示条给出「记住：汪小明 iije」，点了才记住，以后按组词规则的编码打得出；不点什么都不存，提示条在接着按键、换输入框、收起键盘时收起。记住的词在自动学到的词里带日期，长按选 **为什么排在这** 写着「你在五笔里记住的词」。码表里的 **忘掉学到的** 只忘掉这个编码下学到的顺序，不再连拼音里学到的一起忘掉。点错了可以在提示条上撤销，长按这个候选选 **删除**，或在 **用户词库 → 自动学到的词** 里删掉。每个码表的设置里有 **逐字打出后给出组词**，默认开。
+- 新开关 **空格上屏联想词**（**通用输入**，默认关）：开着时上屏后的联想第一个词画成首选的样子，按空格上屏它，不加空格。
 
 ### 小改动
 
+- 五笔、五笔拼音键盘上原来「拼」键的位置换回 ⇧，五笔照样用 z 反查拼音；五笔拼音本来就能直接打拼音，不再有反查。二笔、仓颉、自然码的「拼」键不变。以前做的主题包（已装的、备份里的、再导入的）也这样画。
+- 添加词的拼音框下面说明：码表里也能打这个词，编码自动算。
 - 0.4 及更早的版本不能再直接升级到这一版：先覆盖安装 0.6.2，弹出键盘打几个字、停一下，再装这一版。直接升级的话，码表里存的词等会丢掉，也没有提示。
 - 0.6.0 测试版里改过的长按和滑动不再带过来：回到从 0.5 带过来的设置，没有的用预设；测试版里清空过的列表也不再是关着的。0.6.0 正式版及以后改的照旧都在。
 - 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
@@ -48,9 +52,13 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 - 中英混输 on pinyin's nine, 14 and 18 keys: tap the keys of an English word's letters, as `474663` for iPhone or `9633474663` for 我的iPhone on the nine keys, under the same **中英混输** switch as the full keyboard, words learned in English included. The code row shows such a word in lower case, and Enter commits that (`iphone`).
 - Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」: tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
+- In a table (Wubi, Erbi, Wubi-Pinyin and the others), a word typed a character at a time is offered on the notice strip above the keys after a pause, as 「记住：汪小明 iije」. It is remembered only when tapped, under the code its rules give, and nothing is kept otherwise; the strip goes at the next key, a field change or the keyboard closing. A remembered word shows its date in the learned words, and **为什么排在这** names it remembered. A table's **忘掉学到的** forgets the order under that code alone, no longer what pinyin learned. A mistaken tap is undone on the strip, or deleted by long-pressing the candidate (**删除**) or in **用户词库 → 自动学到的词**. Each table's settings have **逐字打出后给出组词**, on by default.
+- A new switch, **空格上屏联想词** (**通用输入**, off by default): the first word predicted after a commit is drawn as the first choice and Space puts it in, with no space after it.
 
 ### Smaller changes
 
+- Wubi and Wubi-Pinyin have ⇧ again where the 拼 key was. Wubi still looks pinyin up behind z; Wubi-Pinyin types pinyin directly and has no lookup. Erbi, Cangjie and Ziranma keep the 拼 key. Theme packs made earlier (installed, restored or imported again) draw it the same way.
+- The pinyin field of the add-word dialog says that the tables type the word too, with its code worked out.
 - 0.4 and earlier no longer upgrade straight to this release: install 0.6.2 over it first, type a few characters on its keyboard and pause, then install this one. Upgraded directly, the phrases saved in the tables, among others, are lost without a word.
 - Long press and swipe lists edited in the 0.6.0 betas are no longer carried over: they go back to what 0.5 left, or else the presets, and a list emptied in a beta is no longer turned off. Edits from 0.6.0 on stay.
 - The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.

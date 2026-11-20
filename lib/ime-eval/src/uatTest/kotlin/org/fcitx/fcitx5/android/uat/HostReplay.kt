@@ -13,7 +13,9 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
+import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.session.WordOffer
 import org.fcitx.fcitx5.android.host.CandidateEntry
 import org.fcitx.fcitx5.android.host.ChineseConverter
 import org.fcitx.fcitx5.android.host.ChineseModules
@@ -109,6 +111,12 @@ class HostReplay(
         private set
 
     val commits = ArrayList<String>()
+
+    /** A table's words to remember as last told; null once withdrawn. */
+    var offer: WordOffer? = null
+        private set
+
+    val remembered = ArrayList<OfferedWord>()
 
     private val port = object : EngineHost {
         // every call into the engines: a throw from the bar's paging is a crash as much as a key's
@@ -356,6 +364,19 @@ class HostReplay(
     private var rowCursor = -1
 
     fun backspace(times: Int = 1) = repeat(times) { tap(EngineReplay.BACKSPACE) }
+
+    /** The offer's [index]th tapped on the notice strip, the field's text before the cursor read then. */
+    fun remember(index: Int) {
+        val o = offer ?: throw AssertionError("nothing offered")
+        key(EngineReplay.symOf(Keyboard.REMEMBER), HostKeyStates.VIRTUAL, Action.Remember(o.id, index, editor.text.substring(0, editor.selectionStart)))
+        pause()
+    }
+
+    /** The notice's 撤销 after a word remembered. */
+    fun unremember(word: OfferedWord) {
+        key(EngineReplay.symOf(Keyboard.REMEMBER), HostKeyStates.VIRTUAL, Action.Unremember(word.text, word.code))
+        pause()
+    }
     fun enter() = tap(EngineReplay.RETURN)
 
     /** A chat box's send: Enter empties the box with no new input started, so the service tells the field again. */
@@ -555,6 +576,8 @@ class HostReplay(
             is HostEvent.InputMethodChanged -> {
                 if (policy.inputMethodChanged(event.im)) switched = true
             }
+            is HostEvent.WordOffer -> offer = event.offer
+            is HostEvent.WordRemembered -> remembered += event.word
             else -> {}
         }
     }

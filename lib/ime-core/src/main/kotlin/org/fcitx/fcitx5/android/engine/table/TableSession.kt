@@ -116,7 +116,14 @@ class TableSession(
     ) { learning }
 
     // compared as the record has its text (a traditional table's)
-    private val journal = FieldJournal({ habits }, language?.simplify ?: { it })
+    private val journal = FieldJournal({ habits }, language?.simplify ?: { it }, undone = { offers.undone(it) })
+
+    private val offers = Offers()
+
+    // set by [acted]: the key was a space swallowed after a self-commit
+    private var spaceTaken = false
+
+    private val spacePicks = SpacePicks()
 
     private val emojiOf: (String) -> List<String> = language?.emoji ?: { emptyList() }
     private val phrasesOf: (String) -> List<String> = language?.phrases ?: { emptyList() }
@@ -128,6 +135,7 @@ class TableSession(
 
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
+        offers.words.end()
         journal.passedOn()
         committedItselfAt = null
         selfEmoji = emptyList()
@@ -169,8 +177,130 @@ class TableSession(
     }
 
     override fun apply(action: Action): Snapshot {
+        spaceTaken = false
+        when (action) {
+            is Action.Remember -> return offers.remember(action)
+            is Action.Unremember -> return offers.unremember(action)
+            is Action.OfferShown -> return spacePicks.marked(snapshot().copy(wordOffer = offers.words.also { it.shown(action.id) }.offer))
+            else -> Unit
+        }
+        val verified = journal.journal.verified
+        return spacePicks.marked(offers.offered(action, spacePicks.apply(action), verified))
+    }
+
+    // one tap made the word, so deleting it whole right after takes it back as the notice's 撤销 would
+    private inner class Offers {
+        val words = TableWordOffers(
+            table, options, saved,
+            blocked = { code, text -> text in language?.blockedUnder?.invoke(keyed(code)).orEmpty() || shared.blocked(text) },
+            boundaries = language?.words?.let { w -> { text -> w.boundaries(text) } },
+        )
+
+        private var remembered: SavedPhrases.Tapped? = null
+
+        // the field's text reads: a tap is checked against it, so where it does not, a tap could only do nothing
+        private var reads = true
+
+        // what the run offers as [action] made [s]
+        fun offered(action: Action, s: Snapshot, verified: Boolean): Snapshot {
+            if (spaceTaken) return s.copy(wordOffer = words.offer)
+            if (action is Action.Context) reads = action.said || action.before.isNotEmpty()
+            if (words.followed(action, s, verified, composing = input.isNotEmpty())) remembered = null
+            val due = s.commit.isNotEmpty() && s.preedit.isEmpty() && s.handled && !lookingUp && offersWords() && reads
+            return if (due) s.copy(wordOffer = words.offer()) else s
+        }
+
+        private fun offersWords() = options.offerWords && learning && habits.learns && language != null
+
+        // the offer's word tapped: the characters it was typed as are taken back and it is committed whole, saved under
+        // its code; nothing if the offer, the field or the text before the cursor ([Action.Remember.before]) changed since
+        fun remember(action: Action.Remember): Snapshot {
+            val word = words.offer?.takeIf { it.id == action.id }?.words?.getOrNull(action.index)
+            words.end()
+            val idle = input.isEmpty() && !lookingUp
+            if (word == null || !learning || !idle) return snapshot()
+            val n = word.text.codePointCount(0, word.text.length)
+            val simplify = language?.simplify ?: { it }
+            if (journal.lastWhole(n)?.joinToString("") != simplify(word.text) || !action.before.endsWith(word.text)) return snapshot()
+            if (!saved.remember(word.code, word.text)) return snapshot()
+            predictions.goOnFrom(action.before.dropLast(word.text.length))
+            val first = table.match(word.code, null).firstOrNull { table.code(it) == word.code }?.let(table::text).orEmpty()
+            val h = habits
+            val commit = if (h.learns) {
+                val pick = KeyedRows.Pick(word.code, word.text, 'B', first)
+                h.record(KeyedRows.of(language?.kind.orEmpty(), listOf(pick), listOf(Word(simplify(word.text), "")), predictions.wordBefore()), flags = predictions.learnFlags)
+            } else {
+                null
+            }
+            journal.merge(n, word.text, commit)
+            predictions.wrote(word.text, language?.entryOf(word.text, theirs = true))
+            SavedPhrases.Tapped(word.text, word.code, commit).let {
+                remembered = it
+                saved.tapped = it
+            }
+            predict()
+            return snapshot(commit = word.text).copy(deleteBefore = n, remembered = word)
+        }
+
+        // the notice's 撤销: the word unsaved and its commit taken back, its text left
+        fun unremember(action: Action.Unremember): Snapshot {
+            val r = saved.tapped?.takeIf { it.text == action.text && it.code == action.code }
+            saved.forget(action.code, action.text)
+            r?.commit?.let(journal::takeBack)
+            if (remembered === r) remembered = null
+            saved.tapped = null
+            if (input.isNotEmpty()) update()
+            return snapshot()
+        }
+
+        // the remembered word deleted whole right after: unsaved with its commit
+        fun undone(commit: Commit) {
+            val r = remembered?.takeIf { it.commit === commit } ?: return
+            saved.forget(r.code, r.text)
+            remembered = null
+            if (saved.tapped === r) saved.tapped = null
+        }
+    }
+
+    // 空格上屏联想词
+    private inner class SpacePicks {
+        // when the predictions shown came, and whether a space just took one
+        private var predictionsAt = 0L
+        private var picked = false
+
+        // a space now takes the first prediction (past any emoji), unless it follows a self-commit or a space that took one
+        fun takes() = options.spacePicksPrediction && input.isEmpty() && !lookingUp && predictions.offered.isNotEmpty() &&
+            !picked && committedItselfAt == null
+
+        fun apply(action: Action): Snapshot {
+            val was = if (offering()) offeredTexts() else null
+            val picksSpace = action is Action.Key && action.char == ' ' && takes()
+            val at = now()
+            val s = if (picksSpace && at - predictionsAt >= SPACE_PICK_AFTER_MS) {
+                journal.before(action, learning)
+                committedItselfAt = null
+                unrefined.drop()
+                pickOffered(selfEmoji.size).also { picked = true }
+            } else {
+                picked = false
+                acted(action)
+            }
+            // each new round, a tapped prediction's next too: a space right after it is still a space
+            if (offering() && offeredTexts() != was) predictionsAt = at
+            return s
+        }
+
+        // the bar draws as first what a space takes, none while it would type a space
+        fun marked(s: Snapshot): Snapshot {
+            val shown = options.spacePicksPrediction && input.isEmpty() && predictions.offered.isNotEmpty()
+            return if (shown) s.copy(spacePicks = if (takes()) selfEmoji.size else -1, spaceMarks = true) else s
+        }
+    }
+
+    private fun acted(action: Action): Snapshot {
         journal.before(action, learning)
         val taken = action is Action.Key && takesSpace(action.char)
+        spaceTaken = taken
         committedItselfAt = null
         // anything but a refine slice or a cursor move changes the order to weigh
         if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined.drop()
@@ -229,7 +359,7 @@ class TableSession(
             snapshot(commit = text, handled = text.isNotEmpty())
         }
         Action.Refine -> refine()
-        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp,
+        is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown,
         Action.DropPredictions -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
         is Action.Step -> moveCursor(action.applyTo(cursor, input.length))
@@ -242,14 +372,19 @@ class TableSession(
     }
 
     /** A glide's held-back word, committed by the glide: written here, nothing learned. */
-    fun heldBack(word: String) = if (learning) journal.own(word, null) else Unit
+    fun heldBack(word: String) {
+        offers.words.end()
+        if (learning) journal.own(word, null)
+    }
 
     private fun wrote(text: String, entry: Entry?, commit: Commit? = null) = predictions.wrote(text, entry).also { journal.committed(text, commit, learning) }
 
     override fun why(index: Int): Why? = when {
         lookingUp -> lookUp!!.why(index)
         offering() -> predictions.why(index - selfEmoji.size)
-        else -> ranking[index]?.takeIf { it.phrase == null }?.let { TableHabitOrder.why(habits, keyed(input.toString()), it.text, ranked[it.text]) }
+        else -> ranking[index]?.takeIf { it.phrase == null }?.let {
+            TableHabitOrder.why(habits, keyed(input.toString()), it.text, ranked[it.text], saved.isSaved(input.toString(), it.text))
+        }
     }
 
     override fun readingOf(index: Int): List<WordReading>? = if (lookingUp) lookUp!!.readingOf(index) else null
@@ -288,8 +423,9 @@ class TableSession(
     // the code typed, never under a wildcard
     private fun offersOf(item: Item): Set<Offer> {
         val learned = when {
-            item.inTable -> options.orderByUse && habits.knows(item.text)
-            else -> saved.isSaved(item.code, item.text) || shared.learned(item.text)
+            item.inTable -> options.orderByUse && habits.knowsUnder(keyed(input.toString()), item.text)
+            // pinyin's own words are deleted in pinyin; a table deletes what it remembered
+            else -> saved.isSaved(item.code, item.text)
         }
         val keeps = habits.learns && !wild()
         return OfferRules.offers(
@@ -301,7 +437,7 @@ class TableSession(
         )
     }
 
-    override fun reads(c: Char): Boolean = if (mayTakeSpace(c)) {
+    override fun reads(c: Char): Boolean = if (mayTakeSpace(c) || c == ' ' && spacePicks.takes()) {
         true
     } else if (lookingUp) {
         lookUp!!.reads(c)
@@ -313,7 +449,7 @@ class TableSession(
 
     private fun isCode(c: Char) = c in table.keys || c == options.matchingKey || (table.pinyinMarker != null && c in 'a'..'z')
 
-    private fun modeLooksUp(c: Char) = lookUpMode.on && c in 'a'..'z'
+    private fun modeLooksUp(c: Char) = lookUpMode.on && options.lookUpKey && c in 'a'..'z'
 
     private fun startsLookUp(c: Char) = (c == options.pinyinKey || modeLooksUp(c)) && lookUp != null
 
@@ -328,7 +464,7 @@ class TableSession(
      * learned. A lookup its key started stays one either way.
      */
     private fun toggleLookUp(): Snapshot {
-        val look = lookUp ?: return snapshot()
+        val look = lookUp?.takeIf { options.lookUpKey } ?: return snapshot()
         lookUpMode.on = !lookUpMode.on
         return when {
             lookUpMode.on && !lookingUp && input.isNotEmpty() && spellsPinyin() -> {
@@ -523,9 +659,13 @@ class TableSession(
         if (!learning) return snapshot()
         val item = ranking[index] ?: return snapshot(handled = input.isNotEmpty())
         if (item.asText || Offer.FORGET !in offersOf(item)) return snapshot()
-        saved.forget(item.code, item.text)
-        // forgotten by every input method, or a saved phrase or shared word would come back
-        shared.forget(item.text)
+        if (saved.forget(item.code, item.text) != null) {
+            // the same text from pinyin's words would still show here: blocked under this code alone, pinyin's kept
+            if (shared.words(item.code).any { it.second == item.text }) habits.blockUnder(keyed(item.code), item.text, on = true)
+        } else if (item.inTable) {
+            // this code's order alone: what pinyin learned of the text is pinyin's to forget
+            habits.forgetUnder(keyed(input.toString()), item.text)
+        }
         return rankedAgain()
     }
 
@@ -636,9 +776,10 @@ class TableSession(
         // what the code does not show: blocked under it, or 生僻字屏蔽; the lone one left commits itself, a code whose one entry is held commits none
         val held = language?.held
         val hidden: (String) -> Boolean = if (held == null) blockedHere::contains else { t -> t in blockedHere || held(t) }
+        // the table's remembered words under the code as typed, a lone code's too: the user tapped to have them there.
+        // They alone join a lone code (no longer the only one, it commits nothing itself): pinyin's words and phrases stay out
+        val savedHere = saved.saved(code).filterNot { hidden(it.second) }.map { (c, text) -> Item(c, text) }
         val alone = spelt.isEmpty() && alone(coded, hidden)
-        // saved phrases are found by their plain code; the wildcard is for the table's
-        val savedHere = if (alone) emptyList() else saved.saved(code).map { (c, text) -> Item(c, text) }
         val others = if (alone) emptyList() else shared.words(code).filterNot { (c, text) -> saved.isSaved(c, text) }.map { (c, text) -> Item(c, text) }
         val noSort = minOf(code.length, options.noSortInputLength)
         val found = Found(savedHere, entries, coded.size, others)
@@ -954,6 +1095,9 @@ class TableSession(
         private const val OTHER = -1
 
         private const val SPACE_TAKEN_MS = 1000L
+
+        // predictions shown less than this: a space is a space (two quick spaces after a pick add no unseen word)
+        private const val SPACE_PICK_AFTER_MS = 300L
     }
 }
 

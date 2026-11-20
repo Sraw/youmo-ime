@@ -33,8 +33,8 @@ sealed class HostEvent {
         }
     }
 
-    /** `updateCandidatesBulk`'s first 16; [predicting]: 联想's with nothing typed, the bar shows its ×. */
-    data class Candidates(val total: Int, val candidates: List<CandidateEntry>, val predicting: Boolean = false) : HostEvent() {
+    /** `updateCandidatesBulk`'s first 16; [predicting]: 联想's with nothing typed, the bar shows its ×; [lead]: drawn as the first, -1 none. */
+    data class Candidates(val total: Int, val candidates: List<CandidateEntry>, val predicting: Boolean = false, val lead: Int = 0) : HostEvent() {
         companion object {
             val EMPTY = Candidates(0, emptyList())
         }
@@ -86,6 +86,12 @@ sealed class HostEvent {
 
     /** After a letter or digit with "half width after a letter or number" on; empty, none. */
     data class PunctuationAsTyped(val marks: Set<String>) : HostEvent()
+
+    /** A table's words to remember, shown after a pause; null withdraws the last ([org.fcitx.fcitx5.android.engine.session.Snapshot.wordOffer]). */
+    data class WordOffer(val offer: org.fcitx.fcitx5.android.engine.session.WordOffer?) : HostEvent()
+
+    /** An offered word tapped was committed and saved: the notice says so, with 撤销. */
+    data class WordRemembered(val word: org.fcitx.fcitx5.android.engine.session.OfferedWord) : HostEvent()
 
     /** Shown on the keyboard, not through the event flow. */
     data class Tip(val text: String) : HostEvent()

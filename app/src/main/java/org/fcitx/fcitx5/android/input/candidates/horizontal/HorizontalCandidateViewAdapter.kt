@@ -33,10 +33,14 @@ open class HorizontalCandidateViewAdapter(val theme: Theme, val bar: BarLook) :
     var total = -1
         private set
 
+    // drawn as the first: 空格上屏联想词 marks the prediction space takes
+    private var lead = 0
+
     @SuppressLint("NotifyDataSetChanged")
-    fun updateCandidates(data: List<CandidateWord>, total: Int) {
+    fun updateCandidates(data: List<CandidateWord>, total: Int, lead: Int = 0) {
         this.candidates = data
         this.total = total
+        this.lead = lead
         notifyDataSetChanged()
     }
 
@@ -57,7 +61,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme, val bar: BarLook) :
 
     @CallSuper
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
-        holder.update(position, candidates[position])
+        holder.update(position, candidates[position], first = position == lead)
     }
 
     @CallSuper

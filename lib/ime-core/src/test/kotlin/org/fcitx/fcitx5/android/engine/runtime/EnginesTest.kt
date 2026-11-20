@@ -617,7 +617,7 @@ class EnginesTest : EnginesFixture() {
     }
 
     @Test
-    fun aCandidateForgottenInAnyPinyinIsForgottenInTheTablesToo() {
+    fun aCandidateForgottenInAnyPinyinLeavesTheWordATableRemembered() {
         val wubi = InputMethodCatalog.WUBI
         // a table saves no single character, and the log forgets nothing by itself
         val kept = MemoryFiles()
@@ -628,7 +628,7 @@ class EnginesTest : EnginesFixture() {
         }
         for ((im, keys) in listOf(InputMethodCatalog.PINYIN to "nihao", InputMethodCatalog.T9 to "64426", InputMethodCatalog.SHUANGPIN to "nihk")) {
             val dir = MemoryFiles()
-            // a phrase 五笔 saved, its table not loaded: loaded to forget it
+            // a word 五笔 remembered: pinyin's delete is pinyin's alone
             olderPhrases(dir, "abcd" to "你好")
             Engines(::load, dir).use { engines ->
                 engines.type(im, keys)
@@ -642,7 +642,7 @@ class EnginesTest : EnginesFixture() {
             }
             Engines(::load, dir).use {
                 it.settings = wubiShown
-                assertFalse(im, "你好" in it.type(wubi, "abcd").candidates)
+                assertTrue(im, "你好" in it.type(wubi, "abcd").candidates)
             }
         }
     }

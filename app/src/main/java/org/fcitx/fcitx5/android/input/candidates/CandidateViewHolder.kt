@@ -17,13 +17,16 @@ class CandidateViewHolder(val ui: CandidateItemUi) : RecyclerView.ViewHolder(ui.
     var candidate: CandidateWord = CandidateWord.Empty
         private set
 
-    fun update(newIndex: Int, newCandidate: CandidateWord) {
+    private var first = false
+
+    fun update(newIndex: Int, newCandidate: CandidateWord, first: Boolean = newIndex == 0) {
         // a holder bound again at another index draws again where that changes its look, not only its candidate
-        val moved = (idx == 0) != (newIndex == 0) || ui.bar.labelStyle != null && idx != newIndex
+        val moved = this.first != first || ui.bar.labelStyle != null && idx != newIndex
         idx = newIndex
+        this.first = first
         if (candidate != newCandidate || moved) {
             candidate = newCandidate
-            ui.updateCandidate(newCandidate, newIndex)
+            ui.updateCandidate(newCandidate, newIndex, first)
         }
     }
 

@@ -613,7 +613,7 @@ are offered where nothing is learned (a password field, `Session.learning` false
   none of them.
 - **Sessions.** `InputMethodCatalog.PINYIN_KEYS` (`engine-pinyin#keys`, no fcitx input method; the name
   under which a setting says 「拼音 · 14 键」) is the grouped session: a `T9Segmenter` over
-  `G14`, no abbreviations, `spell = true`, wrapped in `ForgetsInTables` as the nine keys are, no
+  `G14`, no abbreviations, `spell = true`, no
   glide, no `u` stroke lookup (笔画筛选 wraps it as every pinyin session). It is made at the first code. `PINYIN_KEYS18` (`engine-pinyin#keys18`,
   「拼音 · 18 键」) is the same over `G18`, fed `Keyboard.pinyin18Key` and its taps `Keyboard.pinyin18Tap`; `T9` (`engine-t9`) survives only
   as pinyin's nine-keys session (「拼音 · 九键」), fed `Keyboard.PINYIN_NINE` — never a listed input
@@ -802,7 +802,7 @@ setting either: it reads the codes.
   routes `CUSTOM_BLOCK` and `PLACES` to it): a `T9Segmenter` over `EngineSettings.ownKeyboard` (the
   groups the app tells, `ownKeys`, rows kept, so a change of rows makes it anew; a change of `ownKeys` alone
   drops that session alone, `KeyboardPair.dropKeyed`, the field's last context told the new one), no
-  abbreviations, `spell = true`, in `ForgetsInTables`, its letters `inUse` as it is made; learned under
+  abbreviations, `spell = true`, its letters `inUse` as it is made; learned under
   `qk:<tag>` (`EnginesOwnKeysTest`). Settings naming no keyboard (none, or groups `problem` refuses):
   `Engines` swallows those codes, what is shown left as it is (no `refines` or `picked` carried), never typed as characters. The learning
   report and the learned list show a grouped kind's keys by `Kinds.keysOf` (`qk:` `filedAs`, `spk:` `grouped`).
@@ -865,8 +865,10 @@ never commits by the next-key rule (the code is being mended, not full), a lone 
 commits. `pinyinKey` (五笔 `z`, 二笔 `[`) looks a character up by pinyin, showing its code (the
 cursor then the pinyin's);
 `matchingKey` is the wildcard (五笔 `z`, 仓颉 and 二笔 `*`). The keyboard's 拼 key (`Action.LookUp`,
-`Keyboard.LOOKUP`) turns a lookup mode on and off for every table with a pinyin session (each has one
-now, 仓颉 too, made as it first looks up: `SessionFactory.MadeOnUse`): on, every letter looks up
+`Keyboard.LOOKUP`) turns a lookup mode on and off for a table with `TableOptions.lookUpKey` (二笔, 仓颉,
+自然码: the scene's `table-lookup` flag puts 拼 in ⇧'s place; 五笔 keeps `z` alone and 五笔拼音, whose pinyin
+mixes in anyway, none, both showing ⇧, whose capitals go in as they are and end a code by 顶字; each
+table's pinyin session is made as it first looks up: `SessionFactory.MadeOnUse`): on, every letter looks up
 (`PinyinLookUp.start(first =)`), a pick leaving it on; a code of letters typed when it is pressed goes
 into a lookup (one with a wildcard or `;` stays a code), a lookup it started back into a code (`drop`:
 `Session.handBack`, the pieces picked put in and learned as a pick, the code keys after them the code
@@ -879,9 +881,33 @@ preset's in a group an older config already has); 仓颉's preedit and hints are
 (`TableOptions.shown`, one character a letter, so cursors are unchanged). What the keyboard needs of
 a table is `Engines.tableKeyboard`: the mode and its roots from the settings, its non-letter code keys
 once its session is made (the table is not read to answer), the same answer while none of them changed. Characters typed one by one make no
-phrase (U-28 C46: 自动造词 and its two settings are gone; an older config's `AutoPhraseLength` and
-`SaveAutoPhraseAfter` are read by nothing); the phrases an older build saved (its FXUT log, which 0.4
-converted into the learning record's `TABLE_WORD` rows and told pinyin of) stay the table's (`SavedPhrases`).
+phrase by themselves (U-28 C46: 自动造词 and its two settings are gone; an older config's `AutoPhraseLength` and
+`SaveAutoPhraseAfter` are read by nothing): `TableWordOffers` keeps the run of one-character commits and
+offers (`Snapshot.wordOffer`, `HostEvent.WordOffer`, after the commit's events) its whole 2 to 4, its last
+3 and 2, at most two, each under its rule code (`PhraseRules`) where the table has it not, it is no
+function-word or numeral run, not blocked, and every shorter code types as before (`keepsPrefixes`). The
+app's `WordOfferGate` shows it on the notice strip 0.8 s after the last finger left (never over another
+notice, nor with touch exploration, nor over symbols; only the words the field then reads back before the
+cursor, as the tap checks them); a tap is `Keyboard.REMEMBER` with `Action.Remember(id, index, before)`,
+the text read before the cursor at the tap deciding (`CommitJournal.lastWhole`, which a passed-on key's
+unverified journal does not stop): the run's commits are taken back and the word committed and saved as
+an `Absorbed(added = [TableWordRow])`, `HostEvent.WordRemembered` after the commit; 撤销 is
+`Action.Unremember`. The strip has no timer: the next key, a field change or the keyboard closing puts it
+away. Once up the app sends `Keyboard.REMEMBER` with `Action.OfferShown(id)`, and only an offer so seen is
+not offered again in the field when withdrawn; a field read as unreadable (`Context.said` false, nothing
+before) gets none. A word so
+saved is the table's alone, may take a lone full code (D8 not applying), and ranks by the PICK rows as
+pinyin's (`TableHabitOrder`); the phrases an older build saved (its FXUT log, which 0.4
+converted into the learning record's `TABLE_WORD` rows) are the same (`SavedPhrases`). A table's delete
+forgets the row under its code alone (`Absorbed(removed)`, undoable); pinyin's deletes and `Forget`
+no longer reach the tables. A table's 忘掉学到的 is `TableForget` (type 17): the PICK stats and firsts of
+that text under that code alone, pinyin's untouched; an older build skips it. `Forget.older` marks a
+0.6.2 FORGET read back (no trailing flag), which still drops the text's table words as that build did.
+为什么排在这 on a remembered word is `Why.remembered` (`Reason.REMEMBERED`, its uses under the code). 每个码表的「逐字打出后给出组词」is `TableOptions.offerWords` (on; none
+without rules, 仓颉). 空格上屏联想词 (`EngineSettings.spacePicksPrediction`, off) has `reads(' ')` true
+while a prediction would be taken: past 0.3 s of its showing, never the space right after a table
+committed itself or after a space that took one; `Snapshot.spacePicks`/`spaceMarks` tell the bar which
+one it draws as the first (`HostEvent.Candidates.lead`).
 `SharedWords` gives every table the user's words from the other input methods, coded by its rules:
 those made, added, typed, and every word of an imported dictionary (owner, 2026-10-19), ranked after
 the table's own. A full code the table has one entry for, which commits itself, takes none of them
@@ -1265,8 +1291,8 @@ place. Rules that keep old files and old users working:
   did not open this run, `LearnLog.takesRewrites`), true when storage is
   full (writes refused, the record open), where the app tells to try again, not to restart.
   The tables (stream C) learn into the record too: a candidate's block is per code (`TableBlock`,
-  listed as `Listed.TABLE_BLOCKS`), kept by U-88/U-86 but 全部清空, which also forgets the phrases
-  an older build saved (the `TABLE_WORD` rows); 恢复码表顺序 is `LearningOp.ResetTableOrder`. Tables and
+  listed as `Listed.TABLE_BLOCKS`), kept by U-88/U-86 but 全部清空, which also forgets the words
+  remembered (the `TABLE_WORD` rows; U-88 drops those remembered from its cut on, `LogRewrites.clearSince`); 恢复码表顺序 is `LearningOp.ResetTableOrder`. Tables and
   handwriting key their 联想 by `Predictions.why` (the predictor's `after`), as pinyin, and reread.
   Pinyin's 联想 goes on from the user's own word the record has last where the decoder made it of
   several (你好 of 你 好: `PinyinSession.ownWord`), so what was put in after it, keyed by its text,

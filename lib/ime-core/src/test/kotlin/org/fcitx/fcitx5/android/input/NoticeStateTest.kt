@@ -33,6 +33,18 @@ class NoticeStateTest {
         },
     )
 
+    // a table's words offered: a word tapped as it goes is not taken
+    @Test
+    fun anOffersWordTakesATapOnlyWhileItIsShown() = assertRows(
+        "shown, no time of its own, typing puts it away" to {
+            val s = NoticeState<String>()
+            assertEquals(NoticeState.STAYS, s.show(null, steady = false, ms = NoticeState.STAYS).ms)
+            assertTrue(s.choose())
+            assertTrue(s.typed())
+        },
+        "going" to { assertFalse(NoticeState<String>().apply { show(null, steady = false) }.apply { dismiss() }.choose()) },
+    )
+
     @Test
     fun whetherTypingPutsItAway() = assertRows(
         "what was done goes" to { assertTrue(NoticeState<String>().apply { show(null, steady = false) }.typed()) },

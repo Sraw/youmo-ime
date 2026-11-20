@@ -84,6 +84,7 @@ object LayoutCheck {
         "row-when" to "0.6.1",
         // not read but checked: a board lacking keys ([check] gives it only where `lacks` or `blank` is told)
         "lacks" to "0.6.3",
+        "table-lookup" to "0.6.3",
     )
 
     /** Every [Finding] key: the app's strings and the page's table must word each (LayoutCheckTest enforces it). */
@@ -216,6 +217,15 @@ object LayoutCheck {
         // a key id twice where one copy is conditional only by its row's when= (the old app took it for the same key twice)
         val ids = layout.parts.filterIsInstance<Row>().flatMap { r -> r.cells.filter { c -> c.id != null } }.groupBy { it.id }
         if (ids.values.any { cells -> cells.size > 1 && cells.any { it.condition == null } }) add("row-when")
+        // an older app fails the whole board on a flag it does not know
+        if (conditions(layout).any { c -> c.anyOf.any { g -> g.any { it.name == "table-lookup" } } }) add("table-lookup")
+    }
+
+    private fun conditions(layout: Layout): List<Condition> = layout.parts.flatMap { p ->
+        when (p) {
+            is Include -> listOfNotNull(p.condition)
+            is Row -> listOfNotNull(p.condition) + p.cells.flatMap { c -> listOfNotNull(c.condition) + (c as? Key)?.variants.orEmpty().map { it.condition } }
+        }
     }
 
     private fun rowsOf(c: Cell, row: Row, layout: Layout): Int = when (c) {
@@ -592,7 +602,7 @@ object LayoutCheck {
             )
             "table" -> listOf(
                 "table" to Input(ime = "table", table = "wbx", roots = true),
-                "table(star)" to Input(ime = "table", table = "cangjie", tableExtra = "star"),
+                "table(star)" to Input(ime = "table", table = "cangjie", tableExtra = "star", tableLookUp = true),
             )
             else -> listOf(im to Input(ime = im))
         }

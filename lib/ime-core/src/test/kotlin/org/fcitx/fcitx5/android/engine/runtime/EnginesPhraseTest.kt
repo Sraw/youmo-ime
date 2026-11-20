@@ -86,12 +86,14 @@ class EnginesPhraseTest {
     private fun Engines.inWubi(): Boolean {
         onEvent(wubiIm, EngineEvent.RESET, 0)
         context(wubiIm, "")
-        return PHRASE in type(wubiIm, TABLE_CODE.dropLast(1)).candidates.also { onEvent(wubiIm, EngineEvent.RESET, 0) }
+        // shown, not committed: the one word under its code commits itself as typed
+        settings = wubiShown
+        return PHRASE in type(wubiIm, TABLE_CODE).candidates.also { onEvent(wubiIm, EngineEvent.RESET, 0) }
     }
 
     // where the user has the phrase's text as a word: their lists (added by hand, learned), imported, a table's saved
     private fun Engines.words(): Set<String> = buildSet {
-        userWords().filter { it.text == PHRASE }.forEach { add(it.kind.name) }
+        userWords().filter { it.text == PHRASE && it.table.isEmpty() }.forEach { add(it.kind.name) }
         if (importedWords().any { it.text == PHRASE }) add("imported")
         if (inWubi()) add("table")
     }

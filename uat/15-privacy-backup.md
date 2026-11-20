@@ -143,6 +143,13 @@
 - **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「带来」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。第二遍（记录里只有这段时间的字）同样清掉：「他 dl」第一个是「带来」，提示「已清掉」；强行停止后再打仍是「带来」（文件里也没了，不是只从内存里拿掉）。
 - **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是带来、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）、ime-core `LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt`（记录里只有清掉的这段时：清掉后内存里没有，重读文件也没有，之后接着记、重读得到）；设备上不跑。
 
+### PR-72 [P1] 清掉最近：这段时间里码表记住的词一起删掉，之前的留下
+<!-- learning: U-88 U-28 -->
+- **前提**：B0-五笔。照 TBL-11 记住「汪小明」；等 30 分钟以上（或在 JVM 里拨钟），再逐字打「鲸」「园」（q g y i 选「鲸」、l f q v）停一下，点提示条记住「鲸园」。
+- **操作**：**⋯ → 清掉最近 → 最近 10 分钟**，确认；点 q g l f、i i j e 看候选。再在密码框里逐字打几个字停一下。
+- **预期**：qglf 里没有「鲸园」（这段时间记住的删了），iije 里还有「汪小明」。密码框里不给出。备份带着记住的词，恢复后回来。
+- **JVM**：ime-core `ClearRecentTableWordsTest.theWordsATableRememberedMeanwhileGoAndOlderOnesStay`（清掉最近 10 分钟后只剩之前记住的，重放记录也一样，之后做的备份恢复到别的手机也一样）、`TableWordLearningTest`（不记录的输入框不给）、`BackupMergeTest`（`TableWordRow` 合并取较早的日子）；设备上不跑。
+
 ## 备份与恢复（学到的）
 
 ### PR-49 [P1] 备份只带用过两次及以上的整句

@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -201,6 +202,26 @@ class BarThemeTest {
         val capsules = SceneBar.of(ctx, ThemeManager.activeTheme)
         assertTrue(capsules !== first)
         assertEquals(0xFF00897B.toInt(), capsules.first.fill!!.value)
+    }
+
+    // 空格上屏联想词: the prediction space takes drawn as the first, past an emoji; none when space is a space
+    @Test
+    @Uat("PY-160")
+    fun theBarDrawsAsFirstTheOneItIsToldLeads() {
+        themes.styled(CAPSULES)
+        KeyboardHarness().use { h ->
+            h.start()
+            h.api.candidates = WORDS.map { CandidateWord("", it, "") }.toTypedArray()
+            fun leads(lead: Int): List<String> {
+                h.emit(HostEvent.Candidates(WORDS.size, h.api.candidates.toList(), predicting = true, lead = lead))
+                h.after(300)
+                h.relayout()
+                return items(bar(h)).filter { runs(text(it)).last().second == WHITE }.map { text(it).text.toString().substringAfter(' ') }
+            }
+            assertEquals(listOf(WORDS[1]), leads(1))
+            assertEquals(emptyList<String>(), leads(-1))
+            assertEquals(listOf(WORDS[0]), leads(0))
+        }
     }
 
     @Test

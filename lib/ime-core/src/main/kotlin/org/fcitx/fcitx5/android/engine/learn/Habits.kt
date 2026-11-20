@@ -103,6 +103,12 @@ interface Habits {
     /** 恢复码表顺序: forgets table [im]'s learned order (uses, firsts); not its pins or blocks. */
     fun resetTableOrder(im: String)
 
+    /** Whether [text] has an order learned under [code]: uses, or a first there. */
+    fun knowsUnder(code: Code, text: String): Boolean = false
+
+    /** Forgets [text]'s order learned under [code] alone ([knowsUnder]); the same text elsewhere keeps its own. */
+    fun forgetUnder(code: Code, text: String) = Unit
+
     object OFF : Habits {
         override val learns get() = false
         override val today get() = 0
@@ -172,6 +178,17 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
 
     override fun resetTableOrder(im: String) = guarded(Unit) {
         log().event { minute, _ -> LearnRecord.TableOrderReset(minute, im) }
+        Unit
+    }
+
+    override fun knowsUnder(code: Code, text: String): Boolean {
+        val s = state
+        return s.statsOf(code).keys.any { it.text == text } ||
+            s.firsts.any { (key, f) -> key.code == code && (f.first?.text == text || f.set.any { it.text == text }) }
+    }
+
+    override fun forgetUnder(code: Code, text: String) = guarded(Unit) {
+        log().event { minute, _ -> LearnRecord.TableForget(minute, Kinds.tableOf(code.kind), code.keys, text) }
         Unit
     }
 

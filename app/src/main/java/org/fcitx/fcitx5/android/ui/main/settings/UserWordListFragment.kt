@@ -417,7 +417,7 @@ class UserWordListFragment : Fragment() {
         val held = rare.heldIn(word.text)
         val actions = buildList {
             if (held.isNotEmpty()) add(if (held.size == 1) R.string.rare_allow_one else R.string.rare_allow_these)
-            if (source.editable) add(R.string.edit)
+            if (source.canEdit(word)) add(R.string.edit)
             if (source == EnglishWords && word.neverCorrected) add(R.string.english_restore_correction)
             if (word.voiceAlways) add(R.string.voice_always_cancel)
             add(source.removeLabel)
@@ -503,6 +503,7 @@ class UserWordListFragment : Fragment() {
             imeOptions = EditorInfo.IME_ACTION_NEXT
         }
         val (pinyinLayout, pinyinField) = ctx.materialTextInput { hint = getString(R.string.word_pinyin) }
+        pinyinLayout.helperText = getString(R.string.word_table_code_hint)
         pinyinField.apply {
             isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
@@ -647,6 +648,9 @@ internal sealed class WordSource(
     abstract suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long
 
     abstract fun detail(res: Resources, word: UserWord): String
+
+    // a table's word is under the code its rules give it: nothing to edit
+    fun canEdit(word: UserWord) = editable && word.table.isEmpty()
 }
 
 /** A blocked one is unblocked, not edited. */
@@ -680,7 +684,9 @@ internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
         if (kind == UserWord.Kind.BLOCKED) fcitx.blockUserWord(text, pinyin) else fcitx.addUserWord(text, pinyin)
 
     override fun detail(res: Resources, word: UserWord): String {
-        val said = if (word.kind == UserWord.Kind.LEARNED) {
+        val said = if (word.table.isNotEmpty()) {
+            res.getString(R.string.word_table_detail, InputMethodNames.of(res, word.table, word.table), word.pinyin)
+        } else if (word.kind == UserWord.Kind.LEARNED) {
             val times = word.count.roundToInt().coerceAtLeast(1)
             res.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
         } else if (word.kind == UserWord.Kind.BLOCKED && word.pinyin.isEmpty()) {

@@ -17,6 +17,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
@@ -43,6 +44,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineBridge
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.InputFeedbacks
@@ -55,6 +57,7 @@ import org.fcitx.fcitx5.android.engine.reading.CandidateCard
 import org.fcitx.fcitx5.android.engine.reading.CharCard
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.reading.WordCard
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
@@ -102,6 +105,7 @@ abstract class BaseInputView(
                     candidateActionMenu?.dismiss()
                 }
                 typed(it)
+                words(it)
                 handleFcitxEvent(it)
             }
         }
@@ -123,6 +127,7 @@ abstract class BaseInputView(
     protected fun dismissPopups() {
         candidateActionMenu?.dismiss()
         undoChip?.dismiss()
+        dropOffer()
     }
 
     private fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String) {
@@ -205,13 +210,89 @@ abstract class BaseInputView(
 
     private val learningMenu by lazy { CandidateLearningMenu(themedContext, fcitx, service.lifecycleScope, ::chip) }
 
-    private fun notice(message: String, undo: UndoChip.Undo?, aboveKeys: Boolean, steady: Boolean = false, ms: Long? = null): Boolean {
+    private fun notice(
+        message: String,
+        undo: UndoChip.Undo?,
+        aboveKeys: Boolean,
+        steady: Boolean = false,
+        ms: Long? = null,
+        choices: List<UndoChip.Choice> = emptyList(),
+    ): Boolean {
         // one line per notice, never its text (it may hold a typed word): UAT counts these to catch a notice
         // said twice, which crossfades in the same chip and looks like one
         Timber.i("say")
         chipTyping.chipShown()
+        // another notice: a word offer waiting is not shown over it
+        removeCallbacks(offerDue)
+        offerGate.noticed()
+        offerShown = choices.isNotEmpty()
         val chip = undoChip ?: UndoChip(undoAnchor, theme, ::undoPlace).also { undoChip = it }
-        return chip.show(message, undo, aboveKeys, steady, ms)
+        return chip.show(message, undo, aboveKeys, steady, ms, choices)
+    }
+
+    /** Whether the letters are up: a word offer is for them, not over symbols or emoji. */
+    protected open val lettersShown: Boolean get() = false
+
+    /** The keyboard showed another window or layout: an offer up stays only over the letters. */
+    protected fun keysChanged() {
+        if (lettersShown) return
+        if (offerShown) undoChip?.dismiss(animated = true)
+        dropOffer()
+    }
+
+    private val offerGate = WordOfferGate()
+
+    private val offerDue = Runnable { showOffer() }
+
+    // the notice shown is a word offer
+    private var offerShown = false
+
+    private fun words(event: HostEvent) {
+        when (event) {
+            is HostEvent.WordOffer -> {
+                removeCallbacks(offerDue)
+                // withdrawn: the field changed, or the run ended
+                if (event.offer == null && offerShown) undoChip?.dismiss(animated = true)
+                if (offerGate.offered(event.offer)) postDelayed(offerDue, WordOfferGate.PAUSE_MS)
+            }
+            is HostEvent.WordRemembered -> {
+                val (text, code) = event.word
+                val message = context.getString(R.string.word_remembered, text, imName(), code)
+                say(message, UndoChip.Undo({ fcitx.runIfReady { unrememberWord(text, code) } }))
+            }
+            else -> {}
+        }
+    }
+
+    private fun imName() = InputMethodNames.of(context, fcitx.runImmediately { inputMethodEntryCached })
+
+    private fun showOffer() {
+        val exploring = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+        val offer = offerGate.due(noticeShown = undoChip?.showing == true, touchExploring = exploring, letters = lettersShown) {
+            service.currentInputConnection?.getTextBeforeCursor(Action.Context.HOST_CHARS, 0)
+        } ?: return
+        val im = imName()
+        val choices = offer.words.map { (i, w) ->
+            val said = context.getString(R.string.word_offer_said, w.text, im, w.code.toList().joinToString(" "))
+            UndoChip.Choice("${w.text} ${w.code}", said) { remember(offer.id, i) }
+        }
+        if (notice(context.getString(R.string.word_offer), null, aboveKeys = true, ms = NoticeState.STAYS, choices = choices)) {
+            fcitx.runIfReady { offerShown(offer.id) }
+        }
+    }
+
+    // the field's text as tapped: the session checks the run is still what ends it
+    private fun remember(id: Int, index: Int) {
+        offerShown = false
+        val before = service.currentInputConnection?.getTextBeforeCursor(Action.Context.HOST_CHARS, 0)?.toString() ?: return
+        fcitx.runIfReady { rememberWord(id, index, before) }
+    }
+
+    private fun dropOffer() {
+        removeCallbacks(offerDue)
+        offerGate.released()
+        offerGate.noticed()
+        offerShown = false
     }
 
     private fun chip(message: String, token: Long) {
@@ -538,6 +619,7 @@ abstract class BaseInputView(
         if (ev.actionMasked == MotionEvent.ACTION_DOWN || ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             downYs.put(ev.getPointerId(ev.actionIndex), ev.getY(ev.actionIndex))
         }
+        offerTouched(ev.actionMasked)
         hold?.touched(ev)
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             swallowing = candidateActionMenu != null || ev.downTime <= candidateActionMenuClosed
@@ -550,11 +632,27 @@ abstract class BaseInputView(
         return true
     }
 
+    // a word offer waits for the keys to be let go of: timed from the last finger up
+    private fun offerTouched(action: Int) {
+        val timeFrom = when (action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                removeCallbacks(offerDue)
+                offerGate.down()
+                false
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> offerGate.up()
+            MotionEvent.ACTION_CANCEL -> offerGate.released()
+            else -> false
+        }
+        if (timeFrom) postDelayed(offerDue, WordOfferGate.PAUSE_MS)
+    }
+
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         if (visibility != VISIBLE) {
             candidateActionMenu?.dismiss()
             undoChip?.dismiss()
+            dropOffer()
         }
     }
 

@@ -220,7 +220,13 @@ class LearnLog(
         return absorbed(minute, rows.subList(half, rows.size)) && first
     }
 
-    /** Removes phrases a table saved, stamped now: forgotten in a table, or everywhere. */
+    /** A word [im]'s table remembers under [code], from today. */
+    fun rememberTableWord(im: String, code: String, text: String) {
+        val stamp = LearnClock.stamp(clock, state, commit = false)
+        write(Absorbed(stamp.minute, listOf(LearnRecord.TableWordRow(im, code, text, stamp.day)), emptyList()))
+    }
+
+    /** Removes words a table remembered, stamped now. */
     fun dropTableWords(rows: List<LearnRecord.TableWordRow>) {
         if (rows.isEmpty()) return
         val stamp = LearnClock.stamp(clock, state, commit = false)

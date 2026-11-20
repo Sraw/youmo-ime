@@ -48,8 +48,9 @@ class PackSeparatorTest {
     @Test
     fun theFileOf060BecomesTheAppsOwnTwoPlacesChanged() {
         val out = done(v060)
-        // read, it is the app's qwerty of now (its comment aside, which the app's has longer)
-        assertEquals(LayoutWriter.write(Fixtures.qwerty), LayoutWriter.write(LayoutReader.layout(out).ok()))
+        // read as a pack's is (KeyData), its keys show where the app's qwerty's of now do: 五笔's ⇧ too, not a 拼 doing nothing
+        fun whens(l: Layout) = l.parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>().map { it.id to it.condition?.toString() }
+        assertEquals(whens(Fixtures.qwerty), whens(KeyData.of("qwerty", LayoutReader.layout(out).ok(), emptyMap(), KeyData.Mode.Pack).layout))
         val separator = "<key id=\"apostrophe\" role=\"apostrophe\" kind=\"function\" width=\"1.5\" label=\"分词\" text-size=\"16\" " +
             "a11y=\"a11y_key_separator\" send=\"'\" shortcut=\"separator\" when=\"composing !table\"/>"
         val expected = v060.replace(shift060, shift060.replace("when=\"!table\"", "when=\"!table !composing\"") + "\n    " + separator)

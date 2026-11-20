@@ -154,7 +154,7 @@ class HandwritingSession(
         Action.Refine -> refine()
         is Action.Forget -> pressed(action.index, Offer.FORGET)
         is Action.Block -> pressed(action.index, Offer.BLOCK)
-        is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp,
+        is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown,
         Action.DropPredictions -> snapshot()
     }
 

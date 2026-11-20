@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.runtime.KeyboardPair
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
+import org.fcitx.fcitx5.android.engine.session.WordOffer
 
 /**
  * The native `androidengine` addon ported (tag `native-last`): keys to [EngineEvent]s, snapshots shown,
@@ -225,8 +226,18 @@ class KeyRouter(
         if (s.refines) refineLater(ic, im, if (event == EngineEvent.REFINE) 0 else Refiner.PAUSE_MILLIS)
         // a refine slice that changed nothing leaves the panel as it is, the list scrolled
         if ((event != EngineEvent.REFINE && event != EngineEvent.CURSOR) || s.handled) show(ic, im, s)
+        // after the commit shown: the app puts its notices away as text goes in
+        // told only as it changes: a refine slice keeps it
+        if (event != EngineEvent.REFINE && s.wordOffer != offered) {
+            offered = s.wordOffer
+            services.wordOffer(ic, s.wordOffer)
+        }
+        s.remembered?.let { services.wordRemembered(ic, it) }
         return s.handled
     }
+
+    // the table's word offer last told
+    private var offered: WordOffer? = null
 
     private fun keep(key: Typed, s: Snapshot) {
         val log = typed
@@ -454,7 +465,12 @@ class KeyRouter(
         override fun label(index: Int) = labels.getOrElse(index) { "" }
         override fun candidate(index: Int): PanelCandidate? = if (index in 0 until size) words[index] else null
 
-        override val cursorIndex get() = if (composing) 0 else -1
+        override val cursorIndex get() = if (composing) 0 else if (spaceMarks) spacePicks else -1
+
+        private val spaceMarks = s.spaceMarks
+        private val spacePicks = s.spacePicks
+
+        override val lead get() = if (spaceMarks) spacePicks else 0
 
         override val bulk get() = true
         override val totalSize get() = total

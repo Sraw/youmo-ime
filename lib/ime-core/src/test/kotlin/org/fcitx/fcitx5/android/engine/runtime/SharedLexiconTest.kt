@@ -78,27 +78,29 @@ class SharedLexiconTest {
     }
 
     @Test
-    fun forgottenInATableAPhraseIsForgottenByPinyinTooAndTakenOutOfPinyinItIsNotBack() {
+    fun deletedInATableAWordStaysPinyinsAndTakenOutOfPinyinItStaysTheTables() {
         val dir = MemoryFiles()
         olderPhrases(dir, "vbwq" to "好你", "wqvb" to "你好", own = mapOf("好你" to "hao ni", "你好" to "ni hao"))
+        fun Engines.pinyins(text: String) = userWords().filter { it.text == text && it.table.isEmpty() }
         Engines(::load, dir).use { engines ->
-            assertEquals(listOf("好你"), engines.type("engine-wubi", "vbw").candidates)
-            engines.onEvent("engine-wubi", EngineEvent.FORGET, 0)
+            engines.settings = wubiShown
+            val at = engines.type("engine-wubi", "vbwq").candidates.indexOf("好你")
+            assertTrue(Offer.FORGET in engines.offers("engine-wubi", at))
+            engines.onEvent("engine-wubi", EngineEvent.FORGET, at)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            assertTrue(engines.userWords().none { it.text == "好你" })
-            assertFalse("好你" in engines.type("engine-wubi", "vbw").candidates)
+            // the table's row gone, pinyin's word kept, and blocked under this code so it shows here no more
+            assertEquals(1, engines.pinyins("好你").size)
+            assertTrue(engines.userWords().none { it.text == "好你" && it.table.isNotEmpty() })
+            assertFalse("好你" in engines.type("engine-wubi", "vbwq").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            // taken out of pinyin's words in the settings: out of the table too
-            assertEquals(listOf("你好"), engines.type("engine-wubi", "wqv").candidates)
-            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            engines.removeWords(engines.userWords().filter { it.text == "你好" })
+            // taken out of pinyin's words in the settings: the table's stays
+            engines.removeWords(engines.pinyins("你好"))
         }
         Engines(::load, dir).use { engines ->
-            for ((code, text) in listOf("vbw" to "好你", "wqv" to "你好")) {
-                assertFalse(text, text in engines.type("engine-wubi", code).candidates)
-                engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-                assertTrue(engines.userWords().none { it.text == text })
-            }
+            engines.settings = wubiShown
+            assertTrue("你好" in engines.type("engine-wubi", "wqvb").candidates)
+            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
+            assertTrue(engines.pinyins("你好").isEmpty())
         }
     }
 
@@ -222,33 +224,24 @@ class SharedLexiconTest {
         }
     }
 
-    // what the real SharedWords.learned lets a table offer to forget
+    // pinyin's word shown in a table is deleted in pinyin: the table offers to block it, never to delete it
     @Test
-    fun aSharedWordIsForgettableInATableOnlyOnceTypedOrMade() {
+    fun aSharedWordIsNeverForgottenInATable() {
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         Engines(knownToPinyin(another = true), MemoryFiles(), warmUps = { it.run() }, additions = { additions }).use { engines ->
-            fun forgettable(code: String = "wqvb", text: String = "你好"): Boolean {
-                val i = engines.type("engine-wubi", code).candidates.indexOf(text)
+            fun offers(): Set<Offer> {
+                val i = engines.type("engine-wubi", "wqvb").candidates.indexOf("你好")
                 assertTrue(i >= 0)
-                val offered = Offer.FORGET in engines.offers("engine-wubi", i)
-                engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-                return offered
+                return engines.offers("engine-wubi", i).also { engines.onEvent("engine-wubi", EngineEvent.RESET, 0) }
             }
-            assertFalse(forgettable())
+            assertFalse(Offer.FORGET in offers())
             engines.type(InputMethodCatalog.PINYIN, "nihao")
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, engines.candidates(InputMethodCatalog.PINYIN, 0, 9).indexOfFirst { it.text == "你好" })
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
-            assertTrue(forgettable())
-            val i = engines.type("engine-wubi", "wqvb").candidates.indexOf("你好")
-            engines.onEvent("engine-wubi", EngineEvent.FORGET, i)
-            engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            assertFalse(forgettable())
-            // added by hand, never typed: as pinyin offers it (something learned to forget)
-            assertTrue(engines.addWord("好你", "hao ni"))
-            val inPinyin = engines.type(InputMethodCatalog.PINYIN, "haoni").candidates.indexOf("好你").also { assertTrue(it >= 0) }
-                .let { Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, it) }
-            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
-            assertEquals(inPinyin, forgettable("vbw", "好你"))
+            // typed in pinyin, learned there: still nothing to delete in 五笔, blocking under its code is
+            val now = offers()
+            assertFalse(Offer.FORGET in now)
+            assertTrue(Offer.BLOCK in now)
         }
     }
 }

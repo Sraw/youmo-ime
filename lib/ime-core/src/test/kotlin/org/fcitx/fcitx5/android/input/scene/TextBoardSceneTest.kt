@@ -55,12 +55,18 @@ class TextBoardSceneTest {
 
     @Test
     fun aTablesKeys() {
-        val looking = keys(TextBoardState(table = true, lookingUp = true, tableExtra = '*'))
+        val looking = keys(TextBoardState(table = true, tableLookUp = true, lookingUp = true, tableExtra = '*'))
         assertTrue("lookup-on" in looking && "star" in looking)
         assertFalse("shift" in looking || "lookup" in looking)
-        val typing = keys(TextBoardState(table = true, composing = true, tableExtra = ';'))
+        val typing = keys(TextBoardState(table = true, tableLookUp = true, composing = true, tableExtra = ';'))
         assertTrue("lookup" in typing && "confirm" in typing && "semicolon" in typing)
         assertFalse("enter" in typing)
+        // 五笔, 五笔拼音: no 拼 key, ⇧ kept while a code is typed too
+        val wubi = keys(TextBoardState(table = true, composing = true))
+        assertTrue("shift" in wubi && "confirm" in wubi)
+        assertFalse("lookup" in wubi || "lookup-on" in wubi)
+        // the flag means nothing off a table
+        assertFalse(TextBoardState(tableLookUp = true).input().tableLookUp)
         // composing elsewhere keeps Return
         assertTrue("enter" in keys(TextBoardState(composing = true)))
         // and is no other environment (English's word): the keyboard keeps the scene it had (TextKeyboard.scene)

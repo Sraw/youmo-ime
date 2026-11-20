@@ -5,13 +5,18 @@
 package org.fcitx.fcitx5.android.scene.layout
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures
 import org.fcitx.fcitx5.android.scene.Forms
+import org.fcitx.fcitx5.android.scene.engine.Expand
+import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -360,5 +365,40 @@ class KeyDataTest {
     fun aGroupKeysCornerWrittenOnlyAsTheCornerIsNotTold() {
         val r = pack("k18", k17.replace("swipe-up=\"keypad:1\"", "swipe-up=\"sym:1\""), Forms.fragments.filterKeys { it == "grouped-bottom" })
         assertEquals(listOf("swipe-up"), r.ignored.map { it.what })
+    }
+
+    // a pack written without `table-lookup` puts 拼 on every table: 五笔 must keep ⇧, not get a 拼 that does nothing
+    @Test
+    fun anOlderPacksLookUpKeyShowsWhereTheAppsDoes() {
+        val text = LayoutWriter.write(Forms.layout("qwerty"))
+            .replace("!table !composing, table !table-lookup", "!table !composing")
+            .replace("table table-lookup ", "table ")
+        check("table-lookup" !in text)
+        val l = pack("qwerty", text).layout
+        fun shown(input: Input) = Expand.rows(l, emptyMap(), Fixtures.portrait.copy(input = input)).ok().flatMap { it.items }
+            .mapNotNull { (it as? ExpandedKey)?.key?.id }.filter { it in setOf("shift", "apostrophe", "lookup", "lookup-on") }
+        val rows = listOf(
+            Triple("五笔: z looks up, ⇧ stays", Input(ime = "table", table = "wbx"), listOf("shift")),
+            Triple("五笔 typing: still ⇧", Input(ime = "table", table = "wbx", composing = true), listOf("shift")),
+            Triple("仓颉: 拼 in ⇧'s place", Input(ime = "table", table = "cj", tableLookUp = true), listOf("lookup")),
+            Triple("仓颉 looking up: 拼 on", Input(ime = "table", table = "cj", tableLookUp = true, lookingUp = true), listOf("lookup-on")),
+            Triple("pinyin: ⇧", Input(), listOf("shift")),
+            Triple("pinyin typing: 分词", Input(composing = true), listOf("apostrophe")),
+        )
+        assertRows(rows, { it.first }) { (why, input, keys) -> assertEquals(keys, shown(input), why) }
+    }
+
+    // a pack's 拼 may come from an include whose own defaults name it: its Shift still gives way on the tables with one
+    @Test
+    fun aLookUpKeyNamedByItsFragmentsDefaultsIsFound() {
+        val text = LayoutWriter.write(Forms.layout("qwerty"))
+            .replace("!table !composing, table !table-lookup", "!table !composing")
+            .lines().filterNot { "U+F0104" in it || "id=\"lookup" in it }.joinToString("\n")
+        val fragment = LayoutReader.fragment(
+            "<fragment xmlns=\"https://youmo-ime/layout/1\" id=\"mine\"><defaults role=\"lookup\"/>" +
+                "<row><key id=\"pin\" label=\"拼\" when=\"table\"/></row></fragment>",
+        ).ok()
+        val shift = keys(pack("qwerty", text, mapOf("mine" to fragment)).layout).getValue("shift")
+        assertEquals("!table !composing, table !table-lookup", shift.condition.toString())
     }
 }
